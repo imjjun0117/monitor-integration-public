@@ -6,7 +6,7 @@ test('verify.ps1 is fail-closed across runtimes, contracts, generation, security
   const source = readFileSync('scripts/verify.ps1', 'utf8');
   for (const gate of [
     'HERMES_JAVA7_HOME', 'HERMES_JAVA8_HOME', 'clean', 'verify',
-    'VerifyAgentJar.java', 'AgentCompatibilityProbe', 'tests/*.test.mjs',
+    'VerifyCollectorJar.java', 'CollectorCompatibilityProbe', 'tests/*.test.mjs',
     'validate:openapi', 'generate:api:check', 'license:check',
     'dependency-vulnerability-gate.ps1', 'scan-secrets.mjs', 'test:e2e',
   ]) {

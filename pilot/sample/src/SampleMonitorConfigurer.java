@@ -1,11 +1,11 @@
 package sample.monitoring;
 
-import com.hermes.monitoring.agent.DeclarativeCheckLoader;
-import com.hermes.monitoring.agent.EnvironmentSecretProvider;
-import com.hermes.monitoring.agent.MonitorAgentBuilder;
-import com.hermes.monitoring.agent.MonitorAgentConfigurer;
-import com.hermes.monitoring.agent.MonitorCheck;
-import com.hermes.monitoring.agent.SecretProvider;
+import com.monitoring.collector.DeclarativeCheckLoader;
+import com.monitoring.collector.EnvironmentSecretProvider;
+import com.monitoring.collector.MonitorCollectorBuilder;
+import com.monitoring.collector.MonitorCollectorConfigurer;
+import com.monitoring.collector.MonitorCheck;
+import com.monitoring.collector.SecretProvider;
 import java.io.File;
 import java.io.InputStream;
 import java.util.Enumeration;
@@ -15,12 +15,12 @@ import java.util.Locale;
 import java.util.Map;
 import javax.servlet.ServletContext;
 
-public final class SampleMonitorConfigurer implements MonitorAgentConfigurer {
+public final class SampleMonitorConfigurer implements MonitorCollectorConfigurer {
     private static final String DEFAULT_CHECK_RESOURCE = "/WEB-INF/monitor-checks.json";
 
     public SampleMonitorConfigurer() { }
 
-    public void configure(MonitorAgentBuilder builder, final ServletContext context)
+    public void configure(MonitorCollectorBuilder builder, final ServletContext context)
             throws Exception {
         builder.identity(value(context, "monitor.project-id", "sample"),
                 value(context, "monitor.instance-id", "local-01"))

@@ -1,12 +1,12 @@
 # Java 애플리케이션에 모니터링 SDK 적용하기
 
-이 문서는 `monitor-agent.jar`를 기존 Java 웹 애플리케이션의 라이브러리로 등록하고, 개발자가 기존 Service·Controller·JSP 구조에 맞춰 모니터링 API를 작성하는 방법을 설명합니다.
+이 문서는 `collector.jar`를 기존 Java 웹 애플리케이션의 라이브러리로 등록하고, 개발자가 기존 Service·Controller·JSP 구조에 맞춰 모니터링 API를 작성하는 방법을 설명합니다.
 
-- SDK 공개 패키지: `com.hermes.monitoring.agent`
+- SDK 공개 패키지: `com.monitoring.collector`
 - Java bytecode: Java 7 호환
-- 권장 운영 폴링 주기: 중앙 서버에서 인스턴스별 60초
+- 권장 운영 폴링 주기: Agent 서버에서 인스턴스별 60초
 - SDK가 URL이나 Controller를 자동 생성하지 않음
-- `com.hermes.monitoring.agent.servlet.MonitorServlet` adapter는 선택 기능
+- `com.monitoring.collector.servlet.MonitorServlet` adapter는 선택 기능
 
 ## 1. SDK 설치
 
@@ -16,20 +16,20 @@
 
 ```xml
 <dependency>
-    <groupId>com.hermes.monitoring</groupId>
-    <artifactId>monitor-agent</artifactId>
+    <groupId>com.monitoring</groupId>
+    <artifactId>collector</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
 
-Maven 좌표는 기존 빌드 호환성을 위해 유지하지만 Java import는 `com.hermes.monitoring.agent`을 사용합니다.
+Maven 좌표는 기존 빌드 호환성을 위해 유지하지만 Java import는 `com.monitoring.collector`을 사용합니다.
 
 ### 로컬 JAR를 사용하는 레거시 WAR
 
 검증된 JAR를 다음 위치에 복사합니다.
 
 ```text
-WEB-INF/lib/monitor-agent-0.1.0-SNAPSHOT.jar
+WEB-INF/lib/collector-0.1.0-SNAPSHOT.jar
 ```
 
 운영 서버에서 JAR를 직접 빌드하지 말고 CI 또는 검증된 빌드 환경의 SHA-256 확인 산출물을 사용합니다. JAR를 넣는 것만으로 endpoint가 자동 생성되지는 않습니다. 개발자가 기존 Spring Controller나 자체 Servlet에서 SDK를 호출합니다.
@@ -41,10 +41,10 @@ WEB-INF/lib/monitor-agent-0.1.0-SNAPSHOT.jar
 ```java
 package sample.monitoring;
 
-import com.hermes.monitoring.agent.DbPoolMetricsProvider;
-import com.hermes.monitoring.agent.MonitorAgentBuilder;
-import com.hermes.monitoring.agent.MonitorCheck;
-import com.hermes.monitoring.agent.MonitorRuntime;
+import com.monitoring.collector.DbPoolMetricsProvider;
+import com.monitoring.collector.MonitorCollectorBuilder;
+import com.monitoring.collector.MonitorCheck;
+import com.monitoring.collector.MonitorRuntime;
 import java.io.File;
 
 public final class MonitorService {
@@ -53,7 +53,7 @@ public final class MonitorService {
     public MonitorService(String token,
                           DbPoolMetricsProvider poolProvider,
                           MonitorCheck projectCheck) {
-        MonitorAgentBuilder builder = new MonitorAgentBuilder()
+        MonitorCollectorBuilder builder = new MonitorCollectorBuilder()
             .identity("sample", "prod-01")
             .token(token)
             .disk("data", "/data", new File("/data"));
@@ -89,7 +89,7 @@ Spring bean으로 등록한다면 기본 singleton scope를 사용하고 기존 
 
 ## 3. Spring MVC Controller 작성
 
-중앙 서버는 등록한 base URL 뒤에 `/monitor/v1/`과 endpoint를 붙입니다. 기존 애플리케이션의 context path가 `/`이면 다음 네 경로를 구현합니다.
+Agent 서버는 등록한 base URL 뒤에 `/monitor/v1/`과 endpoint를 붙입니다. 기존 애플리케이션의 context path가 `/`이면 다음 네 경로를 구현합니다.
 
 - `GET /monitor/v1/info`
 - `GET /monitor/v1/snapshot`
@@ -98,12 +98,12 @@ Spring bean으로 등록한다면 기본 singleton scope를 사용하고 기존 
 
 ### 인증과 요청 크기 제한은 Controller보다 먼저 실행
 
-`@RequestBody`는 Controller 메서드에 들어오기 전에 역직렬화됩니다. 따라서 중앙 수집 경로의 인증과 요청 크기 제한은 기존 보안 Filter chain에서 `DispatcherServlet`보다 먼저 처리해야 합니다. 아래 예시는 핵심 동작만 보여 줍니다. 프로젝트의 기존 Filter 등록 방식으로 `/monitor/v1/*`에만 연결합니다.
+`@RequestBody`는 Controller 메서드에 들어오기 전에 역직렬화됩니다. 따라서 Agent 수집 경로의 인증과 요청 크기 제한은 기존 보안 Filter chain에서 `DispatcherServlet`보다 먼저 처리해야 합니다. 아래 예시는 핵심 동작만 보여 줍니다. 프로젝트의 기존 Filter 등록 방식으로 `/monitor/v1/*`에만 연결합니다.
 
 ```java
 package ipm.web.monitoring;
 
-import com.hermes.monitoring.agent.MonitorRuntime;
+import com.monitoring.collector.MonitorRuntime;
 import java.io.IOException;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -162,7 +162,7 @@ public final class MonitorSecurityFilter implements Filter {
 }
 ```
 
-`Content-Length`가 없는 chunked 요청도 우회하지 못하도록 Tomcat·앞단 reverse proxy에서 `/monitor/v1/checks/run` 요청 본문을 **16 KiB 이하로 강제**합니다. Filter만으로 이 제한을 대체하지 않습니다. 외부 또는 서버 간 통신은 평문 HTTP가 아니라 인증서 검증이 적용된 **HTTPS**를 사용합니다. 가능한 경우 mTLS나 인증된 사설 터널을 사용하고 중앙 서버 IP만 방화벽에서 허용합니다.
+`Content-Length`가 없는 chunked 요청도 우회하지 못하도록 Tomcat·앞단 reverse proxy에서 `/monitor/v1/checks/run` 요청 본문을 **16 KiB 이하로 강제**합니다. Filter만으로 이 제한을 대체하지 않습니다. 외부 또는 서버 간 통신은 평문 HTTP가 아니라 인증서 검증이 적용된 **HTTPS**를 사용합니다. 가능한 경우 mTLS나 인증된 사설 터널을 사용하고 Agent 서버 IP만 방화벽에서 허용합니다.
 
 모든 endpoint는 다음 순서를 지킵니다.
 
@@ -206,7 +206,7 @@ package ipm.web.monitoring;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.hermes.monitoring.agent.MonitorRuntime;
+import com.monitoring.collector.MonitorRuntime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -335,7 +335,7 @@ public final class MonitorController {
     }
 
     private void validateRunRequest(CheckRunRequest request) {
-        if (request == null || !"monitor-center".equals(request.getRequestedBy())
+        if (request == null || !"agent".equals(request.getRequestedBy())
                 || request.getCheckIds() == null
                 || request.getCheckIds().isEmpty()
                 || request.getCheckIds().size() > 20) {
@@ -463,11 +463,11 @@ public final class MonitorErrorHandler {
 ```java
 package sample.monitoring;
 
-import com.hermes.monitoring.agent.CheckCategory;
-import com.hermes.monitoring.agent.CheckContext;
-import com.hermes.monitoring.agent.CheckDirection;
-import com.hermes.monitoring.agent.CheckResult;
-import com.hermes.monitoring.agent.MonitorCheck;
+import com.monitoring.collector.CheckCategory;
+import com.monitoring.collector.CheckContext;
+import com.monitoring.collector.CheckDirection;
+import com.monitoring.collector.CheckResult;
+import com.monitoring.collector.MonitorCheck;
 
 public final class SampleHealthCheck implements MonitorCheck {
     public String getId() {
@@ -520,8 +520,8 @@ public final class SampleHealthCheck implements MonitorCheck {
 ```java
 package sample.monitoring;
 
-import com.hermes.monitoring.agent.DbPoolMetrics;
-import com.hermes.monitoring.agent.DbPoolMetricsProvider;
+import com.monitoring.collector.DbPoolMetrics;
+import com.monitoring.collector.DbPoolMetricsProvider;
 import org.apache.commons.dbcp.BasicDataSource;
 
 public final class SampleDbPoolMetricsProvider
@@ -565,24 +565,24 @@ public String monitorView(Model model) {
 <p>수집 시각: ${snapshot.observed_at}</p>
 ```
 
-이 관리 화면은 기존 관리자 인증과 권한 검사를 통과한 사용자에게만 노출합니다. 중앙 수집용 token을 JSP, HTML, JavaScript에 출력하지 않습니다.
+이 관리 화면은 기존 관리자 인증과 권한 검사를 통과한 사용자에게만 노출합니다. Agent 수집용 token을 JSP, HTML, JavaScript에 출력하지 않습니다.
 
 ## 8. 60초 폴링 설정
 
-SDK 내부에는 scheduler를 만들지 않습니다. 중앙 Monitor Center의 인스턴스 설정에서 다음 값을 저장합니다.
+SDK 내부에는 scheduler를 만들지 않습니다. Agent Agent의 인스턴스 설정에서 다음 값을 저장합니다.
 
 ```text
 poll_interval_seconds = 60
 ```
 
-SDK는 호출받을 때만 데이터를 수집합니다. 60초 설정 변경에는 애플리케이션 재배포나 Tomcat 재시작이 필요하지 않습니다. 중앙의 stale/down 기준은 `max(폴링 주기 × 3, 60초)`이므로 60초 폴링에서는 180초입니다.
+SDK는 호출받을 때만 데이터를 수집합니다. 60초 설정 변경에는 애플리케이션 재배포나 Tomcat 재시작이 필요하지 않습니다. Agent의 stale/down 기준은 `max(폴링 주기 × 3, 60초)`이므로 60초 폴링에서는 180초입니다.
 
 ## 9. Servlet adapter는 선택 기능
 
 기존 Controller를 만들 수 없는 Servlet 2.5 프로젝트만 다음 adapter를 선택할 수 있습니다.
 
 ```text
-com.hermes.monitoring.agent.servlet.MonitorServlet
+com.monitoring.collector.servlet.MonitorServlet
 ```
 
 이 경우에만 `web.xml`에 Servlet과 `/monitor/v1/*` mapping을 추가합니다. Spring Controller나 프로젝트 전용 Servlet에서 SDK를 직접 호출한다면 공통 Servlet adapter 등록은 필요하지 않습니다.
@@ -592,14 +592,14 @@ com.hermes.monitoring.agent.servlet.MonitorServlet
 - JAR SHA-256 검증
 - 애플리케이션당 `MonitorRuntime` 한 개
 - token 32 UTF-8 bytes 이상, 외부 보안 설정에서 주입
-- 모든 중앙 수집 endpoint에서 `isAuthorized()` 선검사
+- 모든 Agent 수집 endpoint에서 `isAuthorized()` 선검사
 - 실패 시 SDK 미호출 및 HTTP 401
 - 성공·실패 모두 `Cache-Control: no-store`
 - 응답 `application/json; charset=UTF-8`
 - 네 JSON Schema 및 fixture 검증
 - 외부 API·배치·쓰기 점검 기본 비활성
-- 중앙 서버 IP만 방화벽 허용
-- 중앙 인스턴스 폴링 주기 60초
+- Agent 서버 IP만 방화벽 허용
+- Agent 인스턴스 폴링 주기 60초
 - 애플리케이션 종료 시 `runtime.shutdown()`
 - 기존 Controller/JSP/DB/Scouter regression 확인
 

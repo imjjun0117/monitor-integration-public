@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 
-const frontend = 'monitor-center/frontend/';
+const frontend = 'agent/frontend/';
 const pages = frontend + 'src/pages/';
 const sourceFiles = [
   frontend + 'src/App.tsx', frontend + 'src/api.ts',

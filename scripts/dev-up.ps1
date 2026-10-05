@@ -13,7 +13,7 @@ Set-Location $Root
 . (Join-Path $PSScriptRoot 'process-helpers.ps1')
 $Maven = if ($IsWindows) { Join-Path $Root 'mvnw.cmd' } else { Join-Path $Root 'mvnw' }
 $Npm = if ($IsWindows) { 'npm.cmd' } else { 'npm' }
-$BundledNodeDirectory = Join-Path $Root 'monitor-center/target/node'
+$BundledNodeDirectory = Join-Path $Root 'agent/target/node'
 if (Test-Path (Join-Path $BundledNodeDirectory $Npm)) {
     $env:PATH = $BundledNodeDirectory + [System.IO.Path]::PathSeparator + $env:PATH
     $Npm = Join-Path $BundledNodeDirectory $Npm
@@ -53,7 +53,7 @@ if (-not [string]::IsNullOrWhiteSpace($env:HERMES_AGENT_ALLOWLIST_FILE) -and
 
 $SamplesEnabled = $env:HERMES_SAMPLE_FIXTURES_ENABLED -eq 'true'
 if ($SamplesEnabled) {
-    $Services += @('agent-a1', 'agent-a2', 'agent-b1', 'agent-b2')
+    $Services += @('collector-a1', 'collector-a2', 'collector-b1', 'collector-b2')
 }
 
 function Get-ComposeRunningServices {
@@ -181,7 +181,7 @@ try {
         $env:SERVER_ADDRESS = $BackendAddress
         $Backend = Start-Process -PassThru @ProcessOptions `
             -FilePath $Maven `
-            -ArgumentList @('-pl', 'monitor-center', '-Dfrontend.skip=true', 'spring-boot:run') `
+            -ArgumentList @('-pl', 'agent', '-Dfrontend.skip=true', 'spring-boot:run') `
             -RedirectStandardOutput (Join-Path $RunDirectory 'backend.out') `
             -RedirectStandardError (Join-Path $RunDirectory 'backend.err')
     } finally {
@@ -191,7 +191,7 @@ try {
 
     $Frontend = Start-Process -PassThru @ProcessOptions `
         -FilePath $Npm `
-        -WorkingDirectory (Join-Path $Root 'monitor-center/frontend') `
+        -WorkingDirectory (Join-Path $Root 'agent/frontend') `
         -ArgumentList @('run', 'dev', '--', '--host', '127.0.0.1', '--port', [string]$FrontendPort) `
         -RedirectStandardOutput (Join-Path $RunDirectory 'frontend.out') `
         -RedirectStandardError (Join-Path $RunDirectory 'frontend.err')

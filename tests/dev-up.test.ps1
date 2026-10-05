@@ -45,7 +45,7 @@ function Stop-TestProcessTree([int]$Id) {
 function New-Fixture {
     $Root = Join-Path ([System.IO.Path]::GetTempPath()) ("hermes-dev-up-test-" + [guid]::NewGuid())
     New-Item -ItemType Directory -Force -Path (Join-Path $Root 'scripts') | Out-Null
-    New-Item -ItemType Directory -Force -Path (Join-Path $Root 'monitor-center/frontend') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $Root 'agent/frontend') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $Root 'bin') | Out-Null
     Copy-Item $DevUpSource (Join-Path $Root 'scripts/dev-up.ps1')
     Copy-Item $HelpersSource (Join-Path $Root 'scripts/process-helpers.ps1')
@@ -93,11 +93,11 @@ case " $* " in
     if [ -n "$HERMES_TEST_COMPOSE_RUNNING" ]; then
       printf '%s\n' $HERMES_TEST_COMPOSE_RUNNING
     elif [ -f "$state" ]; then
-      printf '%s\n' postgres agent-a1 agent-a2 agent-b1 agent-b2
+      printf '%s\n' postgres collector-a1 collector-a2 collector-b1 collector-b2
     fi
     ;;
   *" up -d "*)
-    printf '%s\n' postgres agent-a1 agent-a2 agent-b1 agent-b2 > "$state"
+    printf '%s\n' postgres collector-a1 collector-a2 collector-b1 collector-b2 > "$state"
     ;;
   *" stop "*) rm -f "$state" ;;
 esac
@@ -167,7 +167,7 @@ try {
     $Foreign = Start-Process -PassThru -FilePath python3 -ArgumentList @(
         (Join-Path $Fixture 'scripts/fake-server.py'), $BackendPort, 'frontend')
     Wait-Port $BackendPort $true
-    $env:HERMES_TEST_COMPOSE_RUNNING = 'postgres agent-a1 agent-a2 agent-b1 agent-b2'
+    $env:HERMES_TEST_COMPOSE_RUNNING = 'postgres collector-a1 collector-a2 collector-b1 collector-b2'
     $Failure = $null
     try { Invoke-FixtureDevUp $Fixture $BackendPort $FrontendPort } catch { $Failure = $_ }
     Assert-True ($null -ne $Failure) 'foreign listener was accepted'

@@ -26,3 +26,8 @@ test-results/
 *.zip
 *.sql.gz
 monitor.properties
+
+# 이름 변경 전 로컬 실행 산출물 제외
+/monitor-center/
+/monitor-agent/
+/monitor-agent-testapp/

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const devUp = readFileSync('scripts/dev-up.ps1', 'utf8');
 const helpers = readFileSync('scripts/process-helpers.ps1', 'utf8');
-const app = readFileSync('monitor-center/src/main/resources/application.yml', 'utf8');
+const app = readFileSync('agent/src/main/resources/application.yml', 'utf8');
 const compose = readFileSync('compose.yaml', 'utf8');
 const operations = readFileSync('docs/operations.md', 'utf8');
 const readme = readFileSync('README.md', 'utf8');

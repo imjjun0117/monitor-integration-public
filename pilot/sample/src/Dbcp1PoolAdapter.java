@@ -1,7 +1,7 @@
 package sample.monitoring;
 
-import com.hermes.monitoring.agent.DbPoolMetrics;
-import com.hermes.monitoring.agent.DbPoolMetricsProvider;
+import com.monitoring.collector.DbPoolMetrics;
+import com.monitoring.collector.DbPoolMetricsProvider;
 import java.lang.reflect.Method;
 
 public final class Dbcp1PoolAdapter implements DbPoolMetricsProvider {

@@ -37,7 +37,7 @@ if (-not (Test-Path .env)) {
     $master = New-Random 32
     $password = New-Random 18
     $sampleToken = New-Random 32
-    $hash = $password | & $Maven -q -pl monitor-center -DskipTests exec:java -Dexec.mainClass=com.hermes.monitoring.center.security.HashPasswordCli
+    $hash = $password | & $Maven -q -pl agent -DskipTests exec:java -Dexec.mainClass=com.monitoring.agent.security.HashPasswordCli
     if ($LASTEXITCODE -ne 0 -or -not $hash.StartsWith('$2')) { throw "BCrypt 해시 생성 실패" }
     @(
         "HERMES_DB_PASSWORD='$db'",

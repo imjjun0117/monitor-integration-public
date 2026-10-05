@@ -34,7 +34,7 @@ const composeEnvironment = {
 };
 
 mkdirSync(runDirectory, { recursive: true, mode: 0o700 });
-const stableCenterJar = resolve(runDirectory, 'monitor-center.jar');
+const stableCenterJar = resolve(runDirectory, 'agent.jar');
 const reportPath = resolve(runDirectory, 'report.json');
 let center;
 let agent;
@@ -124,10 +124,10 @@ try {
 }
 
 function prepareCenterJar(destination) {
-  const artifact = resolve(root, 'monitor-center/target/monitor-center-0.1.0-SNAPSHOT.jar');
+  const artifact = resolve(root, 'agent/target/agent-0.1.0-SNAPSHOT.jar');
   if (!existsSync(artifact)) {
     command(resolve(root, 'mvnw'), [
-      '-q', '-pl', 'monitor-center', '-Dmaven.test.skip=true',
+      '-q', '-pl', 'agent', '-Dmaven.test.skip=true',
       '-Dfrontend.skip=true', 'package',
     ], {
       ...process.env,

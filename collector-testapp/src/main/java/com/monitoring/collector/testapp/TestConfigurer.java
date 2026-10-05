@@ -1,0 +1,88 @@
+package com.monitoring.collector.testapp;
+
+import com.monitoring.collector.CheckCategory;
+import com.monitoring.collector.CheckContext;
+import com.monitoring.collector.CheckDirection;
+import com.monitoring.collector.CheckResult;
+import com.monitoring.collector.DbPoolMetrics;
+import com.monitoring.collector.DbPoolMetricsProvider;
+import com.monitoring.collector.MonitorCollectorBuilder;
+import com.monitoring.collector.MonitorCollectorConfigurer;
+import com.monitoring.collector.MonitorCheck;
+import java.io.File;
+import javax.servlet.ServletContext;
+
+// 테스트 웹앱의 Collector 자원 및 점검 등록
+public final class TestConfigurer implements MonitorCollectorConfigurer {
+    public void configure(MonitorCollectorBuilder builder, ServletContext context) {
+        configureBuilder(
+                builder,
+                required(System.getenv("HERMES_TEST_AGENT_TOKEN"), "HERMES_TEST_AGENT_TOKEN"),
+                required(System.getenv("HERMES_TEST_PROJECT_ID"), "HERMES_TEST_PROJECT_ID"),
+                required(System.getenv("HERMES_TEST_INSTANCE_ID"), "HERMES_TEST_INSTANCE_ID"));
+    }
+
+    static void configureBuilder(
+            MonitorCollectorBuilder builder, String token, String projectId, String instanceId) {
+        builder.identity(projectId, instanceId)
+                .token(token)
+                .disk("tmp", "Temporary filesystem", new File(System.getProperty("java.io.tmpdir")))
+                .dbPool(
+                        new DbPoolMetricsProvider() {
+                            public DbPoolMetrics collect() {
+                                return new DbPoolMetrics(
+                                        "main",
+                                        "Sample Pool",
+                                        Integer.valueOf(1),
+                                        Integer.valueOf(2),
+                                        Integer.valueOf(10),
+                                        Integer.valueOf(1),
+                                        Integer.valueOf(0),
+                                        Long.valueOf(0),
+                                        Long.valueOf(1));
+                            }
+                        })
+                .check(check("internal-health", "Internal health", CheckCategory.INTERNAL, null))
+                .check(
+                        check(
+                                "sample-api",
+                                "Sample API",
+                                CheckCategory.API,
+                                CheckDirection.EXTERNAL));
+    }
+
+    static String required(String value, String name) {
+        if (value == null || value.length() == 0) {
+            throw new IllegalStateException(name + "_REQUIRED");
+        }
+        return value;
+    }
+
+    private static MonitorCheck check(
+            final String id,
+            final String name,
+            final CheckCategory category,
+            final CheckDirection direction) {
+        return new MonitorCheck() {
+            public String getId() {
+                return id;
+            }
+
+            public String getName() {
+                return name;
+            }
+
+            public CheckCategory getCategory() {
+                return category;
+            }
+
+            public CheckDirection getDirection() {
+                return direction;
+            }
+
+            public CheckResult execute(CheckContext context) {
+                return new CheckResult(id, "UP", 1L, "ok");
+            }
+        };
+    }
+}

@@ -2,19 +2,19 @@
 
 각 기록은 같은 네 항목으로 작성합니다.
 
-## Java 7 에이전트 로컬 컴파일
+## Java 7 Collector 로컬 컴파일
 
-1. **기능 정보**: 단계 2 `monitor-agent`의 Java 7 바이트코드/API 호환과 JDK 21 로컬 Maven 검증입니다.
+1. **기능 정보**: 단계 2 `collector`의 Java 7 바이트코드/API 호환과 JDK 21 로컬 Maven 검증입니다.
 2. **발생한 문제**: `./mvnw verify`에서 `Source option 7 is no longer supported`와 `Target option 7 is no longer supported`가 발생했습니다. JDK 21 `javac`가 source/target 7을 제거한 것이 원인입니다.
-3. **해결 방법**: `monitor-agent/pom.xml`의 source/target 1.7은 유지하고 Eclipse ECJ compiler를 사용했습니다. Animal Sniffer `java17` API 서명 검사를 추가했습니다. source/target을 8로 올리지 않은 이유는 배포 계약을 지키기 위해서입니다.
-4. **해결 결과**: `./mvnw -pl monitor-agent verify`가 `BUILD SUCCESS`, 테스트 3건 PASS, Animal Sniffer PASS였습니다. `javap -verbose .../MonitorRuntime.class`는 `major version: 51`을 출력했습니다.
+3. **해결 방법**: `collector/pom.xml`의 source/target 1.7은 유지하고 Eclipse ECJ compiler를 사용했습니다. Animal Sniffer `java17` API 서명 검사를 추가했습니다. source/target을 8로 올리지 않은 이유는 배포 계약을 지키기 위해서입니다.
+4. **해결 결과**: `./mvnw -pl collector verify`가 `BUILD SUCCESS`, 테스트 3건 PASS, Animal Sniffer PASS였습니다. `javap -verbose .../MonitorRuntime.class`는 `major version: 51`을 출력했습니다.
 
 ## Servlet 2.5 테스트 WAR
 
-1. **기능 정보**: 단계 2 `monitor-agent-testapp`의 Servlet 2.5 WAR 패키징입니다.
+1. **기능 정보**: 단계 2 `collector-testapp`의 Servlet 2.5 WAR 패키징입니다.
 2. **발생한 문제**: 전체 Maven 빌드에서 `webxml attribute is required`로 실패했습니다. `WEB-INF/web.xml`이 실제 WAR 소스에 없었습니다.
-3. **해결 방법**: `monitor-agent-testapp/src/main/webapp/WEB-INF/web.xml`을 만들고 `MonitorServlet`, configurer init-param, `/monitor/v1/*` mapping을 명시했습니다. 테스트용 `TestConfigurer`도 추가했습니다.
-4. **해결 결과**: 수정 뒤 전체 `./mvnw verify`에서 `monitor-agent-testapp SUCCESS`와 전체 `BUILD SUCCESS`를 확인했습니다.
+3. **해결 방법**: `collector-testapp/src/main/webapp/WEB-INF/web.xml`을 만들고 `MonitorServlet`, configurer init-param, `/monitor/v1/*` mapping을 명시했습니다. 테스트용 `TestConfigurer`도 추가했습니다.
+4. **해결 결과**: 수정 뒤 전체 `./mvnw verify`에서 `collector-testapp SUCCESS`와 전체 `BUILD SUCCESS`를 확인했습니다.
 
 ## 프론트 TypeScript lint
 
@@ -47,7 +47,7 @@
 ## Flyway가 시작 전에 실행되지 않음
 
 1. **기능 정보**: 단계 3 새 PostgreSQL에서 Flyway → 관리자 seed → scheduler 순서의 실제 Spring Boot 시작 검증입니다. 검증 시각은 2026-09-03 15:22~15:27 KST, 중앙 포트는 loopback `8080`, DB 포트는 loopback `5432`였습니다.
-2. **발생한 문제**: 15:22:06 시작한 JAR은 `Started CenterApplication in 5.433 seconds (process running for 6.759)`를 남긴 뒤 약 14초 생존하고 exit code `1`로 종료됐습니다. 누락 relation은 정확히 3종 `certificate_targets`, `instances`, `app_users`였습니다. 원인은 Spring Boot 4 구성에서 Flyway core/PG 모듈과 SQL 2개는 JAR에 있었지만 migration initializer가 활성화되지 않아, 15초 snapshot/5분 API/6시간 인증서 scheduler와 `AdminSeeder`가 빈 schema를 먼저 조회한 것입니다.
+2. **발생한 문제**: 15:22:06 시작한 JAR은 `Started AgentApplication in 5.433 seconds (process running for 6.759)`를 남긴 뒤 약 14초 생존하고 exit code `1`로 종료됐습니다. 누락 relation은 정확히 3종 `certificate_targets`, `instances`, `app_users`였습니다. 원인은 Spring Boot 4 구성에서 Flyway core/PG 모듈과 SQL 2개는 JAR에 있었지만 migration initializer가 활성화되지 않아, 15초 snapshot/5분 API/6시간 인증서 scheduler와 `AdminSeeder`가 빈 schema를 먼저 조회한 것입니다.
 3. **해결 방법**: 먼저 `MigrationStartupIntegrationTest`를 추가해 빈 Testcontainers PostgreSQL 17.11에서 같은 실패를 재현했습니다(1건 중 error 1, exit code `1`, Maven 39.698초). 이어 `FlywayConfiguration.java`에 `classpath:db/migration`을 고정한 `Flyway` init-method `migrate` bean을 추가했습니다. 모든 singleton 초기화 중 migration 2개가 끝난 뒤 context refresh와 scheduler 등록이 진행되도록 선택했습니다. 예외를 삼키거나 scheduler 시작을 늦춰 증상을 숨기지 않았습니다.
 4. **해결 결과**: 같은 통합 명령은 테스트 1/1 PASS, 실패/오류/skip 0, exit code `0`, Maven 50.712초였습니다. 전체 `./mvnw verify`는 54.711초 및 최종 46.093초에 exit code `0`, 3개 모듈 모두 SUCCESS였습니다. 새 DB 실제 JAR은 `Started ... in 5.134 seconds (process running for 5.985)`였고 26초 확인 시 계속 생존했습니다. `GET http://127.0.0.1:8080/actuator/health`는 HTTP `200`, `status=UP`이었습니다. DB에는 필수 table 5종과 fixture 프로젝트 2개/인스턴스 4개, 성공 migration 2개가 있었습니다. JAR에는 SQL 2개, `flyway-core-12.4.0.jar`, `flyway-database-postgresql-12.4.0.jar`가 있었습니다. 전후 relation 오류는 3종→0종, startup exit code는 1→0(생존), health는 응답 불가→200으로 바뀌었습니다.
 
@@ -62,29 +62,29 @@
 
 1. **기능 정보**: 단계 3/6의 패키징된 중앙 JAR 장기 생존 및 `127.0.0.1:8080/actuator/health` 연속 HTTP 응답 검증입니다. health timeout은 5,000ms, 통합 테스트 연속 요청은 3회, 외부 smoke는 전후 각 5회입니다.
 2. **발생한 문제**: 첫 수정 JAR은 시작 뒤 uptime 253초까지 살아 있었지만 health가 5.000498초 후 HTTP `000`, curl exit `28`, response 0 bytes로 timeout 됐습니다. 로그 누락 class는 1종 `ch.qos.logback.classic.spi.ThrowableProxy`였습니다. 원인은 실행 중인 Spring Boot fat JAR 경로를 이후 `mvn verify`가 교체하여, nested JAR classloader가 지연 로딩 시 바뀐 archive offset을 읽은 것입니다. 최종 JAR 자체에는 `logback-classic-1.5.38.jar`가 있었습니다.
-3. **해결 방법**: `tools/check-health.mjs`를 먼저 만들고 기존 PID에 실행해 5초 timeout/exit 1을 재현했습니다. 실행 중인 PID를 종료한 뒤 최종 JAR을 `.run/package-smoke/monitor-center.jar`로 복사해 immutable 경로에서 재기동했습니다. `MigrationStartupIntegrationTest`에는 5초 제한의 health 연속 3회 검사를 추가했고, `scripts/build.ps1`은 `.run/pids`가 있으면 빌드를 거부하도록 바꿨습니다. class 누락을 dependency 추가로 숨기지 않은 이유는 실제 원인이 archive 교체였기 때문입니다.
+3. **해결 방법**: `tools/check-health.mjs`를 먼저 만들고 기존 PID에 실행해 5초 timeout/exit 1을 재현했습니다. 실행 중인 PID를 종료한 뒤 최종 JAR을 `.run/package-smoke/agent.jar`로 복사해 immutable 경로에서 재기동했습니다. `MigrationStartupIntegrationTest`에는 5초 제한의 health 연속 3회 검사를 추가했고, `scripts/build.ps1`은 `.run/pids`가 있으면 빌드를 거부하도록 바꿨습니다. class 누락을 dependency 추가로 숨기지 않은 이유는 실제 원인이 archive 교체였기 때문입니다.
 4. **해결 결과**: 첫 복사본은 840초 가까이 정상 생존한 뒤 graceful shutdown됐고, 최종 산출물 복사본도 시작 뒤 uptime 166초에 running이었습니다. 이전 복사본의 15/15 health 요청과 최종 복사본의 10/10 요청이 모두 HTTP 200/49 bytes였습니다. 최종 두 묶음 응답시간은 288/13/10/10/9ms와 91/10/7/9/12ms, 실패 0, 각 제한 5,000ms입니다. 전후 health는 HTTP 000→200, exit 28→0, bytes 0→49, 누락 class 1종→0종이 됐습니다. 통합 HTTP/DB/CSRF 테스트는 최종 3/3 PASS입니다.
 
 ## 비동기 check endpoint가 실행을 접수하지 않음
 
-1. **기능 정보**: 단계 2 에이전트 `/checks/run`과 `/checks/results`, bounded executor의 등록 check 실행 계약입니다. body 제한은 16KB, 한 요청 check ID 제한은 20개, 전체 deadline은 10초입니다.
+1. **기능 정보**: 단계 2 Collector `/checks/run`과 `/checks/results`, bounded executor의 등록 check 실행 계약입니다. body 제한은 16KB, 한 요청 check ID 제한은 20개, 전체 deadline은 10초입니다.
 2. **발생한 문제**: Servlet이 202를 반환했지만 항상 빈 `accepted_check_ids`를 내보내 실제 check를 executor에 넣지 않았습니다. 새 행동 테스트 첫 실행은 정의되지 않은 `runCheck/results` 메서드 3건으로 test compilation FAIL, exit code 1, 1.742초였습니다.
 3. **해결 방법**: 테스트를 먼저 추가해 등록 ID 접수, 미등록 ID 거부, 최신 결과 보관을 고정했습니다. `MonitorRuntime`에 check lookup/submit/results를 추가하고, `MonitorServlet`은 실제 byte 기준 16KB 제한, JSON/requested_by 검증, 최대 20개, job UUID, accepted/rejected 결과를 구현했습니다. 토큰 reflection도 public constant-time 경계 호출로 제거했습니다.
-4. **해결 결과**: `./mvnw -pl monitor-agent verify` 재실행은 Agent 테스트 4/4 PASS, 실패/오류/skip 0, Animal Sniffer PASS, exit code 0, 3.840초였습니다. 미등록 check는 실행되지 않고 `NOT_REGISTERED`, 중복은 `ALREADY_RUNNING`입니다.
+4. **해결 결과**: `./mvnw -pl collector verify` 재실행은 Agent 테스트 4/4 PASS, 실패/오류/skip 0, Animal Sniffer PASS, exit code 0, 3.840초였습니다. 미등록 check는 실행되지 않고 `NOT_REGISTERED`, 중복은 `ALREADY_RUNNING`입니다.
 
 ## 중앙 변경·즉시 실행 API 누락
 
 1. **기능 정보**: 단계 3 중앙의 인스턴스 변경/연결 시험, API 즉시 점검, 인증서 CRUD/즉시 검사, 임계치 변경 REST 기능입니다. 수동 API 점검 rate limit은 check별 30,000ms입니다.
 2. **발생한 문제**: OpenAPI에는 경로가 있었지만 구현 class 4개가 없어 stage3c 계약 테스트가 2건 중 실패 2, 통과 0, exit code 1, 112.291ms였습니다.
 3. **해결 방법**: 실패 테스트를 먼저 만든 뒤 `InstanceActionsController`, `CheckActionsController`, `CertificateController`, `ThresholdController`를 추가했습니다. token은 응답하지 않고 변경 때만 암호화하며, check ID는 DB 등록 여부를 먼저 확인하고, TLS는 시스템 trust/hostname 검증을 사용합니다.
-4. **해결 결과**: `node --test tests/stage3c.test.mjs`는 2/2 PASS, 실패 0, exit code 0, 117.313ms였습니다. 첫 Java compile에서 JSON 문자열 escape 오류 10건으로 exit 1/1.439초가 발생해 ObjectMapper 기반 직렬화/파싱으로 바꿨고, `./mvnw -pl monitor-center compiler:compile`은 source 19개, exit code 0, `BUILD SUCCESS`, 2.000초였습니다.
+4. **해결 결과**: `node --test tests/stage3c.test.mjs`는 2/2 PASS, 실패 0, exit code 0, 117.313ms였습니다. 첫 Java compile에서 JSON 문자열 escape 오류 10건으로 exit 1/1.439초가 발생해 ObjectMapper 기반 직렬화/파싱으로 바꿨고, `./mvnw -pl agent compiler:compile`은 source 19개, exit code 0, `BUILD SUCCESS`, 2.000초였습니다.
 
 ## 통합 테스트 fixture 격리
 
 1. **기능 정보**: 단계 3 Testcontainers에서 migration fixture 수와 인증/CSRF API를 한 context에서 검증하는 테스트 격리입니다.
 2. **발생한 문제**: CSRF 성공 테스트가 프로젝트 1개를 추가한 뒤 정리하지 않아 fixture count 테스트가 예상 2, 실제 3으로 실패했습니다. focused suite 3건 중 실패 1, exit code 1, Maven 35.356초였습니다.
 3. **해결 방법**: 상태 변경 검증 직후 시험용 `csrf-test` 프로젝트를 명시적으로 삭제해 테스트 간 DB 상태를 원래 fixture 2개로 복원했습니다. 기대값을 3으로 느슨하게 바꾸지 않아 fixture 계약을 유지했습니다.
-4. **해결 결과**: 같은 `./mvnw -pl monitor-center -Dtest=MigrationStartupIntegrationTest test`는 3/3 PASS, 실패/오류/skip 0, exit code 0, test 10.52초, Maven 49.305초였습니다. 프론트 단위 테스트도 같은 실행에서 3/3 PASS했습니다.
+4. **해결 결과**: 같은 `./mvnw -pl agent -Dtest=MigrationStartupIntegrationTest test`는 3/3 PASS, 실패/오류/skip 0, exit code 0, test 10.52초, Maven 49.305초였습니다. 프론트 단위 테스트도 같은 실행에서 3/3 PASS했습니다.
 
 ## PowerShell 실행 파일 부재
 
@@ -112,16 +112,16 @@
 1. **기능 정보**: `scripts/dev-down.ps1`과 공용 process helper가 tracked backend/frontend 자식 tree를 종료하고, 기본 종료에서 PostgreSQL volume을 보존한 뒤 최종 `dev-up.ps1` restart로 서비스 복구하는 운영 경계입니다. Unix는 TERM 후 process별 최대 5초, 강제 종료 후 최대 2초를 기다리며 Windows는 `CloseMainWindow()` 후 같은 bounded escalation을 적용합니다.
 2. **발생한 문제**: 기존 stack 종료에서 old tracked process가 process manager 관측 exit `-9`로 끝났고 직후 `8080` health와 `5173`은 HTTP `000`/connection refused였습니다. 이는 종료 검증 중 예상된 down 구간이었지만, 기존 `dev-down.ps1`은 자식부터 곧바로 `Stop-Process`만 호출하여 graceful 요청, bounded wait, 불응 process에만 force하는 단계와 관측 경고가 없었습니다.
 3. **해결 방법**: production 수정 전에 TERM을 처리해 marker를 남기는 cooperative process와 TERM을 무시하는 process 행동 테스트를 추가해 `Stop-ProcessTreeGracefully` 부재 RED(exit `1`)를 확인했습니다. 공용 helper는 자식부터 Unix TERM/Windows window close를 보내고 제한 안에 종료되지 않은 PID만 `Stop-Process -Force`로 escalation하며 강제 종료 수를 반환합니다. `dev-down.ps1`은 강제 종료가 있을 때만 PID와 count를 warning으로 남기고 기존 sample-profile down 및 기본 volume 보존 계약은 유지합니다.
-4. **해결 결과**: focused signal test는 cooperative TERM 1건과 TERM-ignore force escalation 1건, 총 2/2 PASS, exit `0`, 최종 5.74초였습니다. 실제 tracked stack의 dev-down은 exit `0`/3.03초, force warning 0건, 여섯 port free, `hermes-monitoring_hermes-postgres-data` volume 보존이었습니다. 이어 restart는 exit `0`/12.25초로 두 tracked process를 readiness 뒤 기록했고 process 생존, listener tree 소유, backend/frontend HTTP 200, PostgreSQL healthy, agent 4개 running을 확인했습니다. old 관측 exit는 `-9/-9`였고 새 실제 cooperative 종료의 force escalation count는 0개입니다.
+4. **해결 결과**: focused signal test는 cooperative TERM 1건과 TERM-ignore force escalation 1건, 총 2/2 PASS, exit `0`, 최종 5.74초였습니다. 실제 tracked stack의 dev-down은 exit `0`/3.03초, force warning 0건, 여섯 port free, `monitoring_hermes-postgres-data` volume 보존이었습니다. 이어 restart는 exit `0`/12.25초로 두 tracked process를 readiness 뒤 기록했고 process 생존, listener tree 소유, backend/frontend HTTP 200, PostgreSQL healthy, agent 4개 running을 확인했습니다. old 관측 exit는 `-9/-9`였고 새 실제 cooperative 종료의 force escalation count는 0개입니다.
 
 ## 일반 확인 방법
 
 - JDK: `java -version`이 21인지 확인합니다.
 - DB: `docker compose ps`와 `docker compose exec -T postgres pg_isready -U hermes -d hermes_monitor`를 확인합니다.
-- 에이전트 주소: `ADDRESS_NOT_ALLOWED`면 필요한 CIDR만 명시적으로 추가합니다.
+- Collector 주소: `ADDRESS_NOT_ALLOWED`면 필요한 CIDR만 명시적으로 추가합니다.
 - 스키마: `SCHEMA_ERROR`면 agent major와 fixture를 확인합니다. 기존 최신값은 유지됩니다.
 
-## 독립 QA: 에이전트 계약과 Java 7 실행 산출물
+## 독립 QA: Collector 계약과 Java 7 실행 산출물
 
 1. **기능 정보**: `/info`, `/snapshot`, `/checks/run`, `/checks/results`의 JSON Schema v1, UTC, 제한값, executor 종료와 동일 shaded JAR의 Java 7 바이트코드 계약입니다.
 2. **발생한 문제**: QA 실행에서 snapshot 필수 JVM/OS 필드는 4개만 있었고 DB Pool/check 필드가 camelCase/비계약 형식이었으며, 임의 query가 HTTP 200을 받았습니다. shaded JAR 224개 class 중 1개 `module-info.class`가 major 53이었습니다.
@@ -338,14 +338,14 @@
 1. **기능 정보**: agent Servlet의 `POST /monitor/v1/checks/run`은 형식/등록 오류 400, 전부 실행중·rate/capacity 거절 429, 하나 이상 실제 접수 202를 반환합니다. mixed 요청은 실제 접수가 하나라도 있으면 202이며, 접수 0건일 때 비등록이 섞이면 400입니다.
 2. **발생한 문제**: 실제 sample agent에서 미등록 ID 1건이 `accepted_check_ids=0`인데도 HTTP 202였습니다. 원인은 Servlet이 executor 결과를 받기 전에 상태를 202로 고정한 것이며 기존 테스트는 HTTP 경계를 호출하지 않았습니다.
 3. **해결 방법**: `MonitorRuntime.CheckRun`에 접수/거절 분류를 추가하고 Servlet이 실행 결과 뒤 상태를 결정하도록 바꿨습니다. embedded real HTTP server와 Servlet request/response를 지나는 `MonitorServletHttpStatusIntegrationTest`에서 malformed, unknown-only, all-capacity, accepted, mixed를 고정했습니다.
-4. **해결 결과**: `./mvnw -pl monitor-agent clean test -Ddependency-check.skip=true`에서 Servlet HTTP integration 1/1과 agent 전체 31/31이 PASS했습니다. 미등록-only 상태는 202→400, ALREADY_RUNNING-only는 202→429, accepted 포함은 202를 유지했습니다.
+4. **해결 결과**: `./mvnw -pl collector clean test -Ddependency-check.skip=true`에서 Servlet HTTP integration 1/1과 agent 전체 31/31이 PASS했습니다. 미등록-only 상태는 202→400, ALREADY_RUNNING-only는 202→429, accepted 포함은 202를 유지했습니다.
 
 ## 최종 QA Major 2·3: direction과 선언형 production 점검
 
 1. **기능 정보**: 모든 `MonitorCheck`가 direction을 명시하고 INTERNAL category는 null, API category는 INTERNAL/EXTERNAL 중 하나만 허용합니다. deployment-owned `monitor-checks.json`은 HTTP/TCP/file/directory/batch 점검을 Java 7 production 코드로 등록하고 secret을 실행 시점에만 해석합니다.
 2. **발생한 문제**: API direction이 EXTERNAL로 고정됐고 loader/SecretProvider/executor가 없었습니다. `MonitorCheck.getDirection()`을 먼저 필수화한 RED compile은 `TestConfigurer`의 abstract method 미구현 1건으로 `BUILD FAILURE`였으며 기존 파일럿 JSON은 실행 경로와 분리돼 있었습니다.
 3. **해결 방법**: `CheckDirection`, 필수 `MonitorCheck.getDirection()`, schema 조건, DB V7 constraint를 추가했습니다. loader는 등록 파일만 읽고 read-only HTTP(GET/HEAD/POST, query/header/body, timeout/status/text/안전 regex/JSON/XML), TCP, file/directory, batch freshness를 bounded deadline 안에서 실행합니다. redirect/trust-all/URL 원격 주입을 허용하지 않고 1MB 응답 제한, XXE 차단, runtime SecretProvider와 제한된 결과 code를 적용했습니다. 샘플 프로젝트 Configurer는 JSON을 실제 읽으며 설정 없는 항목은 `configuration_required`와 disabled 상태로 명시했습니다.
-4. **해결 결과**: agent 선언형/HTTPS/direction/파일럿 행동 테스트 10건을 포함해 31/31 PASS, testapp 2/2 PASS, Animal Sniffer PASS였습니다. `VerifyAgentJar`는 shaded JAR 250 class 전부 major 51을 확인했고 로컬 Java 8 호환 probe도 PASS했습니다. 승인 Java 7과 승인 Java 8 gate는 외부 제한으로 유지합니다.
+4. **해결 결과**: agent 선언형/HTTPS/direction/파일럿 행동 테스트 10건을 포함해 31/31 PASS, testapp 2/2 PASS, Animal Sniffer PASS였습니다. `VerifyCollectorJar`는 shaded JAR 250 class 전부 major 51을 확인했고 로컬 Java 8 호환 probe도 PASS했습니다. 승인 Java 7과 승인 Java 8 gate는 외부 제한으로 유지합니다.
 
 ## 최종 QA Major 4: 실제 production E2E 확대
 
@@ -371,7 +371,7 @@
 ## Immutable artifact provenance
 
 1. **기능 정보**: 실행 center/agent 산출물의 SHA-256, byte size와 manifest를 생성하고 실행 전 동일 bytes인지 검증합니다.
-2. **발생한 문제**: 기존 `.run/final/monitor-center-final.jar`는 생성 근거와 hash 검증 파일이 없어 이후 build가 실행 중 artifact를 바꿨는지 독립 확인할 수 없었습니다.
+2. **발생한 문제**: 기존 `.run/final/agent-final.jar`는 생성 근거와 hash 검증 파일이 없어 이후 build가 실행 중 artifact를 바꿨는지 독립 확인할 수 없었습니다.
 3. **해결 방법**: `tools/artifact-manifest.mjs`의 create/verify를 test-first로 추가하고 `build.ps1`/`verify.ps1`이 immutable 경로 복사 뒤 manifest 생성·검증을 수행하게 했습니다. 같은 길이의 artifact 내용을 바꾼 test가 `SHA256_MISMATCH`로 실패하는지 검사합니다.
 4. **해결 결과**: `node --test tests/artifact-provenance.test.mjs`는 최초 missing tool로 0/1 FAIL 후 1/1 PASS했습니다. 최종 package 뒤 manifest의 center/agent SHA-256을 verify하고 그 center copy로 health를 재확인합니다.
 
@@ -429,7 +429,7 @@
 1. **기능 정보**: 2026-09-04 KST에 production PostgreSQL volume을 보존하며 기존 `8080`/`5173`/`18081`~`18084` stack을 종료하고, Tomcat 11.0.25 clean artifact, 실제 runtime, authenticated E2E와 최초 Git 기준선을 검증했습니다.
 2. **발생한 문제**: 기존 `dev-down.ps1`은 wrapper PID만 종료해 이미 생성된 Java/Vite 자식 2개를 남겼고 sample profile을 지정하지 않아 agent container 4개도 남겼습니다. 또한 `build.ps1`은 macOS에서도 `mvnw.cmd`를 고정했고, 오래된 `.env`의 sample key 누락 시 개선된 sample-profile down이 Compose interpolation error를 성공처럼 반환했습니다. fresh-context Codex 검토는 420초 timeout, Claude 검토는 미로그인으로 결과를 만들지 못했습니다.
 3. **해결 방법**: 실패하는 operations contract 2건을 먼저 추가했습니다. 종료는 tracked process tree를 자식부터 재귀 종료하고 sample profile 전체를 내리며 기본 경로에는 `--volumes`를 쓰지 않습니다. 오래된 `.env`는 바꾸지 않고 종료 process에만 동적 32자 placeholder를 주며 native exit를 검사합니다. build는 OS별 wrapper와 center/agent manifest를 사용합니다. 독립 CLI가 불가해 `docs/release-verification.md`에 fail-closed exhaustive checklist를 저장했습니다.
-4. **해결 결과**: 종료 뒤 6개 port 모두 free, 보존 volume `hermes-monitoring_hermes-postgres-data` 존재를 확인했습니다. Trivy는 104 package/HIGH 0/CRITICAL 0/6.479초, Maven은 94/94와 frontend 17/17/294.83초, E2E는 7/7/113.42초, repository는 최종 66/66, secret scan은 0건/0.26초였습니다. immutable center는 33,285,281 bytes/SHA-256 `8d232eb96deefecc3e11cbd3aa8746785d094413a4270a21a347b86b972e04cc`이고 health 10/10, frontend 1/1, agents 4/4가 모두 HTTP 200이었습니다. 실제 banner와 nested JAR 3개는 Tomcat 11.0.25였습니다. 제품 검토 잔여는 blocker 0/major 0/minor 0입니다.
+4. **해결 결과**: 종료 뒤 6개 port 모두 free, 보존 volume `monitoring_hermes-postgres-data` 존재를 확인했습니다. Trivy는 104 package/HIGH 0/CRITICAL 0/6.479초, Maven은 94/94와 frontend 17/17/294.83초, E2E는 7/7/113.42초, repository는 최종 66/66, secret scan은 0건/0.26초였습니다. immutable center는 33,285,281 bytes/SHA-256 `8d232eb96deefecc3e11cbd3aa8746785d094413a4270a21a347b86b972e04cc`이고 health 10/10, frontend 1/1, agents 4/4가 모두 HTTP 200이었습니다. 실제 banner와 nested JAR 3개는 Tomcat 11.0.25였습니다. 제품 검토 잔여는 blocker 0/major 0/minor 0입니다.
 
 ## opt-in LAN 대시보드 바인딩
 
@@ -448,8 +448,8 @@
 ## 로컬 admin 비밀번호 reset 인계와 clean checkout 신뢰성
 
 1. **기능 정보**: 2026-09-07 KST의 `AdminSeeder` 기본 사용자 `admin`, PostgreSQL `app_users` hash와 Mac/Windows portable PowerShell local reset workflow입니다. CLI 계약은 8자 이상 두 번의 secure 입력, 정확히 1행 transaction, BCrypt, 실패 rollback, 재시작 persistence입니다.
-2. **발생한 문제**: clean `monitor-center/target`에서 기존 script가 곧바로 Maven `exec:java`만 실행해 `ClassNotFoundException: com.hermes.monitoring.center.security.AdminPasswordResetCli`로 exit 1/2.360초가 났고 PowerShell은 이를 일반 `admin 비밀번호 reset이 실패했습니다.`로 가렸습니다. `exec:java`가 compile/package lifecycle을 실행하지 않는 것이 확인된 원인입니다. 분리 probe에서 미리 compile된 상태의 같은 Maven stdin/JDBC runtime classpath/인용된 `.env` DB password/URL/user/BCrypt `CharSequence`/실제 schema는 exit 0이어서 배제했습니다. portable PowerShell의 점이 든 미인용 Maven property가 `.skip=true` lifecycle로 분리되는 별도 RED도 exit 1/2.837초로 확인했습니다.
-3. **해결 방법**: repository test를 1/2 FAIL로 먼저 만들고, 비밀번호 입력 전에 `monitor-center` Spring Boot JAR를 package하며 `'-Dfrontend.skip=true'`를 portable하게 단일 argument로 전달합니다. 입력 뒤에는 Maven stdin 경계를 제거하고 JAR의 `PropertiesLauncher`로 기존 `AdminPasswordResetCli`를 direct Java 실행합니다. build/artifact/reset-cli 실패는 `stage`, `code`, `exit`만 노출합니다. 두 `Read-Host -AsSecureString`, BSTR zero/dispose, stdin-only 전달, 기존 `FOR UPDATE`/1행 update/commit·rollback/BCrypt 구현은 유지했고 password argument/temp/log/API는 만들지 않았습니다.
+2. **발생한 문제**: clean `agent/target`에서 기존 script가 곧바로 Maven `exec:java`만 실행해 `ClassNotFoundException: com.monitoring.agent.security.AdminPasswordResetCli`로 exit 1/2.360초가 났고 PowerShell은 이를 일반 `admin 비밀번호 reset이 실패했습니다.`로 가렸습니다. `exec:java`가 compile/package lifecycle을 실행하지 않는 것이 확인된 원인입니다. 분리 probe에서 미리 compile된 상태의 같은 Maven stdin/JDBC runtime classpath/인용된 `.env` DB password/URL/user/BCrypt `CharSequence`/실제 schema는 exit 0이어서 배제했습니다. portable PowerShell의 점이 든 미인용 Maven property가 `.skip=true` lifecycle로 분리되는 별도 RED도 exit 1/2.837초로 확인했습니다.
+3. **해결 방법**: repository test를 1/2 FAIL로 먼저 만들고, 비밀번호 입력 전에 `agent` Spring Boot JAR를 package하며 `'-Dfrontend.skip=true'`를 portable하게 단일 argument로 전달합니다. 입력 뒤에는 Maven stdin 경계를 제거하고 JAR의 `PropertiesLauncher`로 기존 `AdminPasswordResetCli`를 direct Java 실행합니다. build/artifact/reset-cli 실패는 `stage`, `code`, `exit`만 노출합니다. 두 `Read-Host -AsSecureString`, BSTR zero/dispose, stdin-only 전달, 기존 `FOR UPDATE`/1행 update/commit·rollback/BCrypt 구현은 유지했고 password argument/temp/log/API는 만들지 않았습니다.
 4. **해결 결과**: 운영 PostgreSQL을 멈추지 않고 `pg_dump` stream으로 PostgreSQL 17.11 격리 DB에 16-table schema/data와 user 1행을 복제했으며 clone/운영 app-user digest가 reset 전 일치했습니다. clean target에서 exact portable path는 generated dummy를 PTY stdin으로만 두 번 받아 `ADMIN_PASSWORD_RESET_OK`, exit 0/154.178초였습니다. 격리 Spring Boot 실제 login은 old dummy HTTP 401, new dummy HTTP 302였고 backend 재시작 뒤 new dummy도 HTTP 302였습니다. 운영 app-user는 전/후 모두 1행이고 digest가 불변임을 비교로 확인했으며 digest 자체는 기록하지 않습니다. production backend/frontend process, private LAN listener, PostgreSQL healthy/46시간 uptime도 유지했습니다. focused repository test는 RED 1/2에서 GREEN 2/2(exit 0/100.133ms)가 됐고 direct packaged-Java probe는 exit 0/0.850초였습니다. 최종 repository 72/72, Maven reactor 97/97(agent 31, testapp 2, center 64), PowerShell parser 11/11, secret scan과 `git diff --check`가 모두 exit 0입니다. password/dummy leak은 masking 후 0건이며 실제 운영 password는 조회·출력·변경하지 않았습니다. 성능 영향 미측정입니다.
 
 ## 무료/오픈소스 비용 경계 감사

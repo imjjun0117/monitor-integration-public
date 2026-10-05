@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-const base='monitor-agent/src/main/java/com/hermes/monitoring/agent/';
-const required=['MonitorAgentConfigurer.java','MonitorAgentBuilder.java','MonitorCheck.java','DbPoolMetricsProvider.java','BoundedCheckExecutor.java','TokenVerifier.java','MonitorRuntime.java','servlet/MonitorServlet.java'];
+const base='collector/src/main/java/com/monitoring/collector/';
+const required=['MonitorCollectorConfigurer.java','MonitorCollectorBuilder.java','MonitorCheck.java','DbPoolMetricsProvider.java','BoundedCheckExecutor.java','TokenVerifier.java','MonitorRuntime.java','servlet/MonitorServlet.java'];
 
 test('단계 2 Agent SPI와 Servlet이 존재한다',()=>{for(const p of required) assert.equal(existsSync(base+p),true,p);});
 test('Agent 코드는 Java 7 금지 API를 사용하지 않는다',()=>{

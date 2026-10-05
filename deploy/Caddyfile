@@ -10,5 +10,5 @@
             profile shortlived
         }
     }
-    reverse_proxy center:8080
+    reverse_proxy agent:8080
 }

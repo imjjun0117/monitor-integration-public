@@ -14,10 +14,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
-  center:
+  agent:
     build:
       context: .
-      dockerfile: monitor-center/Dockerfile
+      dockerfile: agent/Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:
@@ -40,7 +40,7 @@ services:
     image: caddy:2.11.6-alpine
     restart: unless-stopped
     depends_on:
-      - center
+      - agent
     environment:
       HERMES_PUBLIC_IP: ${HERMES_PUBLIC_IP:?required}
     ports:

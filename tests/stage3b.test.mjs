@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 
-const base = 'monitor-center/src/main/java/com/hermes/monitoring/center/';
+const base = 'agent/src/main/java/com/monitoring/agent/';
 const required = [
   'security/SecurityConfig.java', 'security/AdminSeeder.java',
   'project/ProjectController.java', 'collection/SnapshotCollector.java',

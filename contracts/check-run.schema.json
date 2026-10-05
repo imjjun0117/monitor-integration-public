@@ -19,7 +19,7 @@
       }
     },
     "requested_by": {
-      "const": "monitor-center"
+      "const": "agent"
     }
   }
 }

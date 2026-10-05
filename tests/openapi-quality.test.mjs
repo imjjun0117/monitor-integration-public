@@ -15,10 +15,10 @@ test('OpenAPI defines reusable DTOs, status, paging, sorting, and response codes
 });
 
 test('TypeScript generation uses a standard OpenAPI package and has a diff check', () => {
-  const pkg = JSON.parse(readFileSync('monitor-center/frontend/package.json', 'utf8'));
+  const pkg = JSON.parse(readFileSync('agent/frontend/package.json', 'utf8'));
   assert.ok(pkg.devDependencies['openapi-typescript-codegen']);
   assert.ok(pkg.scripts['generate:api:check']);
-  const generator = readFileSync('monitor-center/frontend/scripts/generate-api.mjs', 'utf8');
+  const generator = readFileSync('agent/frontend/scripts/generate-api.mjs', 'utf8');
   assert.match(generator, /openapi-typescript-codegen/);
   assert.doesNotMatch(generator, /matchAll|new RegExp|\.match\(/);
   assert.match(generator, /--check/);
@@ -36,7 +36,7 @@ test('metric, disk, pool, and history schemas generate concrete typed models', (
     'MetricLatest', 'InstanceMetricSample', 'Disk', 'DiskMetricSample', 'DbPool',
     'DbPoolMetricSample', 'CheckHistorySample', 'DashboardHistory',
   ]) {
-    const source = readFileSync(`monitor-center/frontend/src/generated/models/${model}.ts`, 'utf8');
+    const source = readFileSync(`agent/frontend/src/generated/models/${model}.ts`, 'utf8');
     assert.doesNotMatch(source, /Record<string, any>|\bany\b/, model);
   }
   assert.match(api, /sampled_at: \{type: string, format: date-time\}/);
@@ -44,7 +44,7 @@ test('metric, disk, pool, and history schemas generate concrete typed models', (
 });
 
 test('Maven checks committed generated output before any source-writing generation', () => {
-  const pom = readFileSync('monitor-center/pom.xml', 'utf8');
+  const pom = readFileSync('agent/pom.xml', 'utf8');
   const check = pom.indexOf('<arguments>run generate:api:check</arguments>');
   const write = pom.indexOf('<arguments>run generate:api</arguments>');
   assert.ok(check >= 0, 'Maven immutable generated-client check is missing');
@@ -52,11 +52,11 @@ test('Maven checks committed generated output before any source-writing generati
 });
 
 test('standard generator owns the typed service client without handwritten endpoint duplication', () => {
-  const generator = readFileSync('monitor-center/frontend/scripts/generate-api.mjs', 'utf8');
+  const generator = readFileSync('agent/frontend/scripts/generate-api.mjs', 'utf8');
   assert.match(generator, /exportCore:\s*true/);
   assert.match(generator, /exportServices:\s*true/);
-  assert.equal(existsSync('monitor-center/frontend/src/generated/services/DefaultService.ts'), true);
-  const api = readFileSync('monitor-center/frontend/src/api.ts', 'utf8');
+  assert.equal(existsSync('agent/frontend/src/generated/services/DefaultService.ts'), true);
+  const api = readFileSync('agent/frontend/src/api.ts', 'utf8');
   assert.doesNotMatch(api, /['"`]\/api\/v1\//);
   assert.match(api, /DefaultService/);
 });

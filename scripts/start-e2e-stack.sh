@@ -29,7 +29,7 @@ cleanup() {
   rm -f "$run_dir/credentials.json" "$run_dir/control.json" \
     "$run_dir"/check-run-*.json "$run_dir/center-classpath.txt" \
     "$run_dir/e2e-localhost.crt" "$run_dir/e2e-localhost.key" \
-    "$run_dir/e2e-truststore.p12" "$run_dir/monitor-center.jar"
+    "$run_dir/e2e-truststore.p12" "$run_dir/agent.jar"
 }
 trap cleanup EXIT
 trap 'exit 143' INT TERM
@@ -91,16 +91,16 @@ if [[ "$tls_ready" != true ]]; then
   exit 1
 fi
 
-center_artifact="$root/monitor-center/target/monitor-center-0.1.0-SNAPSHOT.jar"
-(cd "$root/monitor-center/frontend" && npm run build >"$run_dir/frontend-build.log")
+center_artifact="$root/agent/target/agent-0.1.0-SNAPSHOT.jar"
+(cd "$root/agent/frontend" && npm run build >"$run_dir/frontend-build.log")
 JAVA_HOME="$HERMES_E2E_JAVA_HOME" PATH="$HERMES_E2E_JAVA_HOME/bin:$PATH" \
-  "$root/mvnw" -q -pl monitor-center -Dmaven.test.skip=true \
+  "$root/mvnw" -q -pl agent -Dmaven.test.skip=true \
   -Dfrontend.skip=true package
 if [[ ! -f "$center_artifact" ]]; then
   echo "center artifact could not be prepared" >&2
   exit 1
 fi
-center_jar="$run_dir/monitor-center.jar"
+center_jar="$run_dir/agent.jar"
 cp "$center_artifact" "$center_jar"
 admin_hash=$(htpasswd -bnBC 10 '' "$admin_password" | tr -d ':\n')
 
@@ -129,7 +129,7 @@ for port in 18081 18082 18083 18084; do
   fi
   if ! curl --fail --silent --show-error --max-time 3 \
     -H "X-Monitor-Token: $agent_token" -H 'Content-Type: application/json' \
-    --data '{"check_ids":["internal-health","sample-api"],"requested_by":"monitor-center"}' \
+    --data '{"check_ids":["internal-health","sample-api"],"requested_by":"agent"}' \
     --output "$run_dir/check-run-$port.json" \
     "http://127.0.0.1:$port/monitor/v1/checks/run"; then
     echo "sample agent check submission failed on port $port" >&2

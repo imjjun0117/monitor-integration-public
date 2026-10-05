@@ -12,7 +12,7 @@ docs/screenshots
 **/playwright-report
 **/test-results
 **/*.tsbuildinfo
-monitor-agent/target
-monitor-center/target
-monitor-agent-testapp/target/*
-!monitor-agent-testapp/target/monitor-agent-testapp-0.1.0-SNAPSHOT.war
+collector/target
+agent/target
+collector-testapp/target/*
+!collector-testapp/target/collector-testapp-0.1.0-SNAPSHOT.war

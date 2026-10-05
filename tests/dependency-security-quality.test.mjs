@@ -6,10 +6,10 @@ test('Docker build context excludes repository, local state, caches, and secrets
   assert.equal(existsSync('.dockerignore'), true);
   const ignore = readFileSync('.dockerignore', 'utf8');
   for (const entry of ['.git', '.env*', '.run', '.tools', '**/node_modules',
-    'monitor-agent/target', 'monitor-center/target']) {
+    'collector/target', 'agent/target']) {
     assert.ok(ignore.includes(entry), entry);
   }
-  assert.match(ignore, /!monitor-agent-testapp\/target\/monitor-agent-testapp-0\.1\.0-SNAPSHOT\.war/);
+  assert.match(ignore, /!collector-testapp\/target\/collector-testapp-0\.1\.0-SNAPSHOT\.war/);
 });
 
 test('CycloneDX production SBOM and periodic OWASP defense-in-depth are pinned', () => {
@@ -26,7 +26,7 @@ test('CycloneDX production SBOM and periodic OWASP defense-in-depth are pinned',
 });
 
 test('Tomcat embed patch is aligned on the first fixed release for discovered critical CVEs', () => {
-  const pom = readFileSync('monitor-center/pom.xml', 'utf8');
+  const pom = readFileSync('agent/pom.xml', 'utf8');
   assert.match(pom, /<tomcat-embed\.version>11\.0\.25<\/tomcat-embed\.version>/);
   for (const artifact of ['tomcat-embed-core', 'tomcat-embed-el', 'tomcat-embed-websocket']) {
     assert.match(pom, new RegExp(`<artifactId>${artifact}</artifactId>\\s*<version>\\$\\{tomcat-embed\\.version\\}</version>`));

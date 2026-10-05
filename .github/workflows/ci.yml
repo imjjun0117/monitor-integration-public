@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: monitor-center/frontend/package-lock.json
+          cache-dependency-path: agent/frontend/package-lock.json
       - name: Cache Trivy vulnerability databases
         uses: actions/cache@v4
         with:
@@ -51,7 +51,7 @@ jobs:
           sarif_file: .run/security/npm-trivy.sarif
           category: dependency-npm
 
-  build-agent:
+  build-collector:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,15 +59,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - run: ./mvnw -pl monitor-agent -am package
-      - run: java tools/VerifyAgentJar.java monitor-agent/target/monitor-agent-0.1.0-SNAPSHOT.jar
+      - run: ./mvnw -pl collector -am package
+      - run: java tools/VerifyCollectorJar.java collector/target/collector-0.1.0-SNAPSHOT.jar
       - uses: actions/upload-artifact@v4
         with:
-          name: monitor-agent
-          path: monitor-agent/target/monitor-agent-0.1.0-SNAPSHOT.jar
+          name: collector
+          path: collector/target/collector-0.1.0-SNAPSHOT.jar
 
-  agent-runtime:
-    needs: build-agent
+  collector-runtime:
+    needs: build-collector
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -77,15 +77,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: monitor-agent
-          path: monitor-agent/target
+          name: collector
+          path: collector/target
       - uses: actions/setup-java@v5
         with:
           distribution: zulu
           java-version: ${{ matrix.java }}
       - run: >-
-          java -cp monitor-agent/target/monitor-agent-0.1.0-SNAPSHOT.jar
-          com.hermes.monitoring.agent.AgentCompatibilityProbe
+          java -cp collector/target/collector-0.1.0-SNAPSHOT.jar
+          com.monitoring.collector.CollectorCompatibilityProbe
 
   verify:
     needs: dependency-vulnerability
@@ -110,10 +110,10 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: monitor-center/frontend/package-lock.json
+          cache-dependency-path: agent/frontend/package-lock.json
       - uses: docker/setup-compose-action@v1
       - run: node tools/scan-secrets.mjs
-      - working-directory: monitor-center/frontend
+      - working-directory: agent/frontend
         run: |
           npm ci
           npx playwright install --with-deps chromium

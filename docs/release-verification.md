@@ -30,8 +30,8 @@ fresh-context CLI 검토를 우선 시도했습니다. Codex read-only 실행은
 
 ## 산출물
 
-- `.run/final/monitor-center-final.jar`: 33,285,281 bytes, SHA-256 `8d232eb96deefecc3e11cbd3aa8746785d094413a4270a21a347b86b972e04cc`
-- `.run/final/monitor-agent-final.jar`: 348,007 bytes, SHA-256 `64cf4e5f3fc35ce1e0de321bd601197ee70998fa3d7da6f5187518b648c134e9`
+- `.run/final/agent-final.jar`: 33,285,281 bytes, SHA-256 `8d232eb96deefecc3e11cbd3aa8746785d094413a4270a21a347b86b972e04cc`
+- `.run/final/collector-final.jar`: 348,007 bytes, SHA-256 `64cf4e5f3fc35ce1e0de321bd601197ee70998fa3d7da6f5187518b648c134e9`
 - `.run/final/build-manifest.json`: 위 두 파일을 상대 경로로 검증하며 ignored local evidence로 유지.
 
 ## 2026-09-04 dev lifecycle 보강
@@ -57,7 +57,7 @@ fresh-context CLI 검토를 우선 시도했습니다. Codex read-only 실행은
 | Accessibility | login axe serious 0, dashboard axe violation 0, 1440/1024/390 horizontal document overflow 0 |
 | Screenshots | `docs/screenshots/redesign/` login/dashboard 각 1440·1024·390, 총 6개 |
 | External HTTPS | root HTML 302→상대 `/login`, login 200/custom Korean, unauth dashboard API 401 `UNAUTHORIZED`, tunnel 1개, agents 4개 |
-| Artifact | `.run/redesign/monitor-center-redesign-final-v2.jar` 33,285,548 bytes, SHA-256 `880534c6f9f37e1e19616573c7c33f788585b44ff2db72957f81f27eaf9005f9` |
+| Artifact | `.run/redesign/agent-redesign-final-v2.jar` 33,285,548 bytes, SHA-256 `880534c6f9f37e1e19616573c7c33f788585b44ff2db72957f81f27eaf9005f9` |
 | Bundle | static 2,302,074→2,179,838 bytes(-5.31%); initial JS -26.90%; initial CSS -49.89%. 각 artifact 1회 size 비교, render 미측정 |
 | Slop audit | login 8→1, dashboard 7→2; gradient/glass/decorative tile/giant stat/equal card grid/invented metric 0 |
 

@@ -10,16 +10,16 @@ if ($LASTEXITCODE -ne 0) { throw "빌드 실패" }
 
 $ArtifactDirectory = Join-Path $Root ".run/final"
 New-Item -ItemType Directory -Force -Path $ArtifactDirectory | Out-Null
-$ImmutableJar = Join-Path $ArtifactDirectory "monitor-center-final.jar"
-$ImmutableAgentJar = Join-Path $ArtifactDirectory "monitor-agent-final.jar"
+$ImmutableJar = Join-Path $ArtifactDirectory "agent-final.jar"
+$ImmutableCollectorJar = Join-Path $ArtifactDirectory "collector-final.jar"
 Copy-Item -Force `
-    (Join-Path $Root "monitor-center/target/monitor-center-0.1.0-SNAPSHOT.jar") `
+    (Join-Path $Root "agent/target/agent-0.1.0-SNAPSHOT.jar") `
     $ImmutableJar
 Copy-Item -Force `
-    (Join-Path $Root "monitor-agent/target/monitor-agent-0.1.0-SNAPSHOT.jar") `
-    $ImmutableAgentJar
+    (Join-Path $Root "collector/target/collector-0.1.0-SNAPSHOT.jar") `
+    $ImmutableCollectorJar
 & node (Join-Path $Root "tools/artifact-manifest.mjs") create `
-    (Join-Path $ArtifactDirectory "build-manifest.json") $ImmutableJar $ImmutableAgentJar
+    (Join-Path $ArtifactDirectory "build-manifest.json") $ImmutableJar $ImmutableCollectorJar
 if ($LASTEXITCODE -ne 0) { throw "산출물 manifest 생성 실패" }
 & node (Join-Path $Root "tools/artifact-manifest.mjs") verify `
     (Join-Path $ArtifactDirectory "build-manifest.json")

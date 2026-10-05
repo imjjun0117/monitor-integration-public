@@ -40,16 +40,16 @@ Invoke-Checked { node tools/scan-secrets.mjs } "secret/log scan failed"
 Invoke-Checked { node --test tests/*.test.mjs } "repository contract/schema tests failed"
 Invoke-Checked { & $Maven clean verify } "Maven clean verify or Java license gate failed"
 
-$AgentJar = Join-Path $Root 'monitor-agent/target/monitor-agent-0.1.0-SNAPSHOT.jar'
-Invoke-Checked { java tools/VerifyAgentJar.java $AgentJar } "not every shaded agent class is Java 7"
+$CollectorJar = Join-Path $Root 'collector/target/collector-0.1.0-SNAPSHOT.jar'
+Invoke-Checked { java tools/VerifyCollectorJar.java $CollectorJar } "not every shaded collector class is Java 7"
 Invoke-Checked {
-    & $Java7 -cp $AgentJar com.hermes.monitoring.agent.AgentCompatibilityProbe
-} "approved Java 7 agent runtime gate failed"
+    & $Java7 -cp $CollectorJar com.monitoring.collector.CollectorCompatibilityProbe
+} "approved Java 7 collector runtime gate failed"
 Invoke-Checked {
-    & $Java8 -cp $AgentJar com.hermes.monitoring.agent.AgentCompatibilityProbe
-} "approved Java 8 agent runtime gate failed"
+    & $Java8 -cp $CollectorJar com.monitoring.collector.CollectorCompatibilityProbe
+} "approved Java 8 collector runtime gate failed"
 
-Push-Location monitor-center/frontend
+Push-Location agent/frontend
 try {
     Invoke-Checked { npm ci } "npm ci failed"
     Invoke-Checked { npm run validate:openapi } "OpenAPI validation failed"
@@ -67,13 +67,13 @@ try {
 Invoke-Checked { node tools/scan-secrets.mjs } "final secret/log scan failed"
 $ArtifactDirectory = Join-Path $Root '.run/final'
 New-Item -ItemType Directory -Force -Path $ArtifactDirectory | Out-Null
-$ImmutableJar = Join-Path $ArtifactDirectory 'monitor-center-final.jar'
+$ImmutableJar = Join-Path $ArtifactDirectory 'agent-final.jar'
 Copy-Item -Force `
-    (Join-Path $Root 'monitor-center/target/monitor-center-0.1.0-SNAPSHOT.jar') `
+    (Join-Path $Root 'agent/target/agent-0.1.0-SNAPSHOT.jar') `
     $ImmutableJar
 $BuildManifest = Join-Path $ArtifactDirectory 'build-manifest.json'
 Invoke-Checked {
-    node tools/artifact-manifest.mjs create $BuildManifest $ImmutableJar $AgentJar
+    node tools/artifact-manifest.mjs create $BuildManifest $ImmutableJar $CollectorJar
 } "artifact manifest creation failed"
 Invoke-Checked {
     node tools/artifact-manifest.mjs verify $BuildManifest

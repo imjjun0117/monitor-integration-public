@@ -1,7 +1,7 @@
 <!-- 기존 web.xml의 web-app 내부에 병합하며 기존 JSP/필터는 삭제하지 않습니다. -->
 <servlet>
     <servlet-name>hermesMonitorServlet</servlet-name>
-    <servlet-class>com.hermes.monitoring.agent.servlet.MonitorServlet</servlet-class>
+    <servlet-class>com.monitoring.collector.servlet.MonitorServlet</servlet-class>
     <init-param>
         <param-name>configurerClass</param-name>
         <param-value>sample.monitoring.SampleMonitorConfigurer</param-value>

@@ -44,13 +44,13 @@ if ($LASTEXITCODE -ne 0 -or (($JavaVersionOutput | Select-Object -First 1) -join
     throw 'JDK 21이 필요합니다.'
 }
 
-& $Maven -q -pl monitor-center -DskipTests '-Dfrontend.skip=true' package
+& $Maven -q -pl agent -DskipTests '-Dfrontend.skip=true' package
 $BuildExit = $LASTEXITCODE
 if ($BuildExit -ne 0) {
     throw "ADMIN_PASSWORD_RESET_FAILED stage=build exit=$BuildExit"
 }
-$ResetJars = @(Get-ChildItem -LiteralPath (Join-Path $Root 'monitor-center/target') `
-    -Filter 'monitor-center-*.jar' -File | Where-Object { $_.Name -notlike '*.original' })
+$ResetJars = @(Get-ChildItem -LiteralPath (Join-Path $Root 'agent/target') `
+    -Filter 'agent-*.jar' -File | Where-Object { $_.Name -notlike '*.original' })
 if ($ResetJars.Count -ne 1) {
     throw 'ADMIN_PASSWORD_RESET_FAILED stage=build code=RESET_ARTIFACT_INVALID'
 }
@@ -78,7 +78,7 @@ try {
         throw '비밀번호 확인이 일치하지 않습니다.'
     }
     $PlainFirst | & $Java.Source `
-        '-Dloader.main=com.hermes.monitoring.center.security.AdminPasswordResetCli' `
+        '-Dloader.main=com.monitoring.agent.security.AdminPasswordResetCli' `
         -cp $ResetJar.FullName org.springframework.boot.loader.launch.PropertiesLauncher
     $ResetExit = $LASTEXITCODE
     if ($ResetExit -ne 0) {
