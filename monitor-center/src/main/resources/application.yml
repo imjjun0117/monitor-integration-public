@@ -1,0 +1,23 @@
+server:
+  address: 127.0.0.1
+  port: 8080
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/hermes_monitor
+    username: hermes
+    password: ${HERMES_DB_PASSWORD}
+  flyway:
+    enabled: true
+management.endpoints.web.exposure.include: health,info
+hermes:
+  master-key: ${HERMES_MASTER_KEY}
+  agent-allowed-cidrs: ${HERMES_AGENT_ALLOWED_CIDRS:}
+  agent-allowed-hosts: ${HERMES_AGENT_ALLOWED_HOSTS:}
+  agent-allowlist-file: ${HERMES_AGENT_ALLOWLIST_FILE:}
+  check:
+    external-interval-ms: ${HERMES_EXTERNAL_CHECK_INTERVAL_MS:86400000}

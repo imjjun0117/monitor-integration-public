@@ -1,0 +1,153 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '23 3 * * 1'
+
+jobs:
+  dependency-vulnerability:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: monitor-center/frontend/package-lock.json
+      - name: Cache Trivy vulnerability databases
+        uses: actions/cache@v4
+        with:
+          path: .tools/trivy/cache
+          key: trivy-db-0.74.0-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            trivy-db-0.74.0-${{ runner.os }}-
+      - name: Fail-closed production dependency scan
+        run: pwsh ./scripts/dependency-vulnerability-gate.ps1
+      - name: Upload dependency scan reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-vulnerability-reports
+          path: .run/security
+      - name: Upload Maven dependency SARIF
+        if: always() && hashFiles('.run/security/maven-trivy.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: .run/security/maven-trivy.sarif
+          category: dependency-maven
+      - name: Upload npm dependency SARIF
+        if: always() && hashFiles('.run/security/npm-trivy.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: .run/security/npm-trivy.sarif
+          category: dependency-npm
+
+  build-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: ./mvnw -pl monitor-agent -am package
+      - run: java tools/VerifyAgentJar.java monitor-agent/target/monitor-agent-0.1.0-SNAPSHOT.jar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: monitor-agent
+          path: monitor-agent/target/monitor-agent-0.1.0-SNAPSHOT.jar
+
+  agent-runtime:
+    needs: build-agent
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['7', '8']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: monitor-agent
+          path: monitor-agent/target
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: ${{ matrix.java }}
+      - run: >-
+          java -cp monitor-agent/target/monitor-agent-0.1.0-SNAPSHOT.jar
+          com.hermes.monitoring.agent.AgentCompatibilityProbe
+
+  verify:
+    needs: dependency-vulnerability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '7'
+      - run: echo "HERMES_JAVA7_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '8'
+      - run: echo "HERMES_JAVA8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: monitor-center/frontend/package-lock.json
+      - uses: docker/setup-compose-action@v1
+      - run: node tools/scan-secrets.mjs
+      - working-directory: monitor-center/frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - run: pwsh ./scripts/verify.ps1
+
+  periodic-owasp:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: dependency-check-nvd
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Select weekly NVD cache
+        id: odc_cache_epoch
+        run: echo "epoch=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Cache OWASP Dependency-Check database
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hermes-dependency-check
+          key: dependency-check-${{ runner.os }}-12.2.2-${{ steps.odc_cache_epoch.outputs.epoch }}
+          restore-keys: |
+            dependency-check-${{ runner.os }}-12.2.2-
+      - name: Scheduled NVD defense-in-depth
+        run: ./mvnw -B -Pperiodic-owasp verify
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+      - name: Upload OWASP reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: periodic-owasp-reports
+          path: target/dependency-check-report.*

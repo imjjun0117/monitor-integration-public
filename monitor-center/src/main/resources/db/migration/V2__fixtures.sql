@@ -1,0 +1,7 @@
+INSERT INTO projects(project_id,display_name) VALUES ('sample-a','샘플 A');
+INSERT INTO projects(project_id,display_name) VALUES ('sample-b','샘플 B');
+INSERT INTO instances(project_id,instance_id,display_name,environment,agent_base_url,token_ciphertext,token_iv) VALUES ('sample-a','local-01','샘플 A 1','local','http://127.0.0.1:18081',decode(repeat('00',32),'hex'), decode(repeat('00',12),'hex'));
+INSERT INTO instances(project_id,instance_id,display_name,environment,agent_base_url,token_ciphertext,token_iv) VALUES ('sample-a','local-02','샘플 A 2','local','http://127.0.0.1:18082',decode(repeat('00',32),'hex'), decode(repeat('00',12),'hex'));
+INSERT INTO instances(project_id,instance_id,display_name,environment,agent_base_url,token_ciphertext,token_iv) VALUES ('sample-b','local-01','샘플 B 1','local','http://127.0.0.1:18083',decode(repeat('00',32),'hex'), decode(repeat('00',12),'hex'));
+INSERT INTO instances(project_id,instance_id,display_name,environment,agent_base_url,token_ciphertext,token_iv) VALUES ('sample-b','local-02','샘플 B 2','local','http://127.0.0.1:18084',decode(repeat('00',32),'hex'), decode(repeat('00',12),'hex'));
+INSERT INTO thresholds(scope,metric_key,warning_value,critical_value) VALUES ('GLOBAL','SYSTEM_CPU',0.80,0.90),('GLOBAL','PHYSICAL_MEMORY',0.80,0.90),('GLOBAL','JVM_HEAP',0.80,0.90),('GLOBAL','DISK',0.80,0.90),('GLOBAL','DB_POOL',0.80,0.95),('GLOBAL','API_LATENCY_MS',2000,5000),('GLOBAL','CERTIFICATE_DAYS',30,7);

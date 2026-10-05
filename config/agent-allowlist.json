@@ -1,0 +1,6 @@
+{
+  "allowed_cidrs": [
+    "127.0.0.1/32"
+  ],
+  "allowed_hosts": []
+}

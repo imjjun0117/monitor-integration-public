@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:17.11-bookworm
+    restart: unless-stopped
+    ports: ["127.0.0.1:${HERMES_DB_PORT:-5432}:5432"]
+    environment:
+      POSTGRES_DB: hermes_monitor
+      POSTGRES_USER: hermes
+      POSTGRES_PASSWORD: ${HERMES_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hermes -d hermes_monitor"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    volumes: ["hermes-postgres-data:/var/lib/postgresql/data"]
+  agent-a1:
+    profiles: ["samples"]
+    build:
+      context: .
+      dockerfile: monitor-agent-testapp/Dockerfile
+    ports: ["127.0.0.1:18081:8080"]
+    environment:
+      HERMES_TEST_AGENT_TOKEN: ${HERMES_SAMPLE_AGENT_TOKEN:?required}
+      HERMES_TEST_PROJECT_ID: sample-a
+      HERMES_TEST_INSTANCE_ID: local-01
+  agent-a2:
+    profiles: ["samples"]
+    build:
+      context: .
+      dockerfile: monitor-agent-testapp/Dockerfile
+    ports: ["127.0.0.1:18082:8080"]
+    environment:
+      HERMES_TEST_AGENT_TOKEN: ${HERMES_SAMPLE_AGENT_TOKEN:?required}
+      HERMES_TEST_PROJECT_ID: sample-a
+      HERMES_TEST_INSTANCE_ID: local-02
+  agent-b1:
+    profiles: ["samples"]
+    build:
+      context: .
+      dockerfile: monitor-agent-testapp/Dockerfile
+    ports: ["127.0.0.1:18083:8080"]
+    environment:
+      HERMES_TEST_AGENT_TOKEN: ${HERMES_SAMPLE_AGENT_TOKEN:?required}
+      HERMES_TEST_PROJECT_ID: sample-b
+      HERMES_TEST_INSTANCE_ID: local-01
+  agent-b2:
+    profiles: ["samples"]
+    build:
+      context: .
+      dockerfile: monitor-agent-testapp/Dockerfile
+    ports: ["127.0.0.1:18084:8080"]
+    environment:
+      HERMES_TEST_AGENT_TOKEN: ${HERMES_SAMPLE_AGENT_TOKEN:?required}
+      HERMES_TEST_PROJECT_ID: sample-b
+      HERMES_TEST_INSTANCE_ID: local-02
+volumes:
+  hermes-postgres-data:

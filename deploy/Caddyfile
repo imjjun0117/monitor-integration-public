@@ -1,0 +1,14 @@
+{
+    admin off
+    default_sni {$HERMES_PUBLIC_IP}
+}
+
+{$HERMES_PUBLIC_IP} {
+    tls {
+        issuer acme {
+            dir https://acme-v02.api.letsencrypt.org/directory
+            profile shortlived
+        }
+    }
+    reverse_proxy center:8080
+}

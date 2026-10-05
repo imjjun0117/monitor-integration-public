@@ -1,0 +1,64 @@
+{
+  "projects": [
+    {
+      "project_id": "sample-a",
+      "display_name": "Sample A",
+      "status": "UP",
+      "instances": [
+        {
+          "instance_id": "local-01",
+          "display_name": "sample-a local-01",
+          "host_name": "local-01",
+          "status": "UP",
+          "system_cpu_ratio": 0.32,
+          "heap_ratio": 0.54,
+          "db_pool": "8/20",
+          "internal_checks": "1/1",
+          "last_seen_at": "2026-09-03T01:30:15Z"
+        },
+        {
+          "instance_id": "local-02",
+          "display_name": "sample-a local-02",
+          "host_name": "local-02",
+          "status": "UP",
+          "system_cpu_ratio": 0.32,
+          "heap_ratio": 0.54,
+          "db_pool": "8/20",
+          "internal_checks": "1/1",
+          "last_seen_at": "2026-09-03T01:30:15Z"
+        }
+      ]
+    },
+    {
+      "project_id": "sample-b",
+      "display_name": "Sample B",
+      "status": "UP",
+      "instances": [
+        {
+          "instance_id": "local-01",
+          "display_name": "sample-b local-01",
+          "host_name": "local-01",
+          "status": "UP",
+          "system_cpu_ratio": 0.32,
+          "heap_ratio": 0.54,
+          "db_pool": "8/20",
+          "internal_checks": "1/1",
+          "last_seen_at": "2026-09-03T01:30:15Z"
+        },
+        {
+          "instance_id": "local-02",
+          "display_name": "sample-b local-02",
+          "host_name": "local-02",
+          "status": "UP",
+          "system_cpu_ratio": 0.32,
+          "heap_ratio": 0.54,
+          "db_pool": "8/20",
+          "internal_checks": "1/1",
+          "last_seen_at": "2026-09-03T01:30:15Z"
+        }
+      ]
+    }
+  ],
+  "failed_api_count": 0,
+  "expiring_certificate_count": 0
+}

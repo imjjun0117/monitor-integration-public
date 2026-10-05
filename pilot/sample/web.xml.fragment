@@ -1,0 +1,18 @@
+<!-- 기존 web.xml의 web-app 내부에 병합하며 기존 JSP/필터는 삭제하지 않습니다. -->
+<servlet>
+    <servlet-name>hermesMonitorServlet</servlet-name>
+    <servlet-class>com.hermes.monitoring.agent.servlet.MonitorServlet</servlet-class>
+    <init-param>
+        <param-name>configurerClass</param-name>
+        <param-value>sample.monitoring.SampleMonitorConfigurer</param-value>
+    </init-param>
+    <init-param>
+        <param-name>monitor.checks.resource</param-name>
+        <param-value>/WEB-INF/monitor-checks.json</param-value>
+    </init-param>
+    <load-on-startup>2</load-on-startup>
+</servlet>
+<servlet-mapping>
+    <servlet-name>hermesMonitorServlet</servlet-name>
+    <url-pattern>/monitor/v1/*</url-pattern>
+</servlet-mapping>

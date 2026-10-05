@@ -1,0 +1,7 @@
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+hermes:
+  external-https: true

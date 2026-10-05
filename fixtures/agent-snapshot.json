@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "observed_at": "2026-09-03T01:30:15Z",
+  "identity": {
+    "project_id": "sample-a",
+    "instance_id": "local-01"
+  },
+  "jvm": {
+    "pid": 18432,
+    "start_time": "2026-09-02T01:30:15Z",
+    "uptime_ms": 86400000,
+    "java_vendor": "Temurin",
+    "java_version": "1.8.0",
+    "process_cpu_ratio": 0.21,
+    "heap_used_bytes": 438304768,
+    "heap_max_bytes": 805306368,
+    "non_heap_used_bytes": 73400320,
+    "thread_live_count": 82,
+    "thread_peak_count": 104,
+    "gc_count": 830,
+    "gc_time_ms": 12431
+  },
+  "system": {
+    "system_cpu_ratio": 0.32,
+    "physical_memory_used_bytes": 12884901888,
+    "physical_memory_total_bytes": 17179869184,
+    "disks": [
+      {
+        "path_id": "data",
+        "path_display": "/data",
+        "used_bytes": 75161927680,
+        "total_bytes": 107374182400
+      }
+    ]
+  },
+  "db_pools": [
+    {
+      "pool_id": "main",
+      "name": "Main DataSource",
+      "active": 8,
+      "idle": 7,
+      "max": 20,
+      "min_idle": 3,
+      "waiters": null,
+      "max_wait_ms": 10000,
+      "validation_latency_ms": 18,
+      "unsupported": [
+        "waiters"
+      ]
+    }
+  ],
+  "recent_checks": [
+    {
+      "check_id": "db-health",
+      "category": "INTERNAL",
+      "status": "UP",
+      "duration_ms": 32,
+      "checked_at": "2026-09-03T01:30:00Z",
+      "message": "정상"
+    }
+  ],
+  "partial": false,
+  "collection_errors": []
+}

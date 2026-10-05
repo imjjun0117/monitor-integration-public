@@ -1,0 +1,27 @@
+monitor.project-id=sample
+monitor.instance-id=local-01
+monitor.display-name=샘플 프로젝트 로컬 1호기
+monitor.environment=local
+monitor.token=${외부_보안_설정에서_주입}
+monitor.disk.data.path=/data
+monitor.checks.resource=/WEB-INF/monitor-checks.json
+monitor.api-checks.enabled=false
+
+# 아래 값은 실제 배포의 외부 설정에서 제공한 뒤 해당 JSON declaration을 enabled=true로 바꿉니다.
+sample.batch.import.marker.path=
+sample.batch.cleanup.marker.path=
+sample.batch.sync.marker.path=
+sample.log.current.path=
+sample.search.host=
+sample.search.port=
+sample.smtp.host=
+sample.smtp.port=
+sample.storage.shared.path=
+sample.document-viewer.health.url=
+sample.catalog-api.health.url=
+sample.smart.health.url=
+sample.partner-api.health.url=
+sample.data-portal.health.url=
+sample.reference-api.health.url=
+sample.news-api.health.url=
+sample.analysis-api.health.url=

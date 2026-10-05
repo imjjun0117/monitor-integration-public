@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* TailAdmin primitives use the existing Hermes palette. */
+@theme inline {
+  --font-sans: var(--hm-font);
+  --color-brand-50: var(--hm-primary-soft);
+  --color-brand-500: var(--hm-primary);
+  --color-brand-600: var(--hm-primary-hover);
+  --color-gray-50: #f9fafb;
+  --color-gray-100: var(--hm-subtle);
+  --color-gray-200: var(--hm-border);
+  --color-gray-300: var(--hm-border-strong);
+  --color-gray-500: var(--hm-secondary);
+  --color-gray-600: var(--hm-secondary);
+  --color-gray-700: #344054;
+  --color-gray-800: var(--hm-ink);
+  --color-success-50: var(--hm-success-soft);
+  --color-success-200: #a8d9bd;
+  --color-success-700: var(--hm-success);
+  --color-warning-50: var(--hm-warning-soft);
+  --color-warning-200: #f4d799;
+  --color-warning-700: var(--hm-warning);
+  --color-error-50: var(--hm-danger-soft);
+  --color-error-200: #f5beb9;
+  --color-error-600: var(--hm-danger);
+  --color-error-700: #981b12;
+  --color-blue-50: var(--hm-info-soft);
+  --color-blue-700: var(--hm-info);
+  --shadow-theme-xs: 0 1px 2px 0 rgb(16 24 40 / 0.05);
+  --shadow-theme-lg: 0 12px 32px -8px rgb(16 24 40 / 0.18);
+}

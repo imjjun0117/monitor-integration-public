@@ -1,0 +1,56 @@
+name: monitor-server
+services:
+  postgres:
+    image: postgres:17.11-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hermes_monitor
+      POSTGRES_USER: hermes
+      POSTGRES_PASSWORD: ${HERMES_DB_PASSWORD:?required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hermes -d hermes_monitor"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  center:
+    build:
+      context: .
+      dockerfile: monitor-center/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: tunnel
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hermes_monitor
+      HERMES_DB_PASSWORD: ${HERMES_DB_PASSWORD:?required}
+      HERMES_MASTER_KEY: ${HERMES_MASTER_KEY:?required}
+      HERMES_ADMIN_USERNAME: ${HERMES_ADMIN_USERNAME:-admin}
+      HERMES_ADMIN_PASSWORD_HASH: ${HERMES_ADMIN_PASSWORD_HASH:?required}
+      HERMES_SAMPLE_FIXTURES_ENABLED: "false"
+      HERMES_AGENT_ALLOWLIST_FILE: /app/config/agent-allowlist.json
+      HERMES_EXTERNAL_CHECK_INTERVAL_MS: ${HERMES_EXTERNAL_CHECK_INTERVAL_MS:-86400000}
+    volumes:
+      - ./config/agent-allowlist.json:/app/config/agent-allowlist.json:ro
+  https:
+    image: caddy:2.11.6-alpine
+    restart: unless-stopped
+    depends_on:
+      - center
+    environment:
+      HERMES_PUBLIC_IP: ${HERMES_PUBLIC_IP:?required}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:

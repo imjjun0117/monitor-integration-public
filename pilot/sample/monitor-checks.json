@@ -1,0 +1,81 @@
+{
+  "checks": [
+    {
+      "check_id": "db-connection",
+      "name": "DB 연결",
+      "category": "INTERNAL",
+      "direction": null,
+      "type": "CUSTOM",
+      "enabled": false,
+      "implementation": "Project DataSource validation MonitorCheck required",
+      "configuration_required": [
+        "sample.datasource.validation-query"
+      ]
+    },
+    {
+      "check_id": "batch-import",
+      "name": "데이터 수집 배치",
+      "category": "INTERNAL",
+      "direction": null,
+      "type": "BATCH",
+      "enabled": false,
+      "path": "${sample.batch.import.marker.path}",
+      "max_age_ms": 86400000,
+      "configuration_required": [
+        "sample.batch.import.marker.path"
+      ]
+    },
+    {
+      "check_id": "log-freshness",
+      "name": "로그 갱신",
+      "category": "INTERNAL",
+      "direction": null,
+      "type": "FILE",
+      "enabled": false,
+      "path": "${sample.log.current.path}",
+      "max_age_ms": 600000,
+      "configuration_required": [
+        "sample.log.current.path"
+      ]
+    },
+    {
+      "check_id": "search-tcp",
+      "name": "검색 TCP",
+      "category": "INTERNAL",
+      "direction": null,
+      "type": "TCP",
+      "enabled": false,
+      "host": "${sample.search.host}",
+      "port": "${sample.search.port}",
+      "connect_timeout_ms": 2000,
+      "configuration_required": [
+        "sample.search.host",
+        "sample.search.port"
+      ]
+    },
+    {
+      "check_id": "smtp-tcp",
+      "name": "SMTP TCP",
+      "category": "INTERNAL",
+      "direction": null,
+      "type": "TCP",
+      "enabled": false,
+      "host": "${sample.smtp.host}",
+      "port": "${sample.smtp.port}",
+      "connect_timeout_ms": 2000,
+      "configuration_required": [
+        "sample.smtp.host",
+        "sample.smtp.port"
+      ]
+    },
+    {
+      "check_id": "data-mount-access",
+      "name": "데이터 마운트 접근",
+      "category": "INTERNAL",
+      "direction": null,
+      "type": "DIRECTORY",
+      "enabled": true,
+      "path": "${monitor.disk.data.path}"
+    }
+  ]
+}

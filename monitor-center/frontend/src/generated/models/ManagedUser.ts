@@ -1,0 +1,20 @@
+/* generated using openapi-typescript-codegen -- do not edit */
+/* istanbul ignore file */
+/* tslint:disable */
+/* eslint-disable */
+export type ManagedUser = {
+    username: string;
+    role: ManagedUser.role;
+    enabled: boolean;
+    project_ids: Array<string>;
+    created_at: string;
+    updated_at: string;
+};
+export namespace ManagedUser {
+    export enum role {
+        ADMIN = 'ADMIN',
+        OPERATOR = 'OPERATOR',
+        VIEWER = 'VIEWER',
+    }
+}
+
