@@ -6,6 +6,22 @@ import { PermissionContext } from '../../components/PermissionContext';
 import { createUser } from '../../api';
 import { selectOption } from '../../test-select';
 
+vi.mock('../../generated', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../generated')>();
+  return {
+    ...original,
+    DefaultService: {
+      ...original.DefaultService,
+      listRoles: vi.fn(async () =>
+        ['ADMIN', 'OPERATOR', 'VIEWER'].map((roleId) => ({
+          roleId,
+          name: { ADMIN: '관리자', OPERATOR: '운영자', VIEWER: '조회자' }[roleId],
+          enabled: true,
+        })),
+      ),
+    },
+  };
+});
 vi.mock('../../api', () => ({
   getUsers: vi.fn(async () => ({
     items: [

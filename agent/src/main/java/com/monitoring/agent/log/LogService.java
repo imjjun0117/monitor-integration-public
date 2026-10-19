@@ -18,6 +18,8 @@ import tools.jackson.databind.ObjectMapper;
 // 조회 주기에 따라 로그를 읽고 여러 사용자가 임시 결과 공유
 @Service
 public final class LogService {
+    @Autowired(required = false)
+    private com.monitoring.agent.transport.CollectorTransportHub transport;
     private final CollectorClient client;
     private final ObjectMapper json;
     private final TokenCipher cipher;
@@ -112,6 +114,9 @@ public final class LogService {
                                 cipher.decrypt(
                                         (byte[]) config.get("token_ciphertext"),
                                         (byte[]) config.get("token_iv"));
+                        if (transport != null) {
+                            client.setTransport(transport);
+                        }
                         var response =
                                 json.readTree(
                                         client.readLog(

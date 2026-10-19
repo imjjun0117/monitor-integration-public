@@ -9,6 +9,8 @@ import com.monitoring.collector.MonitorCollectorBuilder;
 import com.monitoring.collector.MonitorCollectorConfigurer;
 import com.monitoring.collector.MonitorRuntime;
 import com.monitoring.collector.LogReader;
+import com.monitoring.collector.CollectorConfiguration;
+import com.monitoring.collector.CollectorConnection;
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -33,6 +35,7 @@ public final class MonitorServlet extends HttpServlet {
     private final Gson gson = new GsonBuilder().serializeNulls().create();
     private MonitorRuntime runtime;
     private LogReader logs;
+    private CollectorConnection connection;
     private String initializationError;
     private String initializationReason;
     private String initializationExceptionType;
@@ -41,17 +44,33 @@ public final class MonitorServlet extends HttpServlet {
     public void init() {
         try {
             String configurerClass = getInitParameter("configurerClass");
+            CollectorConfiguration configuration =
+                    new CollectorConfiguration(
+                            getServletContext(), getInitParameter("configLocation"));
             MonitorCollectorBuilder builder = new MonitorCollectorBuilder();
             ClassLoader loader = Thread.currentThread().getContextClassLoader();
             if (loader == null) {
                 loader = MonitorServlet.class.getClassLoader();
             }
-            MonitorCollectorConfigurer configurer =
-                    (MonitorCollectorConfigurer)
-                            Class.forName(configurerClass, true, loader).newInstance();
-            configurer.configure(builder, getServletContext());
+            if (configurerClass == null || configurerClass.trim().length() == 0) {
+                configuration.configure(builder, getServletContext());
+            } else {
+                MonitorCollectorConfigurer configurer =
+                        (MonitorCollectorConfigurer)
+                                Class.forName(configurerClass, true, loader).newInstance();
+                configurer.configure(builder, getServletContext());
+            }
+            configuration.override(builder.configuration());
             runtime = builder.build();
-            logs = new LogReader(getInitParameter("logAllowedRoots"));
+            logs =
+                    new LogReader(
+                            configuration.get(
+                                    "monitor.log.allowed-roots",
+                                    getInitParameter("logAllowedRoots") == null
+                                            ? ""
+                                            : getInitParameter("logAllowedRoots")));
+            connection = new CollectorConnection(runtime, logs, configuration.websocketUrl());
+            getServletContext().setAttribute(CollectorConnection.CONTEXT_KEY, connection);
         } catch (Exception error) {
             initializationFailed(error);
         } catch (LinkageError error) {
@@ -61,6 +80,13 @@ public final class MonitorServlet extends HttpServlet {
 
     // 초기화 실패 원인을 구분하여 응답 정보 및 WAS 로그 기록
     private void initializationFailed(Throwable error) {
+        if (connection != null) {
+            connection.destroy();
+        }
+        if (runtime != null) {
+            runtime.shutdown();
+            runtime = null;
+        }
         initializationError =
                 "TOKEN_TOO_SHORT".equals(error.getMessage())
                                 || "INVALID_IDENTITY".equals(error.getMessage())
@@ -120,6 +146,10 @@ public final class MonitorServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
         String path = request.getPathInfo();
+        if ("/connection/status".equals(path)) {
+            json(response, connection.status());
+            return;
+        }
         if ("/info".equals(path)) {
             json(response, runtime.info());
             return;
@@ -144,6 +174,30 @@ public final class MonitorServlet extends HttpServlet {
     // 로그 조회 및 점검 실행 요청 처리
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
+        if ("/connection/start".equals(request.getPathInfo())) {
+            try {
+                JsonObject body =
+                        new JsonParser()
+                                .parse(new String(readLimited(request.getInputStream()), UTF8))
+                                .getAsJsonObject();
+                if (body.size() != 1 || !body.has("ticket")) {
+                    throw new IllegalArgumentException("INVALID_REQUEST");
+                }
+                Map<String, Object> state = connection.start(body.get("ticket").getAsString());
+                response.setStatus(202);
+                json(response, state);
+            } catch (IllegalStateException unavailable) {
+                send(response, 409, "TRANSPORT_NOT_CONFIGURED");
+            } catch (Exception invalid) {
+                send(response, 400, "INVALID_CONNECTION_REQUEST");
+            }
+            return;
+        }
+        if ("/connection/stop".equals(request.getPathInfo())) {
+            connection.stop();
+            json(response, connection.status());
+            return;
+        }
         if ("/logs/read".equals(request.getPathInfo())) {
             readLog(request, response);
             return;
@@ -306,6 +360,10 @@ public final class MonitorServlet extends HttpServlet {
     }
 
     public void destroy() {
+        getServletContext().removeAttribute(CollectorConnection.CONTEXT_KEY);
+        if (connection != null) {
+            connection.destroy();
+        }
         if (runtime != null) {
             runtime.shutdown();
         }

@@ -17,7 +17,7 @@
 2. 기존 `WEB-INF/web.xml`의 **monitor servlet 선언 안에** 아래 `init-param`만 추가합니다. 기존 전체 web.xml을 교체하지 마세요.
 3. WAS를 재기동합니다. JAR 교체만으로는 기존 로딩 클래스가 바뀌지 않습니다.
 
-Sample의 실제 로그가 `/usr/local/tomcat/logs/catalina.out`인 Linux 서버 예시:
+샘플 서버의 로그가 `/usr/local/tomcat/logs/catalina.out`인 Linux 서버 예시:
 
 ```xml
 <init-param>
@@ -28,7 +28,7 @@ Sample의 실제 로그가 `/usr/local/tomcat/logs/catalina.out`인 Linux 서버
 
 대시보드의 파일 경로에는 `/usr/local/tomcat/logs/catalina.out`을 등록합니다. 컨테이너에서는 **Collector가 실행되는 컨테이너 안에서 보이는 경로**를 사용합니다.
 
-Windows는 실제 Tomcat 로그 폴더의 절대 경로를 같은 `param-value`에 넣습니다. 여러 허용 폴더는 세미콜론(`;`)으로 구분합니다. 샘플 대학·샘플 기업의 웹앱 위치가 Tomcat 로그 위치를 뜻하지는 않으므로 실제 WAS 로그 경로를 확인한 뒤 지정해야 합니다. 전체 드라이브 대신 로그 폴더만 허용하세요.
+Windows는 실제 Tomcat 로그 폴더의 절대 경로를 같은 `param-value`에 넣습니다. 여러 허용 폴더는 세미콜론(`;`)으로 구분합니다. 대상 웹앱 위치가 Tomcat 로그 위치를 뜻하지는 않으므로 실제 WAS 로그 경로를 확인한 뒤 지정해야 합니다. 전체 드라이브 대신 로그 폴더만 허용하세요.
 
 허용 폴더를 절대 경로로 설정하지 않으면 `LOG_ROOTS_NOT_CONFIGURED`, 폴더 밖 경로는 `LOG_PATH_NOT_ALLOWED`로 차단합니다. 심볼릭 링크·상위 경로 이동도 최종 실제 경로를 검사합니다. 원격 UNC 공유 경로는 허용하지 않습니다. WAS 실행 계정에 파일 읽기 권한이 있어야 합니다. 허용 폴더 안에서 파일 추가·주기 변경·사용/미사용 변경은 대시보드만으로 처리하며 JAR 재배포가 필요 없습니다.
 

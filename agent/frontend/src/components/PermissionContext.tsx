@@ -1,7 +1,14 @@
 // 화면 접근 및 쓰기 권한 공유
 import { createContext, useContext } from 'react';
+import type { ManagedMenu } from '../generated';
 
-type Permissions = { role: string; username: string; isAdmin: boolean; canWrite: boolean };
+type Permissions = {
+  role: string;
+  username: string;
+  isAdmin: boolean;
+  canWrite: boolean;
+  menus?: ManagedMenu[];
+};
 // 개별 컴포넌트의 기존 표시 유지. 앱에서는 PermissionProvider로 실제 권한 제공
 export const PermissionContext = createContext<Permissions>({
   role: 'ADMIN',

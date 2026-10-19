@@ -3,6 +3,10 @@ package com.monitoring.collector;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Collections;
+import java.util.Properties;
 import java.nio.charset.Charset;
 
 // 프로젝트 식별 정보·자원·점검 설정으로 Collector 생성
@@ -11,6 +15,9 @@ public final class MonitorCollectorBuilder {
     private String projectId;
     private String instanceId;
     private String token;
+    private String environment;
+    private String contextPath;
+    private final Map<String, String> configuration = new LinkedHashMap<String, String>();
     private final List<MonitorCheck> checks = new ArrayList<MonitorCheck>();
     private final List<DiskTarget> disks = new ArrayList<DiskTarget>();
     private final List<DbPoolMetricsProvider> dbPools = new ArrayList<DbPoolMetricsProvider>();
@@ -26,6 +33,34 @@ public final class MonitorCollectorBuilder {
     public MonitorCollectorBuilder token(String value) {
         token = value;
         return this;
+    }
+
+    // JVM 전역 설정을 변경하지 않고 웹앱별 표시 정보 설정
+    public MonitorCollectorBuilder attributes(String environment, String contextPath) {
+        this.environment = environment;
+        this.contextPath = contextPath;
+        return this;
+    }
+
+    // 기존 프로젝트 설정에서 공통 통신·로그 설정만 복사
+    public MonitorCollectorBuilder configuration(Properties properties) {
+        for (String key :
+                new String[] {
+                    "monitor.central.url",
+                    "monitor.log.allowed-roots",
+                    "monitor.websocket.allow-local-ws"
+                }) {
+            String value = properties.getProperty(key);
+            if (value != null) {
+                configuration.put(key, value);
+            }
+        }
+        return this;
+    }
+
+    // 인증 정보가 포함되지 않은 초기화 설정 반환
+    public Map<String, String> configuration() {
+        return Collections.unmodifiableMap(configuration);
     }
 
     // 프로젝트별 점검 등록
@@ -65,7 +100,10 @@ public final class MonitorCollectorBuilder {
         if (token == null || token.getBytes(UTF8).length < 32) {
             throw new IllegalStateException("TOKEN_TOO_SHORT");
         }
-        return new MonitorRuntime(projectId, instanceId, token, checks, disks, dbPools);
+        MonitorRuntime runtime =
+                new MonitorRuntime(projectId, instanceId, token, checks, disks, dbPools);
+        runtime.configureAttributes(environment, contextPath);
+        return runtime;
     }
 
     private boolean valid(String value) {

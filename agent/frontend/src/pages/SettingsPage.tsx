@@ -3,8 +3,10 @@ import { usePermissions } from '../components/PermissionContext';
 import { Alert } from '../components/ui';
 import UserSettingsTab from './settings/UserSettingsTab';
 import AuditSettingsTab from './settings/AuditSettingsTab';
+import MenuSettingsTab from './settings/MenuSettingsTab';
+import RoleSettingsTab from './settings/RoleSettingsTab';
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import CertificateSettingsTab from './settings/CertificateSettingsTab';
 import InstanceSettingsTab from './settings/InstanceSettingsTab';
 import ProjectSettingsTab from './settings/ProjectSettingsTab';
@@ -14,7 +16,10 @@ export default function SettingsPage() {
   const section = useLocation().pathname.split('/').at(-1) ?? 'projects';
   const mobileReadonly = useMobileReadonly();
   const { isAdmin, canWrite } = usePermissions();
-  if (!isAdmin && ['projects', 'users', 'audit'].includes(section)) {
+  if (
+    !isAdmin &&
+    ['projects', 'users', 'menus', 'permissions', 'roles', 'audit'].includes(section)
+  ) {
     return <Navigate to="/settings/instances" replace />;
   }
   return (
@@ -25,41 +30,11 @@ export default function SettingsPage() {
       {!canWrite && (
         <Alert variant="info" title="조회 전용 계정입니다. 설정을 변경할 수 없습니다." />
       )}
-      <nav aria-label="설정 탭" className="settings-nav">
-        {isAdmin && (
-          <Link aria-current={section === 'projects' ? 'page' : undefined} to="/settings/projects">
-            프로젝트 관리
-          </Link>
-        )}
-        <Link aria-current={section === 'instances' ? 'page' : undefined} to="/settings/instances">
-          인스턴스 관리
-        </Link>
-        <Link
-          aria-current={section === 'thresholds' ? 'page' : undefined}
-          to="/settings/thresholds"
-        >
-          임계치 관리
-        </Link>
-        <Link
-          aria-current={section === 'certificates' ? 'page' : undefined}
-          to="/settings/certificates"
-        >
-          인증서 대상 관리
-        </Link>
-        {isAdmin && (
-          <>
-            <Link aria-current={section === 'users' ? 'page' : undefined} to="/settings/users">
-              사용자 관리
-            </Link>
-            <Link aria-current={section === 'audit' ? 'page' : undefined} to="/settings/audit">
-              변경 이력
-            </Link>
-          </>
-        )}
-      </nav>
       <fieldset
         className="settings-content"
-        disabled={!canWrite || (mobileReadonly && section !== 'audit')}
+        disabled={
+          (!canWrite && section !== 'thresholds') || (mobileReadonly && section !== 'audit')
+        }
         aria-describedby={mobileReadonly ? 'mobile-settings-note' : undefined}
       >
         {section === 'projects' && <ProjectSettingsTab />}
@@ -68,6 +43,9 @@ export default function SettingsPage() {
         {section === 'certificates' && <CertificateSettingsTab />}
         {isAdmin && section === 'users' && <UserSettingsTab />}
         {isAdmin && section === 'audit' && <AuditSettingsTab />}
+        {isAdmin && section === 'menus' && <MenuSettingsTab />}
+        {isAdmin && section === 'roles' && <RoleSettingsTab />}
+        {isAdmin && section === 'permissions' && <Navigate to="/settings/roles" replace />}
       </fieldset>
     </>
   );

@@ -9,15 +9,18 @@ import {
   TextInput,
 } from '../../components/ui';
 import { Table, Tbody, Td, Th, Thead, Tr } from '../../components/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Project, ProjectWrite } from '../../generated';
+import { DefaultService } from '../../generated';
 import { createProject, deleteProjectPermanently, getProjects } from '../../api';
 import { BooleanSelect, LabeledField, MutationError, QueryContent, SettingsDialog } from './forms';
 import { useInvalidateMutation } from './useInvalidateMutation';
 import { emptyProject, validateProject } from './validation';
+import { useProjectScope } from '../../components/ProjectScope';
 
 export default function ProjectSettingsTab() {
+  const { project: selectedProject } = useProjectScope();
   const query = useQuery({ queryKey: ['projects'], queryFn: getProjects });
   const [value, setValue] = useState<ProjectWrite>(emptyProject());
   const [validation, setValidation] = useState<string>();
@@ -101,13 +104,16 @@ export default function ProjectSettingsTab() {
             <Thead>
               <Tr>
                 <Th>프로젝트</Th>
+                <Th>XLog 수집</Th>
                 <Th>작업</Th>
               </Tr>
             </Thead>
             <Tbody>
-              {query.data?.items.map((project) => (
-                <ProjectRow key={project.project_id} project={project} />
-              ))}
+              {query.data?.items
+                .filter((project) => !selectedProject || project.project_id === selectedProject)
+                .map((project) => (
+                  <ProjectRow key={project.project_id} project={project} />
+                ))}
             </Tbody>
           </Table>
         </div>
@@ -117,6 +123,23 @@ export default function ProjectSettingsTab() {
 }
 
 function ProjectRow({ project }: { project: Project }) {
+  const client = useQueryClient();
+  const settings = useQuery({
+    queryKey: ['xlog-settings', project.project_id],
+    queryFn: () => DefaultService.getXlogSettings({ projectId: project.project_id }),
+    retry: false,
+  });
+  const xlog = useMutation({
+    mutationFn: (enabled: boolean) =>
+      DefaultService.saveXlogSettings({
+        projectId: project.project_id,
+        requestBody: { enabled },
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['xlog-settings', project.project_id] });
+      void client.invalidateQueries({ queryKey: ['connection', project.project_id] });
+    },
+  });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const permanentDelete = useInvalidateMutation(
     () => deleteProjectPermanently(project.project_id),
@@ -127,6 +150,17 @@ function ProjectRow({ project }: { project: Project }) {
   return (
     <Tr>
       <Td>{project.project_id}</Td>
+      <Td>
+        <Button
+          permission="write"
+          variant="secondary"
+          isDisabled={!settings.data || xlog.isPending}
+          onClick={() => xlog.mutate(!settings.data?.enabled)}
+        >
+          {settings.data?.enabled ? '사용' : '미사용'}
+        </Button>
+        {xlog.isError && <span role="alert">저장 실패</span>}
+      </Td>
       <Td>
         <div className="settings-row-actions">
           <Button permission="admin" variant="danger" onClick={() => setConfirmDelete(true)}>

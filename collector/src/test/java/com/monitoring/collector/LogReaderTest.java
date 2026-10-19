@@ -95,4 +95,61 @@ public class LogReaderTest {
             assertEquals(code, expected.getMessage());
         }
     }
+
+    @Test
+    public void missingDatedFileDoesNotFallBackToPreviousDay() throws Exception {
+        File root = temporary.newFolder("missing-day");
+        java.text.SimpleDateFormat dates = new java.text.SimpleDateFormat("yyyy-MM-dd");
+        Files.write(new File(root, "stdout.2026-10-10.log").toPath(), "previous day\n".getBytes(UTF8));
+        LogReader reader = new LogReader(root.getAbsolutePath());
+        String pattern = new File(root, "stdout.{yyyy-MM-dd}.log").getAbsolutePath();
+
+        try {
+            reader.read(pattern, "UTF-8", null, dates.parse("2026-10-11"));
+            fail("Missing file accepted");
+        } catch (IOException expected) {
+            assertEquals("LOG_FILE_NOT_FOUND", expected.getMessage());
+        }
+
+        assertEquals(
+                "previous day\n",
+                reader.read(
+                                new File(root, "stdout.2026-10-10.log").getAbsolutePath(),
+                                "UTF-8",
+                                null)
+                        .get("text"));
+    }
+
+    @Test
+    public void datedFileFollowsNewDayAndResetsCursorWithoutReadingOutsideRoots() throws Exception {
+        File root = temporary.newFolder("dated");
+        java.text.SimpleDateFormat dates = new java.text.SimpleDateFormat("yyyy-MM-dd");
+        Files.write(new File(root, "catalina.2026-10-05.log").toPath(), "old day\n".getBytes(UTF8));
+        Path today = new File(root, "catalina.2026-10-06.log").toPath();
+        Files.write(today, "new day\n".getBytes(UTF8));
+        LogReader reader = new LogReader(root.getAbsolutePath());
+        String pattern = new File(root, "catalina.{yyyy-MM-dd}.log").getAbsolutePath();
+        Map<String, Object> first = reader.read(pattern, "UTF-8", null, dates.parse("2026-10-05"));
+        Map<String, Object> next =
+                reader.read(
+                        pattern,
+                        "UTF-8",
+                        first.get("cursor").toString(),
+                        dates.parse("2026-10-06"));
+        assertEquals("new day\n", next.get("text"));
+        assertEquals(true, next.get("reset"));
+        Files.write(today, "appended\n".getBytes(UTF8), StandardOpenOption.APPEND);
+        assertEquals(
+                "appended\n",
+                reader.read(
+                                pattern,
+                                "UTF-8",
+                                next.get("cursor").toString(),
+                                dates.parse("2026-10-06"))
+                        .get("text"));
+        denied(
+                reader,
+                new File(root, "../catalina.{yyyy-MM-dd}.log").getAbsolutePath(),
+                "LOG_PATH_NOT_ALLOWED");
+    }
 }

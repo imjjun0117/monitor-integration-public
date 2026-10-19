@@ -16,9 +16,15 @@ public final class DashboardController {
         this.query = query;
     }
 
+    Map<String, Object> dashboard(String period) {
+        return query.dashboard(period);
+    }
+
     @GetMapping
     Map<String, Object> dashboard(
-            @RequestParam(name = "period", defaultValue = "24h") String period) {
-        return query.dashboard(period);
+            @RequestParam(name = "period", defaultValue = "24h") String period,
+            @RequestParam(name = "project", defaultValue = "") String project,
+            @RequestParam(name = "instance", defaultValue = "") String instance) {
+        return query.dashboard(period, project, instance);
     }
 }

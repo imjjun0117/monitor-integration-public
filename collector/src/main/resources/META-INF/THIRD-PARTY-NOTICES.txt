@@ -1,0 +1,16 @@
+Collector bundled dependencies
+
+Gson 2.9.1
+Upstream: https://github.com/google/gson
+License: Apache License, Version 2.0
+Relocated from com.google.gson to com.monitoring.collector.internal.gson.
+
+nv-websocket-client 2.14
+Upstream: https://github.com/TakahikoKawasaki/nv-websocket-client
+License: Apache License, Version 2.0
+Relocated from com.neovisionaries.ws.client to
+com.monitoring.collector.internal.websocket.
+
+Both bundled libraries have been package-relocated for application isolation.
+The license text is included in META-INF/LICENSE-APACHE-2.0.txt.
+Servlet API and Java-WebSocket test support are not bundled in this JAR.

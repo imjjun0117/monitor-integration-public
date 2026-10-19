@@ -9,15 +9,8 @@ export type UserWrite = {
      * Required on creation; blank on update preserves existing password. Supplied passwords need at least 12 characters and at most 72 UTF-8 bytes.
      */
     password?: string;
-    role: UserWrite.role;
+    role: string;
     enabled: boolean;
     projectIds: Array<Identifier>;
 };
-export namespace UserWrite {
-    export enum role {
-        ADMIN = 'ADMIN',
-        OPERATOR = 'OPERATOR',
-        VIEWER = 'VIEWER',
-    }
-}
 

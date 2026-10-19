@@ -11,6 +11,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class ResourceQueryTest {
     @Test
     void supportsRequestedRangesAndRejectsInvalidPeriods() {
+        assertEquals(Duration.ofMinutes(5), ResourceQuery.duration("5m"));
+        assertEquals(Duration.ofMinutes(15), ResourceQuery.duration("15m"));
+        assertEquals(Duration.ofHours(1), ResourceQuery.duration("1h"));
         assertEquals(Duration.ofDays(1), ResourceQuery.duration("24h"));
         assertEquals(Duration.ofDays(7), ResourceQuery.duration("7d"));
         assertEquals(Duration.ofDays(30), ResourceQuery.duration("30d"));
@@ -47,6 +50,6 @@ class ResourceQueryTest {
         assertEquals(Duration.ofDays(365).toSeconds(), arguments.get(disk)[3]);
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new ResourceQuery(db).resources("test", "dev", "365d", 1001));
+                () -> new ResourceQuery(db).resources("test", "dev", "365d", 20001));
     }
 }

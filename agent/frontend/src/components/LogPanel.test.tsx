@@ -56,6 +56,8 @@ test('polls only while open, uses configured interval, and pauses for hidden tab
   expect(readLog).not.toHaveBeenCalled();
   vi.useFakeTimers();
   fireEvent.click(button);
+  expect(readLog).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '조회 시작' }));
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1);
   });
@@ -64,10 +66,26 @@ test('polls only while open, uses configured interval, and pauses for hidden tab
     'token=value <script>literal</script>',
   );
   expect(screen.getByLabelText('로그 원문').querySelector('script')).toBeNull();
+  vi.mocked(readLog).mockImplementationOnce(
+    () =>
+      new CancelablePromise((resolve) =>
+        resolve({
+          text: 'second line\n',
+          cursor: '2',
+          reset: false,
+          limited: false,
+          code: null,
+          retry_after_seconds: 10,
+        }),
+      ),
+  );
   await act(async () => {
     await vi.advanceTimersByTimeAsync(9_999);
   });
   expect(readLog).toHaveBeenCalledTimes(2);
+  expect(readLog).toHaveBeenLastCalledWith('test', 'dev', 1, '1');
+  expect(screen.getByLabelText('로그 원문')).toHaveTextContent('second line');
+  expect(screen.getByRole('status')).toHaveTextContent('추가된 내용 12자');
   fireEvent.click(screen.getByRole('button', { name: '일시정지' }));
   await act(async () => {
     await vi.advanceTimersByTimeAsync(10_000);
@@ -129,6 +147,8 @@ test('HTTP errors stop automatic requests and restarting respects retry cooldown
   const button = await screen.findByRole('button', { name: 'WAS' });
   vi.useFakeTimers();
   fireEvent.click(button);
+  expect(readLog).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '조회 시작' }));
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1);
   });

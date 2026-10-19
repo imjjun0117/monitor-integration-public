@@ -20,9 +20,11 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 final class AccessAuditFilter extends OncePerRequestFilter {
     private final JdbcTemplate db;
     private final TransactionTemplate transactions;
+    private final MenuAccess menus;
 
     AccessAuditFilter(JdbcTemplate db, PlatformTransactionManager manager) {
         this.db = db;
+        menus = new MenuAccess(db);
         transactions = new TransactionTemplate(manager);
         transactions.setTimeout(30);
     }
@@ -45,7 +47,9 @@ final class AccessAuditFilter extends OncePerRequestFilter {
         }
         var users =
                 db.queryForList(
-                        "select role,enabled,security_version from app_users where username=?",
+                        "select u.role,r.base_role,(u.enabled and r.enabled) as"
+                            + " enabled,u.security_version from app_users u join app_roles r on"
+                            + " r.role_id=u.role where u.username=?",
                         auth.getName());
         var session = request.getSession(false);
         if (users.isEmpty() || !Boolean.TRUE.equals(users.getFirst().get("enabled"))) {
@@ -68,7 +72,8 @@ final class AccessAuditFilter extends OncePerRequestFilter {
             }
             session.setAttribute("hermes.securityVersion", version);
         }
-        String role = user.get("role").toString();
+        String roleId = user.get("role").toString();
+        String role = user.get("base_role").toString();
         var context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(
                 UsernamePasswordAuthenticationToken.authenticated(
@@ -78,7 +83,7 @@ final class AccessAuditFilter extends OncePerRequestFilter {
         SecurityContextHolder.setContext(context);
         String path = request.getRequestURI();
         boolean write = !List.of("GET", "HEAD", "OPTIONS").contains(request.getMethod());
-        if (!allowed(path, role, write)) {
+        if (!allowed(path, role, write) || !menus.allowed(path, roleId, write)) {
             if (write) {
                 attempt(auth.getName(), request, "DENIED");
             }
@@ -147,12 +152,19 @@ final class AccessAuditFilter extends OncePerRequestFilter {
                 && !"OPERATOR".equals(role)) {
             return false;
         }
-        if (path.startsWith("/api/v1/settings/users")
+        if (path.startsWith("/api/v1/settings/roles")
+                || path.startsWith("/api/v1/settings/users")
+                || path.startsWith("/api/v1/settings/menus")
+                || path.startsWith("/api/v1/settings/permissions")
                 || path.startsWith("/api/v1/settings/audit")) {
             return false;
         }
         if (write && !"OPERATOR".equals(role)) {
             return false;
+        }
+        // 장애 ID에 연결된 프로젝트 범위는 IncidentQuery에서 읽기·변경 모두 검증
+        if (path.startsWith("/api/v1/incidents")) {
+            return true;
         }
         String[] parts = path.split("/");
         if (parts.length >= 5 && ("projects".equals(parts[3]) || "api-checks".equals(parts[3]))) {
@@ -169,7 +181,8 @@ final class AccessAuditFilter extends OncePerRequestFilter {
             }
             var targets =
                     db.queryForList(
-                            "select project_id from certificate_targets where certificate_target_id=?",
+                            "select project_id from certificate_targets where"
+                                    + " certificate_target_id=?",
                             Long.parseLong(parts[4]));
             return !targets.isEmpty() && project(targets.getFirst().get("project_id").toString());
         }
@@ -183,7 +196,8 @@ final class AccessAuditFilter extends OncePerRequestFilter {
     private boolean project(String projectId) {
         return Boolean.TRUE.equals(
                 db.queryForObject(
-                        "select exists(select 1 from user_project_access where username=? and project_id=?)",
+                        "select exists(select 1 from user_project_access where username=? and"
+                                + " project_id=?)",
                         Boolean.class,
                         SecurityContextHolder.getContext().getAuthentication().getName(),
                         projectId));
@@ -197,7 +211,8 @@ final class AccessAuditFilter extends OncePerRequestFilter {
                         ? parts[4]
                         : null;
         db.update(
-                "insert into audit_log(actor,action,entity_type,project_id,target_id,outcome) values(?,?,?,?,?,?)",
+                "insert into audit_log(actor,action,entity_type,project_id,target_id,outcome)"
+                        + " values(?,?,?,?,?,?)",
                 actor,
                 request.getMethod(),
                 "REQUEST",

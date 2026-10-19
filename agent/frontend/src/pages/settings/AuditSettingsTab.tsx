@@ -7,6 +7,7 @@ import { getAudit, getProjects } from '../../api';
 import { Empty, Failure, Loading, RefreshFailure } from '../../components/QueryState';
 import { roleLabels } from '../../components/PermissionContext';
 import { LabeledField } from './forms';
+import { useProjectScope } from '../../components/ProjectScope';
 
 const entities: Record<string, string> = {
   projects: '프로젝트',
@@ -15,6 +16,9 @@ const entities: Record<string, string> = {
   thresholds: '임계치',
   certificate_targets: '인증서 대상',
   app_users: '계정',
+  app_roles: '역할',
+  app_menus: '메뉴',
+  role_menu_permissions: '메뉴 권한',
   user_project_access: '프로젝트 권한',
   log_sources: '로그 설정',
   LOG_VIEW: '서버 로그',
@@ -40,6 +44,10 @@ const fields: Record<string, string> = {
   check_id: '점검',
   username: '계정',
   role: '역할',
+  role_id: '역할 ID',
+  base_role: '기준 권한',
+  builtin: '기본 역할',
+  description: '설명',
   enabled: '사용',
   display_name: '표시명',
   monitoring_enabled: '점검 사용',
@@ -77,8 +85,9 @@ function valueText(value: unknown) {
         : JSON.stringify(value);
 }
 export default function AuditSettingsTab() {
+  const { project } = useProjectScope();
   const [page, setPage] = useState(0);
-  const [draft, setDraft] = useState({ project: '', actor: '' });
+  const [draft, setDraft] = useState({ project, actor: '' });
   const [filters, setFilters] = useState(draft);
   const query = useQuery({
     queryKey: ['audit', page, filters],
@@ -89,7 +98,7 @@ export default function AuditSettingsTab() {
   return (
     <>
       <form
-        className="filters"
+        className="filters audit-filters"
         onSubmit={(event) => {
           event.preventDefault();
           setPage(0);

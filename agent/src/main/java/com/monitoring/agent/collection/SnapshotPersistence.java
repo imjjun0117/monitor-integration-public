@@ -5,7 +5,6 @@ import com.monitoring.agent.metric.ThresholdResolver;
 import com.monitoring.agent.check.CheckEvidence;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +40,7 @@ public final class SnapshotPersistence {
                 status -> saveTransaction(projectId, instanceId, info, snapshot, receivedAt));
     }
 
-    // 점검 정의·최신 상태·분 단위 이력 저장 후 수집 실패 정보 초기화
+    // 점검 정의·최신 상태·수집 시각별 이력 저장 후 수집 실패 정보 초기화
     private void saveTransaction(
             String projectId,
             String instanceId,
@@ -49,7 +48,6 @@ public final class SnapshotPersistence {
             JsonNode snapshot,
             Instant receivedAt) {
         Instant observedAt = Instant.parse(snapshot.path("observed_at").asString());
-        Instant minute = receivedAt.truncatedTo(ChronoUnit.MINUTES);
         JsonNode jvm = snapshot.path("jvm");
         JsonNode system = snapshot.path("system");
         ThresholdResolver.Resolved limits = thresholds.resolve(projectId, instanceId);
@@ -68,9 +66,9 @@ public final class SnapshotPersistence {
                 evaluate(snapshot, observedAt, receivedAt, limits, inactiveChecks);
 
         saveSnapshotLatest(projectId, instanceId, jvm, system, observedAt, receivedAt, evaluated);
-        saveMetricHistory(projectId, instanceId, jvm, system, minute);
-        saveDisks(projectId, instanceId, system.path("disks"), minute, limits);
-        savePools(projectId, instanceId, snapshot.path("db_pools"), minute, limits);
+        saveMetricHistory(projectId, instanceId, jvm, system, receivedAt);
+        saveDisks(projectId, instanceId, system.path("disks"), receivedAt, limits);
+        savePools(projectId, instanceId, snapshot.path("db_pools"), receivedAt, limits);
         saveChecks(projectId, instanceId, snapshot.path("recent_checks"), receivedAt);
         db.update(
                 "update instances set host_name=?,last_seen_at=?,consecutive_failures=0,"
@@ -136,9 +134,9 @@ public final class SnapshotPersistence {
                 "{}");
     }
 
-    // 동일 분의 중복 저장을 막고 자원 이력 등록
+    // 수신 시각별 자원 이력 등록 및 같은 수신 건의 재저장 차단
     private void saveMetricHistory(
-            String projectId, String instanceId, JsonNode jvm, JsonNode system, Instant minute) {
+            String projectId, String instanceId, JsonNode jvm, JsonNode system, Instant receivedAt) {
         db.update(
                 """
             insert into instance_metric_samples(
@@ -147,7 +145,7 @@ public final class SnapshotPersistence {
               physical_memory_total_bytes,thread_live_count,thread_peak_count,gc_count,gc_time_ms)
             values(?,?,?,?,?,?,?,?,?,?,?,?,?,?) on conflict do nothing
             """,
-                timestamp(minute),
+                timestamp(receivedAt),
                 projectId,
                 instanceId,
                 nullableDouble(system, "system_cpu_ratio"),
@@ -168,7 +166,7 @@ public final class SnapshotPersistence {
             String projectId,
             String instanceId,
             JsonNode disks,
-            Instant minute,
+            Instant receivedAt,
             ThresholdResolver.Resolved limits) {
         db.update(
                 "delete from disk_latest where project_id=? and instance_id=?",
@@ -195,7 +193,7 @@ public final class SnapshotPersistence {
                 insert into disk_samples(sampled_at,project_id,instance_id,path_id,used_bytes,total_bytes,status)
                 values(?,?,?,?,?,?,?) on conflict do nothing
                 """,
-                    timestamp(minute),
+                    timestamp(receivedAt),
                     projectId,
                     instanceId,
                     disk.path("path_id").asString(),
@@ -210,7 +208,7 @@ public final class SnapshotPersistence {
             String projectId,
             String instanceId,
             JsonNode pools,
-            Instant minute,
+            Instant receivedAt,
             ThresholdResolver.Resolved limits) {
         db.update(
                 "delete from db_pool_latest where project_id=? and instance_id=?",
@@ -246,7 +244,7 @@ public final class SnapshotPersistence {
                   waiters,max_wait_ms,validation_latency_ms,status)
                 values(?,?,?,?,?,?,?,?,?,?,?,?) on conflict do nothing
                 """,
-                    timestamp(minute),
+                    timestamp(receivedAt),
                     projectId,
                     instanceId,
                     pool.path("pool_id").asString(),

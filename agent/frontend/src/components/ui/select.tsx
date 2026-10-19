@@ -1,5 +1,6 @@
 // 접근 가능한 선택 메뉴와 키보드 탐색 구성
 import * as Select from '@radix-ui/react-select';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import {
   Children,
   isValidElement,
@@ -15,6 +16,7 @@ type OptionProps = {
   label: string;
   isDisabled?: boolean;
   disabled?: boolean;
+  searchText?: string;
 };
 type SelectProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
@@ -26,6 +28,7 @@ type SelectProps = Omit<
   onChange?: (event: unknown, value: string) => void;
   isDisabled?: boolean;
   children: ReactNode;
+  searchLabel?: string;
 };
 // Radix로 포커스·키보드 탐색·문자 검색·메뉴 위치 처리
 // 메뉴와 항목은 TailAdmin 스타일 적용
@@ -39,10 +42,23 @@ export function FormSelect({
   className = '',
   name,
   required,
+  searchLabel,
   ...props
 }: SelectProps) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const searchInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!open) {
+      setSearch('');
+      return;
+    }
+    if (searchLabel) {
+      const timer = setTimeout(() => searchInput.current?.focus(), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [open, searchLabel]);
   useEffect(() => {
     if (!open) {
       return;
@@ -73,6 +89,11 @@ export function FormSelect({
     };
   }, [open]);
   const options = Children.toArray(children).filter(isValidElement<OptionProps>);
+  const matches = options.filter((option) =>
+    `${option.props.label} ${option.props.searchText ?? ''}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
   const encode = (choice: string | number) => `choice:${choice}`;
   return (
     <div className="ta-select">
@@ -90,7 +111,11 @@ export function FormSelect({
           ref={trigger}
           className={`ta-select-trigger ta-input ${className}`}
         >
-          <Select.Value />
+          <Select.Value>
+            {searchLabel
+              ? options.find((option) => String(option.props.value) === String(value))?.props.label
+              : undefined}
+          </Select.Value>
           <Select.Icon className="ta-select-chevron">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path
@@ -108,17 +133,40 @@ export function FormSelect({
             aria-label={
               props['aria-label'] ?? trigger.current?.labels?.[0]?.textContent ?? '선택 목록'
             }
-            className="ta-select-menu"
+            className={`ta-select-menu${searchLabel ? ' scope-select-menu' : ''}${trigger.current?.closest('.settings-content, .settings-dialog') ? ' ta-select-menu-compact' : ''}`}
             position="popper"
             sideOffset={6}
             collisionPadding={12}
             collisionBoundary={trigger.current?.closest('dialog') ?? undefined}
           >
+            {searchLabel && (
+              <div className="scope-select-search">
+                <input
+                  ref={searchInput}
+                  aria-label={searchLabel}
+                  placeholder={searchLabel}
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      event.currentTarget
+                        .closest('[role="listbox"]')
+                        ?.querySelector<HTMLElement>('[role="option"]:not([data-disabled])')
+                        ?.focus();
+                    }
+                    if (event.key !== 'Escape' && event.key !== 'Tab') {
+                      event.stopPropagation();
+                    }
+                  }}
+                />
+              </div>
+            )}
             <Select.ScrollUpButton className="ta-select-scroll" aria-label="이전 항목">
-              ⌃
+              <ChevronUp size={16} aria-hidden="true" />
             </Select.ScrollUpButton>
             <Select.Viewport className="ta-select-viewport">
-              {options.map((option) => (
+              {matches.map((option) => (
                 <Select.Item
                   key={encode(option.props.value)}
                   value={encode(option.props.value)}
@@ -139,9 +187,10 @@ export function FormSelect({
                   </Select.ItemIndicator>
                 </Select.Item>
               ))}
+              {matches.length === 0 && <p className="scope-select-empty">검색 결과가 없습니다.</p>}
             </Select.Viewport>
             <Select.ScrollDownButton className="ta-select-scroll" aria-label="다음 항목">
-              ⌄
+              <ChevronDown size={16} aria-hidden="true" />
             </Select.ScrollDownButton>
           </Select.Content>
         </Select.Portal>

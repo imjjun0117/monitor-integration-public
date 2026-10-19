@@ -5,6 +5,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import DashboardPage from './DashboardPage';
 
 const state = vi.hoisted(() => ({ causes: [] as Array<Record<string, unknown>> }));
+vi.mock('../components/ProjectScope', () => ({ useProjectScope: () => ({ project: 'alpha' }) }));
+vi.mock('../components/InstanceScope', () => ({ default: () => null }));
 vi.mock('../api', () => ({
   getDashboard: vi.fn(async () => ({
     projects: [{ project_id: 'alpha', display_name: 'Alpha', status: 'WARN', instances: [] }],
@@ -47,7 +49,7 @@ function view() {
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/?project=alpha&instance=prod']}>
         <DashboardPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -56,49 +58,40 @@ function view() {
 
 test('summary cards are links to the corresponding filtered detail lists', async () => {
   view();
-  expect(await screen.findByRole('link', { name: /^프로젝트 1/ })).toHaveAttribute(
+  expect(await screen.findByRole('link', { name: /^실패 API/ })).toHaveAttribute(
     'href',
-    '/projects',
-  );
-  expect(screen.getByRole('link', { name: /^프로젝트 1/ }).textContent).toBe('1');
-  expect(screen.getByRole('link', { name: /^수집 정상 서버/ }).textContent).toBe('0/0');
-  expect(screen.getByRole('link', { name: /^수집 정상 서버/ })).toHaveAttribute(
-    'href',
-    '/instances?collection=UP',
-  );
-  expect(screen.getByRole('link', { name: /^실패 API/ })).toHaveAttribute(
-    'href',
-    '/api-monitoring?status=DOWN&usage=used',
+    '/api-monitoring?project=alpha&instance=prod&status=DOWN&usage=used',
   );
   expect(screen.getByRole('link', { name: /^만료 예정 인증서/ })).toHaveAttribute(
     'href',
-    '/certificates?expiry=soon',
+    '/certificates?project=alpha&instance=prod&expiry=soon',
   );
 });
 
-test('project overview API count excludes INTERNAL checks', async () => {
+test('issues distinguish API checks from INTERNAL checks', async () => {
   state.causes = [
     cause({ subject_id: 'api' }),
     cause({ subject_id: 'internal', check_category: 'INTERNAL' }),
   ];
   view();
-  const row = (await screen.findByRole('button', { name: 'Alpha 자원 보기' })).closest('tr')!;
-  expect(within(row).getAllByRole('cell').at(-2)).toHaveTextContent('1');
+  const issues = await screen.findByRole('region', { name: '상태 이상 목록' });
+  expect(within(issues).getAllByText('API 점검')).toHaveLength(1);
+  expect(within(issues).getAllByText('내부 점검')).toHaveLength(1);
 });
 
 test('internal check shows its readable name and specific cause, not collection failure', async () => {
   state.causes = [
     cause({
       check_category: 'INTERNAL',
-      subject_id: 'batch-cleanup',
-      subject_name: '판매특허 정리 배치 신선도',
+      subject_id: 'batch-extinction',
+      subject_name: '판매특허 소멸 배치 신선도',
       result_code: 'INTERNAL_CHECK_FAILED',
       status: 'DOWN',
     }),
   ];
   view();
   expect(
-    await screen.findByText('판매특허 정리 배치 점검 · 배치 처리 이력 조회에 실패했습니다.'),
+    await screen.findByText('판매특허 소멸 배치 점검 · 배치 처리 이력 조회에 실패했습니다.'),
   ).toBeVisible();
   expect(screen.queryByText(/분류되지 않은 수집 오류/)).not.toBeInTheDocument();
   expect(screen.queryByText('장애')).not.toBeInTheDocument();

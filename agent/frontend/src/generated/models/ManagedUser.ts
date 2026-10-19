@@ -4,17 +4,11 @@
 /* eslint-disable */
 export type ManagedUser = {
     username: string;
-    role: ManagedUser.role;
+    role: string;
+    role_name?: string;
     enabled: boolean;
     project_ids: Array<string>;
     created_at: string;
     updated_at: string;
 };
-export namespace ManagedUser {
-    export enum role {
-        ADMIN = 'ADMIN',
-        OPERATOR = 'OPERATOR',
-        VIEWER = 'VIEWER',
-    }
-}
 

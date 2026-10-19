@@ -26,6 +26,8 @@ public final class InstanceActionsController {
     private final TokenCipher cipher;
     private final CollectorClient client;
     private final ObjectMapper json;
+    @Autowired(required = false)
+    private com.monitoring.agent.transport.CollectorTransportHub transport;
 
     @Autowired
     InstanceActionsController(
@@ -75,6 +77,7 @@ public final class InstanceActionsController {
                         value.enabled(),
                         projectId,
                         instanceId);
+                applyTransport(projectId, instanceId, value.enabled());
                 return;
             }
             TokenCipher.EncryptedToken encrypted = cipher.encrypt(value.token());
@@ -95,8 +98,26 @@ public final class InstanceActionsController {
                     value.enabled(),
                     projectId,
                     instanceId);
+            if (transport != null) {
+                transport.stop(projectId, instanceId);
+            }
         } catch (DataIntegrityViolationException error) {
             throw new ProjectConflictException("AGENT_URL_ALREADY_EXISTS");
+        }
+    }
+
+    private void applyTransport(String projectId, String instanceId, boolean enabled) {
+        if (transport == null) {
+            return;
+        }
+        try {
+            if (enabled) {
+                transport.configure(projectId, instanceId);
+            } else {
+                transport.stop(projectId, instanceId);
+            }
+        } catch (Exception failed) {
+            transport.stop(projectId, instanceId);
         }
     }
 
@@ -114,6 +135,7 @@ public final class InstanceActionsController {
                         projectId,
                         instanceId);
         try {
+            client.setTransport(transport);
             String token =
                     cipher.decrypt(
                             (byte[]) value.get("token_ciphertext"), (byte[]) value.get("token_iv"));

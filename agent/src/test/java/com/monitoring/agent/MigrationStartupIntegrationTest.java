@@ -49,6 +49,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -231,9 +232,9 @@ class MigrationStartupIntegrationTest {
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
         assertEquals(200, login.statusCode());
-        assertTrue(login.body().contains("DC Monitoring"));
+        assertTrue(login.body().contains("Monitoring"));
         assertFalse(login.body().contains("Hermes Monitoring"));
-        assertTrue(login.body().contains("<h1 id=\"login-title\">로그인</h1>"));
+        assertTrue(login.body().contains("<h1 id=\"login-title\" lang=\"en\">Login</h1>"));
         assertTrue(login.body().contains("alt=\"\""));
         assertTrue(login.body().contains("/monitoring.svg"));
         assertFalse(login.body().contains("security-copy"));
@@ -258,7 +259,7 @@ class MigrationStartupIntegrationTest {
     @Test
     void allOpenApiOperationsMatchRuntimeStatusContentAndRequiredFields() throws Exception {
         RuntimeOpenApiContract contract = RuntimeOpenApiContract.load(json);
-        assertEquals(38, contract.operationCount());
+        assertEquals(63, contract.operationCount());
         contract.assertControllerRouteCoverage(handlerMapping);
         MockMvc mvc =
                 MockMvcBuilders.webAppContextSetup(webContext).apply(springSecurity()).build();
@@ -288,6 +289,7 @@ class MigrationStartupIntegrationTest {
                             .param("password", password));
             assertContract(
                     mvc, contract, "getSession", authorized(get("/api/v1/session/me"), false));
+            assertContract(mvc, contract, "getXlog", authorized(get("/api/v1/xlog"), false));
             assertContract(
                     mvc, contract, "listProjects", authorized(get("/api/v1/projects"), false));
 
@@ -358,6 +360,58 @@ class MigrationStartupIntegrationTest {
                                     project,
                                     instance),
                             true));
+            String transportUrl =
+                    "/api/v1/projects/" + project + "/instances/" + instance + "/connection";
+            String xlogUrl = "/api/v1/projects/" + project + "/xlog-settings";
+            assertContract(mvc, contract, "getXlogSettings", authorized(get(xlogUrl), false));
+            assertContract(
+                    mvc,
+                    contract,
+                    "saveXlogSettings",
+                    authorized(
+                            put(xlogUrl)
+                                    .contentType("application/json")
+                                    .content("{\"enabled\":true}"),
+                            true));
+            assertContract(mvc, contract, "getConnection", authorized(get(transportUrl), false));
+            assertContract(
+                    mvc,
+                    contract,
+                    "saveConnectionMode",
+                    authorized(
+                            put(transportUrl)
+                                    .contentType("application/json")
+                                    .content("{\"mode\":\"WSS\"}"),
+                            true));
+            assertContract(
+                    mvc,
+                    contract,
+                    "startConnection",
+                    authorized(post(transportUrl + "/start"), true));
+            assertContract(
+                    mvc,
+                    contract,
+                    "stopConnection",
+                    authorized(post(transportUrl + "/stop"), true));
+            assertContract(
+                    mvc,
+                    contract,
+                    "getCollectorEvents",
+                    authorized(
+                            get(
+                                    "/api/v1/projects/"
+                                            + project
+                                            + "/instances/"
+                                            + instance
+                                            + "/events"),
+                            false));
+            mvc.perform(
+                            authorized(
+                                    put(transportUrl)
+                                            .contentType("application/json")
+                                            .content("{\"mode\":\"HTTP\"}"),
+                                    true))
+                    .andExpect(status().isOk());
             assertContract(
                     mvc,
                     contract,
@@ -705,8 +759,100 @@ class MigrationStartupIntegrationTest {
                     authorized(delete("/api/v1/projects/{projectId}", project), true));
             assertContract(
                     mvc, contract, "logout", authorized(post("/api/v1/session/logout"), true));
-            assertEquals(36, contract.checkedCount());
-            contract.assertSecurityErrors(mvc);
+            assertContract(
+                    mvc, contract, "listMenus", authorized(get("/api/v1/settings/menus"), false));
+            assertContract(
+                    mvc,
+                    contract,
+                    "updateMenu",
+                    authorized(
+                            put("/api/v1/settings/menus/dashboard")
+                                    .contentType("application/json")
+                                    .content(
+                                            "{\"label\":\"종합"
+                                                    + " 현황\",\"sortOrder\":10,\"enabled\":true}"),
+                            true));
+            assertContract(
+                    mvc,
+                    contract,
+                    "listPermissions",
+                    authorized(get("/api/v1/settings/permissions"), false));
+            assertContract(
+                    mvc,
+                    contract,
+                    "updatePermissions",
+                    authorized(
+                            put("/api/v1/settings/permissions/OPERATOR")
+                                    .contentType("application/json")
+                                    .content(
+                                            json.writeValueAsString(
+                                                    db.queryForList(
+                                                            "select menu_id as \"menuId\",can_read"
+                                                                    + " as \"canRead\",can_write as"
+                                                                    + " \"canWrite\" from"
+                                                                    + " role_menu_permissions where"
+                                                                    + " role='OPERATOR'"))),
+                            true));
+            String roleBody =
+                    "{\"roleId\":\"CONTRACT_ROLE\",\"name\":\"Contract role\","
+                            + "\"description\":\"\",\"baseRole\":\"VIEWER\",\"enabled\":true}";
+            assertContract(
+                    mvc, contract, "listRoles", authorized(get("/api/v1/settings/roles"), false));
+            assertContract(
+                    mvc,
+                    contract,
+                    "createRole",
+                    authorized(
+                            post("/api/v1/settings/roles")
+                                    .contentType("application/json")
+                                    .content(roleBody),
+                            true));
+            assertContract(
+                    mvc,
+                    contract,
+                    "updateRole",
+                    authorized(
+                            put("/api/v1/settings/roles/CONTRACT_ROLE")
+                                    .contentType("application/json")
+                                    .content(roleBody),
+                            true));
+            assertContract(
+                    mvc,
+                    contract,
+                    "listRoleUsers",
+                    authorized(get("/api/v1/settings/roles/CONTRACT_ROLE/users"), false));
+            assertContract(
+                    mvc,
+                    contract,
+                    "assignRoleUsers",
+                    authorized(
+                            put("/api/v1/settings/roles/CONTRACT_ROLE/users")
+                                    .contentType("application/json")
+                                    .content("[]"),
+                            true));
+            assertContract(
+                    mvc,
+                    contract,
+                    "deleteRole",
+                    authorized(delete("/api/v1/settings/roles/CONTRACT_ROLE"), true));
+            assertEquals(54, contract.checkedCount());
+            // 목록 조회의 403은 프로젝트가 없는 조회자가 아닌 메뉴 권한 차단으로 검증
+            List<Map<String, Object>> readerPermissions =
+                    db.queryForList(
+                            "select menu_id,can_read,can_write from role_menu_permissions where role='VIEWER'");
+            db.update(
+                    "update role_menu_permissions set can_read=false,can_write=false where role='VIEWER'");
+            try {
+                contract.assertSecurityErrors(mvc);
+            } finally {
+                for (Map<String, Object> permission : readerPermissions) {
+                    db.update(
+                            "update role_menu_permissions set can_read=?,can_write=? where role='VIEWER' and menu_id=?",
+                            permission.get("can_read"),
+                            permission.get("can_write"),
+                            permission.get("menu_id"));
+                }
+            }
             contract.assertApplicationErrors(mvc, project, instance);
         } finally {
             agent.stop(0);
@@ -714,6 +860,75 @@ class MigrationStartupIntegrationTest {
             deleteContractRows(project, instance);
             db.update(
                     "delete from app_users where username in ('contract-admin','contract-reader')");
+        }
+    }
+
+    @Test
+    void incidentResponsesMatchOpenApiAndSupportDirectEntry() throws Exception {
+        RuntimeOpenApiContract contract = RuntimeOpenApiContract.load(json);
+        MockMvc mvc =
+                MockMvcBuilders.webAppContextSetup(webContext).apply(springSecurity()).build();
+        db.update(
+                "insert into projects(project_id, display_name) values ('incident-contract', 'Incident contract')");
+        try {
+            String observation =
+                    """
+                    {"project_id":"incident-contract","instance_id":null,"kind":"CERTIFICATE",
+                     "status":"DOWN","metric_key":"CERTIFICATE_DAYS","subject_id":"1",
+                     "subject_name":"test.invalid","value":1,"warning_value":30,"critical_value":7,
+                     "result_code":null,"observed_at":"2026-10-01T12:00:00Z"}
+                    """;
+            long id =
+                    db.queryForObject(
+                            """
+                    insert into incidents(
+                        project_id, source_key, kind, severity, state, closed_at, first_observation, latest_observation)
+                    values ('incident-contract', 'cert', 'CERTIFICATE', 'DOWN', 'RECOVERED', now(), ?::jsonb, ?::jsonb)
+                    returning incident_id
+                    """,
+                            Long.class,
+                            observation,
+                            observation);
+            String path = "/api/v1/incidents/" + id;
+            assertContract(
+                    mvc,
+                    contract,
+                    "listIncidents",
+                    authorized(
+                            get("/api/v1/incidents")
+                                    .param("project", "incident-contract")
+                                    .param("state", ""),
+                            false));
+            assertContract(mvc, contract, "getIncident", authorized(get(path), false));
+            assertContract(
+                    mvc,
+                    contract,
+                    "getIncidentEvidence",
+                    authorized(get(path + "/evidence"), false));
+            assertContract(
+                    mvc,
+                    contract,
+                    "actOnIncident",
+                    authorized(
+                            post(path + "/actions")
+                                    .contentType("application/json")
+                                    .content(
+                                            "{\"version\":0,\"action\":\"COMMENT\",\"note\":\"복구 확인\"}"),
+                            true));
+            assertEquals(4, contract.checkedCount());
+        } finally {
+            db.update("delete from projects where project_id = 'incident-contract'");
+        }
+    }
+
+    @Test
+    void observabilityRoutesSupportDirectEntryAndRefresh() throws Exception {
+        MockMvc mvc =
+                MockMvcBuilders.webAppContextSetup(webContext).apply(springSecurity()).build();
+        for (String path : List.of("/xlog", "/logs", "/instances", "/incidents", "/incidents/1")) {
+            mvc.perform(get(path).with(user("admin").roles("ADMIN")))
+                    .andExpect(status().isOk())
+                    .andExpect(forwardedUrl("/index.html"));
         }
     }
 
@@ -737,6 +952,9 @@ class MigrationStartupIntegrationTest {
         com.sun.net.httpserver.HttpServer server =
                 com.sun.net.httpserver.HttpServer.create(
                         new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext(
+                "/monitor/v1/connection/start",
+                exchange -> respond(exchange, 202, "{\"state\":\"CONNECTING\"}"));
         server.createContext(
                 "/monitor/v1/info",
                 exchange ->
@@ -1030,7 +1248,7 @@ class MigrationStartupIntegrationTest {
                 }
                 documented.add(operation.get("_runtimeMethod") + " " + path);
             }
-            assertEquals(36, runtime.size(), "unexpected controller route count");
+            assertEquals(61, runtime.size(), "unexpected controller route count");
             assertEquals(documented, runtime, "controller routes and OpenAPI paths differ");
         }
 
@@ -1237,7 +1455,7 @@ class MigrationStartupIntegrationTest {
     }
 
     @Test
-    void snapshotTransactionPersistsLatestAndOneMinuteHistoryForEveryResource() throws Exception {
+    void snapshotTransactionRetainsEachCollectionAndDeduplicatesRetries() throws Exception {
         deleteSnapshotData("sample-a", "local-01");
         JsonNode snapshot =
                 json.readTree(Files.readAllBytes(Path.of("../fixtures/agent-snapshot.json")));
@@ -1252,16 +1470,17 @@ class MigrationStartupIntegrationTest {
               "category":"API","direction":"EXTERNAL"}]}
             """);
         Instant received = Instant.parse("2026-09-03T01:30:45Z");
+        Instant nextReceived = Instant.parse("2026-09-03T01:30:59Z");
         snapshots.save("sample-a", "local-01", info, snapshot, received);
-        snapshots.save(
-                "sample-a", "local-01", info, snapshot, Instant.parse("2026-09-03T01:30:59Z"));
+        snapshots.save("sample-a", "local-01", info, snapshot, nextReceived);
+        snapshots.save("sample-a", "local-01", info, snapshot, nextReceived);
 
         assertCount("instance_snapshot_latest", 1);
-        assertCount("instance_metric_samples", 1);
+        assertCount("instance_metric_samples", 2);
         assertCount("disk_latest", 1);
-        assertCount("disk_samples", 1);
+        assertCount("disk_samples", 2);
         assertCount("db_pool_latest", 1);
-        assertCount("db_pool_samples", 1);
+        assertCount("db_pool_samples", 2);
         assertCount("check_definitions", 3);
         assertCount("check_results_latest", 1);
         assertCount("check_result_samples", 1);

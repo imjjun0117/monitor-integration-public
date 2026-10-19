@@ -283,7 +283,7 @@ public class MonitorServletHttpStatusIntegrationTest {
                 return "configurerClass".equals(name) ? StatusConfigurer.class.getName() : null;
             }
 
-            public Enumeration<?> getInitParameterNames() {
+            public Enumeration<String> getInitParameterNames() {
                 return Collections.enumeration(Collections.singleton("configurerClass"));
             }
         };

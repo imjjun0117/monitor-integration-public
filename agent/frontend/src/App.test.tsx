@@ -6,7 +6,7 @@ import App from './App';
 import { selectOption } from './test-select';
 // Canvas는 실제 브라우저에서 검증. 여기서는 화면 이동과 입력 동작 검증
 vi.mock('./components/chartEngine', () => ({
-  createMetricChart: () => ({ dispose: vi.fn(), resize: vi.fn(), setOption: vi.fn() }),
+  createMetricChart: () => ({ on: vi.fn(), dispose: vi.fn(), resize: vi.fn(), setOption: vi.fn() }),
 }));
 
 import settingsPageSource from './pages/SettingsPage.tsx?raw';
@@ -15,12 +15,15 @@ const requests: string[] = [];
 const methods: string[] = [];
 const bodies: unknown[] = [];
 let connectionFailureCode: string | undefined;
+let websocketState = 'IDLE';
 
 beforeEach(() => {
+  sessionStorage.clear();
   requests.length = 0;
   methods.length = 0;
   bodies.length = 0;
   connectionFailureCode = undefined;
+  websocketState = 'IDLE';
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -32,6 +35,27 @@ beforeEach(() => {
       }
       if (url.endsWith('/session/me')) {
         return response({ username: 'admin', role: 'ADMIN' });
+      }
+      if (url.endsWith('/connection/start')) {
+        websocketState = 'CONNECTED';
+        return response({ state: websocketState, mode: 'WSS', dropped: 0 });
+      }
+      if (url.endsWith('/connection/stop')) {
+        websocketState = 'CLOSED';
+        return response({ state: websocketState, mode: 'WSS', dropped: 0 });
+      }
+      if (url.endsWith('/connection')) {
+        return response({ state: websocketState, mode: 'WSS', dropped: 0 });
+      }
+      if (url.endsWith('/xlog-settings')) {
+        return response({ enabled: false });
+      }
+      if (url.includes('/api/v1/xlog')) {
+        return response({
+          items: [],
+          enabled_projects: 0,
+          summary: { count: 0, errors: 0, average_ms: 0, p95_ms: 0 },
+        });
       }
       if (url.endsWith('/projects/sample-a/instances/live-01/test')) {
         if (connectionFailureCode !== undefined) {
@@ -124,6 +148,15 @@ beforeEach(() => {
       }
       if (url.endsWith('/api-checks/sample-a/live-01/data-path/run')) {
         return response({ status: 'ACCEPTED' });
+      }
+      if (url.endsWith('/projects/sample-a/instances/live-01/thresholds')) {
+        return response({
+          projectName: 'Sample A',
+          instanceName: 'Live Agent',
+          recipientEmails: [],
+          metrics: [],
+          ...(init?.body ? JSON.parse(String(init.body)) : {}),
+        });
       }
       if (url.includes('/projects/sample-a/instances')) {
         return response({
@@ -241,25 +274,45 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test('renders exactly five top-level navigation choices', async () => {
+test('renders eight top-level navigation choices including incident management', async () => {
   app('/');
   await screen.findByRole('heading', { name: '종합 현황' });
   const navigation = screen.getByRole('navigation', { name: '주 메뉴' });
-  expect(navigation.querySelectorAll(':scope a')).toHaveLength(5);
-  for (const label of ['종합 현황', '프로젝트', 'API 모니터링', '인증서 관리', '설정']) {
+  expect(navigation.querySelectorAll(':scope a, :scope .settings-menu-toggle')).toHaveLength(8);
+  for (const label of [
+    '종합 현황',
+    '장애 관리',
+    '프로젝트',
+    'API 모니터링',
+    '인증서 관리',
+    '설정',
+  ]) {
     expect(screen.getAllByText(label).length).toBeGreaterThan(0);
   }
 });
 
-test('shell exposes Hermes Monitoring brand without filler and keeps skip navigation and active location', async () => {
+test('settings navigation expands on click and becomes inaccessible when collapsed', async () => {
+  app('/');
+  const toggle = await screen.findByRole('button', { name: '설정' });
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('navigation', { name: '설정 하위 메뉴' })).not.toBeInTheDocument();
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('navigation', { name: '설정 하위 메뉴' })).toBeInTheDocument();
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('navigation', { name: '설정 하위 메뉴' })).not.toBeInTheDocument();
+});
+
+test('shell exposes Monitoring brand without filler and keeps skip navigation and active location', async () => {
   app('/api-monitoring');
   await screen.findByRole('heading', { name: 'API 모니터링' });
   expect(screen.getByRole('link', { name: '본문으로 건너뛰기' })).toHaveAttribute(
     'href',
     '#main-content',
   );
-  expect(screen.getAllByText('Hermes Monitoring')).toHaveLength(1);
-  expect(screen.queryAllByRole('img', { name: 'Hermes Monitoring' })).toHaveLength(0);
+  expect(screen.getAllByText('Monitoring')).toHaveLength(1);
+  expect(screen.queryAllByRole('img', { name: 'Monitoring' })).toHaveLength(0);
   expect(screen.getByText('운영 모니터링')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'API 모니터링' })).toHaveAttribute(
     'aria-current',
@@ -274,7 +327,7 @@ test('shell exposes Hermes Monitoring brand without filler and keeps skip naviga
 test('instance pages provide deterministic accessible parent links', async () => {
   app('/projects/sample-a');
   const projectsBack = await screen.findByRole('link', { name: '프로젝트 목록으로' });
-  expect(projectsBack).toHaveAttribute('href', '/projects');
+  expect(projectsBack).toHaveAttribute('href', '/projects?project=');
   projectsBack.focus();
   expect(projectsBack).toHaveFocus();
 
@@ -314,12 +367,14 @@ test('mobile shell marks operational mutation as desktop-only while keeping moni
     })),
   );
   app('/settings/projects');
-  await screen.findByRole('heading', { name: '설정' });
+  await screen.findByRole('heading', { name: '프로젝트 관리' });
   expect(await screen.findByText(/모바일에서는 조회만 지원/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '프로젝트 등록' })).toBeDisabled();
   expect(
-    screen.getByRole('navigation', { name: '주 메뉴' }).querySelectorAll(':scope a'),
-  ).toHaveLength(5);
+    screen
+      .getByRole('navigation', { name: '주 메뉴' })
+      .querySelectorAll(':scope a, :scope .settings-menu-toggle'),
+  ).toHaveLength(8);
 });
 
 test('loads project instances from the authenticated production API without fixtures', async () => {
@@ -331,6 +386,7 @@ test('loads project instances from the authenticated production API without fixt
 
 test('API filters and drawer operate on API results', async () => {
   app('/api-monitoring');
+  expect(await screen.findByRole('cell', { name: /외부 API.*Partner API/ })).toBeInTheDocument();
   fireEvent.click(await screen.findByRole('button', { name: 'Partner API' }));
   expect(await screen.findByRole('heading', { name: 'Partner API' })).toBeInTheDocument();
   expect(screen.getByLabelText('프로젝트 필터')).toBeInTheDocument();
@@ -338,7 +394,6 @@ test('API filters and drawer operate on API results', async () => {
   expect(screen.getByLabelText('내외부 필터')).toBeInTheDocument();
   expect(screen.getByLabelText('상태 필터')).toBeInTheDocument();
   expect(screen.getByLabelText('API 이름')).toBeInTheDocument();
-  expect(screen.getByRole('cell', { name: /외부 API.*Partner API/ })).toBeInTheDocument();
 });
 
 test('API filters have persistent visible labels associated with every control', async () => {
@@ -440,16 +495,17 @@ test('settings polish uses labeled selects, boolean payloads, and compact action
       }),
     ),
   );
-  expect(screen.getByRole('button', { name: '연결 테스트' }).parentElement).toHaveClass(
+  expect(screen.getByRole('button', { name: '연결' }).parentElement).toHaveClass(
     'settings-row-actions',
   );
   expect(screen.queryByRole('button', { name: '비활성화' })).not.toBeInTheDocument();
 });
 
-test('project settings rows expose only project ID and delete work action', async () => {
+test('project settings rows expose project ID, XLog usage and delete action', async () => {
   app('/settings/projects');
   const table = await screen.findByRole('table', { name: '프로젝트 설정' });
-  expect(table.querySelectorAll('th')).toHaveLength(2);
+  expect(table.querySelectorAll('th')).toHaveLength(3);
+  expect(table).toHaveTextContent('XLog 수집');
   expect(table).toHaveTextContent('프로젝트');
   expect(table).toHaveTextContent('작업');
   expect(table).not.toHaveTextContent('표시명');
@@ -466,7 +522,7 @@ test('project settings rows expose only project ID and delete work action', asyn
 test('successful connection tests are acknowledged', async () => {
   cleanup();
   app('/settings/instances');
-  fireEvent.click(await screen.findByRole('button', { name: '연결 테스트' }));
+  fireEvent.click(await screen.findByRole('button', { name: '연결' }));
   expect(await screen.findByText('연결 테스트에 성공했습니다.')).toBeVisible();
 });
 
@@ -477,8 +533,8 @@ test('settings tables and threshold toolbar retain complete labels', async () =>
 
   cleanup();
   app('/settings/thresholds');
-  const add = await screen.findByRole('button', { name: '임계치 추가' });
-  expect(add.parentElement).toHaveClass('settings-toolbar');
+  expect(await screen.findByRole('combobox', { name: '프로젝트' })).toBeVisible();
+  expect(screen.getByLabelText('인스턴스')).toBeDisabled();
 });
 
 test('project permanent delete is default-safe and calls the explicit endpoint after confirmation', async () => {
@@ -500,7 +556,7 @@ test('project permanent delete is default-safe and calls the explicit endpoint a
 
 test('instance permanent delete names its target and calls the explicit endpoint', async () => {
   app('/settings/instances');
-  fireEvent.click(await screen.findByRole('button', { name: '인스턴스 live-01 영구 삭제' }));
+  fireEvent.click(await screen.findByRole('button', { name: '인스턴스 live-01 삭제' }));
   expect(screen.getByRole('dialog', { name: '인스턴스 live-01 영구 삭제' })).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: '인스턴스 live-01 영구 삭제 확인' }));
   await waitFor(() =>
@@ -526,7 +582,7 @@ test('instance project dropdown uses enabled projects and deterministic first se
 test('connection test translates safe code and never exposes server details', async () => {
   connectionFailureCode = 'AUTH_ERROR';
   app('/settings/instances');
-  fireEvent.click(await screen.findByRole('button', { name: '연결 테스트' }));
+  fireEvent.click(await screen.findByRole('button', { name: '연결' }));
   expect(
     await screen.findByText('인증에 실패했습니다. Collector 토큰을 다시 확인하세요.'),
   ).toBeVisible();
@@ -536,7 +592,7 @@ test('connection test translates safe code and never exposes server details', as
 test('connection test explains an invalid allowlist file without exposing server details', async () => {
   connectionFailureCode = 'ALLOWLIST_CONFIG_ERROR';
   app('/settings/instances');
-  fireEvent.click(await screen.findByRole('button', { name: '연결 테스트' }));
+  fireEvent.click(await screen.findByRole('button', { name: '연결' }));
   expect(
     await screen.findByText(
       '접속 허용 목록 파일을 읽을 수 없습니다. 파일 위치와 JSON 형식을 확인하세요.',
@@ -566,7 +622,7 @@ test('an internal check can run from instance detail and refresh its result', as
 test('connection test shows safe guidance without a structured error code', async () => {
   connectionFailureCode = '';
   app('/settings/instances');
-  fireEvent.click(await screen.findByRole('button', { name: '연결 테스트' }));
+  fireEvent.click(await screen.findByRole('button', { name: '연결' }));
   expect(
     await screen.findByText('Collector에 연결할 수 없습니다. 주소, 포트, 방화벽을 확인하세요.'),
   ).toBeVisible();
@@ -612,13 +668,15 @@ test('API filter request transmits project, instance, direction, status, and nam
 
 test('API project and instance filters use registered dependent options and clear stale instance', async () => {
   app('/api-monitoring');
-  const project = await screen.findByLabelText('프로젝트 필터');
-  const instance = screen.getByLabelText('인스턴스 필터');
+  let project = await screen.findByLabelText('프로젝트 필터');
+  let instance = screen.getByLabelText('인스턴스 필터');
   expect(project).toHaveAttribute('role', 'combobox');
   await waitFor(() => expect(project).toHaveTextContent('전체 프로젝트'));
   expect(instance).toBeDisabled();
   expect(screen.getByText('프로젝트를 먼저 선택하세요')).toBeVisible();
   await selectOption(project, 'Sample A (sample-a)');
+  instance = await screen.findByLabelText('인스턴스 필터');
+  project = screen.getByLabelText('프로젝트 필터');
   await waitFor(() => expect(instance).toBeEnabled());
   expect(instance).toHaveTextContent('전체 인스턴스');
   await selectOption(instance, 'Live Agent (live-01)');
@@ -630,6 +688,7 @@ test('API project and instance filters use registered dependent options and clea
     ).toBe(true),
   );
   await selectOption(project, '전체 프로젝트');
+  instance = await screen.findByLabelText('인스턴스 필터');
   expect(instance).toHaveTextContent('프로젝트를 먼저 선택하세요');
   await waitFor(() => expect(requests.slice(-1)[0]).not.toContain('instance=live-01'));
 });
@@ -674,7 +733,9 @@ test('settings never repopulates an agent token', async () => {
   fireEvent.click(screen.getByRole('button', { name: '취소' }));
 
   fireEvent.click(screen.getByRole('button', { name: '인스턴스 live-01 수정' }));
-  const existing = screen.getByLabelText('인스턴스 live-01 새 토큰');
+  expect(screen.getByRole('heading', { name: '인스턴스 수정' })).toBeInTheDocument();
+  expect(screen.queryByText('표시명 (live-01)')).not.toBeInTheDocument();
+  const existing = screen.getByLabelText('새 토큰');
   expect(existing).toHaveAttribute('type', 'password');
   expect(existing).toHaveValue('');
 });
@@ -712,7 +773,7 @@ test('instance edit saves every editable field and clears the write-only token a
   fireEvent.change(screen.getByLabelText('인스턴스 live-01 환경'), {
     target: { value: 'production' },
   });
-  fireEvent.change(screen.getByLabelText('인스턴스 live-01 새 토큰'), {
+  fireEvent.change(screen.getByLabelText('새 토큰'), {
     target: { value: 'abcdefghijklmnopqrstuvwxyz123456' },
   });
   await selectOption(screen.getByLabelText('인스턴스 live-01 API 자동 점검'), '사용 안 함');
@@ -727,74 +788,60 @@ test('instance edit saves every editable field and clears the write-only token a
     }),
   );
   // 저장 성공 후 창을 닫고 다시 열어도 토큰이 반환되지 않는지 검증
-  await waitFor(() =>
-    expect(screen.queryByLabelText('인스턴스 live-01 새 토큰')).not.toBeInTheDocument(),
-  );
+  await waitFor(() => expect(screen.queryByLabelText('새 토큰')).not.toBeInTheDocument());
   fireEvent.click(screen.getByRole('button', { name: '인스턴스 live-01 수정' }));
-  expect(screen.getByLabelText('인스턴스 live-01 새 토큰')).toHaveValue('');
+  expect(screen.getByLabelText('새 토큰')).toHaveValue('');
 });
 
-test('certificate day thresholds use descending warning and critical semantics', async () => {
+test('threshold management requires project then instance selection', async () => {
   app('/settings/thresholds');
-  const warning = await screen.findByLabelText('CERTIFICATE_DAYS 경고');
-  fireEvent.change(warning, { target: { value: '45' } });
-  fireEvent.click(screen.getByRole('button', { name: '임계치 저장' }));
-  await waitFor(() => expect(methods).toContain('PUT'));
-  expect(screen.queryByText(/경고 값이 위험 값보다 작아야/)).not.toBeInTheDocument();
+  expect(await screen.findByLabelText('인스턴스')).toBeDisabled();
+  expect(screen.queryByLabelText('CPU 사용률 경고')).not.toBeInTheDocument();
+  await selectOption(screen.getByRole('combobox', { name: '프로젝트' }), 'Sample A');
+  await waitFor(() => expect(screen.getByLabelText('인스턴스')).toBeEnabled());
+  expect(screen.queryByLabelText('CPU 사용률 경고')).not.toBeInTheDocument();
+  await selectOption(screen.getByLabelText('인스턴스'), 'Live Agent');
+  expect(await screen.findByText(/등록된 임계치가 없습니다/)).toBeVisible();
+  expect(screen.getByRole('button', { name: '추가' })).toBeEnabled();
+  expect(screen.queryByText('기본값 사용')).not.toBeInTheDocument();
+  expect(screen.queryByText('공통 기본값')).not.toBeInTheDocument();
 });
 
-test('threshold decimal fields preserve in-progress text and reject an empty value', async () => {
+test('threshold management saves the selected server without choosing a setting mode', async () => {
   app('/settings/thresholds');
-  const warning = await screen.findByLabelText('SYSTEM_CPU 경고');
-  fireEvent.change(warning, { target: { value: '0.' } });
-  expect(warning).toHaveValue('0.');
-  fireEvent.change(warning, { target: { value: '' } });
-  expect(warning).toHaveValue('');
-  fireEvent.click(screen.getByRole('button', { name: '임계치 저장' }));
-  expect(await screen.findByText(/0 이상의 유한한 숫자/)).toBeInTheDocument();
-  expect(methods).not.toContain('PUT');
-});
-
-test('threshold settings can create scoped project and instance overrides', async () => {
-  app('/settings/thresholds');
-  await screen.findByLabelText('SYSTEM_CPU 경고');
-  fireEvent.click(screen.getByRole('button', { name: '임계치 추가' }));
-  await selectOption(screen.getByLabelText('새 임계치 범위'), 'INSTANCE');
-  fireEvent.change(screen.getByLabelText('새 임계치 프로젝트 ID'), {
-    target: { value: 'sample-a' },
-  });
-  fireEvent.change(screen.getByLabelText('새 임계치 인스턴스 ID'), {
-    target: { value: 'live-01' },
-  });
-  await selectOption(screen.getByLabelText('새 임계치 metric'), 'CERTIFICATE_DAYS');
-  fireEvent.change(screen.getByLabelText('새 임계치 경고'), { target: { value: '45' } });
-  fireEvent.change(screen.getByLabelText('새 임계치 위험'), { target: { value: '14' } });
-  fireEvent.click(screen.getByRole('button', { name: '임계치 저장' }));
-
+  await selectOption(await screen.findByRole('combobox', { name: '프로젝트' }), 'Sample A');
+  await waitFor(() => expect(screen.getByLabelText('인스턴스')).toBeEnabled());
+  await selectOption(screen.getByLabelText('인스턴스'), 'Live Agent');
+  fireEvent.click(await screen.findByRole('button', { name: '추가' }));
+  await selectOption(screen.getByLabelText('항목'), 'CPU 사용률');
+  fireEvent.change(screen.getByLabelText('경고 기준'), { target: { value: '75' } });
+  fireEvent.change(screen.getByLabelText('위험 기준'), { target: { value: '90' } });
+  fireEvent.click(screen.getByRole('button', { name: '등록' }));
   await waitFor(() => expect(methods).toContain('PUT'));
   expect(bodies).toContainEqual(
-    expect.arrayContaining([
-      {
-        scope: 'INSTANCE',
-        projectId: 'sample-a',
-        instanceId: 'live-01',
-        metricKey: 'CERTIFICATE_DAYS',
-        warningValue: 45,
-        criticalValue: 14,
-      },
-    ]),
+    expect.objectContaining({
+      metrics: expect.arrayContaining([
+        expect.objectContaining({ metricKey: 'SYSTEM_CPU', warningValue: 0.75, useDefault: false }),
+      ]),
+    }),
   );
+  expect(
+    requests.some(
+      (url, index) =>
+        url.endsWith('/projects/sample-a/instances/live-01/thresholds') && methods[index] === 'PUT',
+    ),
+  ).toBe(true);
 });
 
-test('threshold settings reject missing scope keys without issuing a request', async () => {
+test('clearing project selection clears the selected instance and form', async () => {
   app('/settings/thresholds');
-  await screen.findByLabelText('SYSTEM_CPU 경고');
-  fireEvent.click(screen.getByRole('button', { name: '임계치 추가' }));
-  await selectOption(screen.getByLabelText('새 임계치 범위'), 'PROJECT');
-  fireEvent.click(screen.getByRole('button', { name: '임계치 저장' }));
-
-  expect(await screen.findByText(/범위에 맞는 프로젝트와 인스턴스 ID/)).toBeInTheDocument();
-  expect(methods).not.toContain('PUT');
+  await selectOption(await screen.findByRole('combobox', { name: '프로젝트' }), 'Sample A');
+  await waitFor(() => expect(screen.getByLabelText('인스턴스')).toBeEnabled());
+  await selectOption(screen.getByLabelText('인스턴스'), 'Live Agent');
+  await screen.findByText(/등록된 임계치가 없습니다/);
+  await selectOption(screen.getByRole('combobox', { name: '프로젝트' }), '프로젝트 선택');
+  expect(screen.queryByLabelText('CPU 사용률 경고')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('인스턴스')).toBeDisabled();
 });
 
 test('certificate target form exposes and validates the persisted check interval', async () => {
@@ -838,14 +885,15 @@ test('the top bar names the current section and exposes the signed-in account', 
 test('sidebar can collapse and the mobile menu closes after navigation', async () => {
   app('/');
   await screen.findByRole('heading', { name: '종합 현황' });
+  await waitFor(() => expect(screen.getByLabelText('프로젝트 선택')).toHaveTextContent('Sample A'));
   fireEvent.click(screen.getByRole('button', { name: '사이드 메뉴 접기' }));
   expect(document.querySelector('.app-shell')).toHaveClass('sidebar-collapsed');
   fireEvent.click(screen.getByRole('button', { name: '사이드 메뉴 펼치기' }));
   expect(document.querySelector('.app-shell')).not.toHaveClass('sidebar-collapsed');
   fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }));
   const menu = screen.getByRole('dialog', { name: '주 메뉴' });
-  fireEvent.click(menu.querySelector<HTMLAnchorElement>('a[href="/projects"]')!);
-  expect(await screen.findByRole('heading', { name: '프로젝트' })).toBeInTheDocument();
+  fireEvent.click(menu.querySelector<HTMLAnchorElement>('a[href^="/projects"]')!);
+  expect(await screen.findByRole('table', { name: '인스턴스 목록' })).toBeInTheDocument();
   await waitFor(() =>
     expect(screen.queryByRole('dialog', { name: '주 메뉴' })).not.toBeInTheDocument(),
   );
@@ -858,11 +906,32 @@ test('account menu supports keyboard navigation and restores focus on Escape', a
   const settings = screen.getByRole('menuitem', { name: '설정 관리' });
   expect(settings).toHaveFocus();
   fireEvent.keyDown(settings, { key: 'ArrowDown' });
+  const theme = screen.getByRole('menuitem', { name: /모드로 전환/ });
+  expect(theme).toHaveFocus();
+  fireEvent.keyDown(theme, { key: 'ArrowDown' });
   const logout = screen.getByRole('menuitem', { name: '로그아웃' });
   expect(logout).toHaveFocus();
   fireEvent.keyDown(logout, { key: 'Escape' });
   expect(screen.queryByRole('menu', { name: '계정 메뉴' })).not.toBeInTheDocument();
   expect(trigger).toHaveFocus();
+});
+
+test('theme switching lives in the account menu and persists the choice', async () => {
+  document.documentElement.dataset.theme = 'dark';
+  app('/');
+  const trigger = await screen.findByRole('button', { name: /admin/ });
+  expect(document.querySelector('.topbar .theme-toggle')).toBeNull();
+  fireEvent.click(trigger);
+  fireEvent.click(screen.getByRole('menuitem', { name: '라이트 모드로 전환' }));
+  expect(document.documentElement.dataset.theme).toBe('light');
+  expect(localStorage.getItem('monitoring.theme')).toBe('light');
+  expect(trigger).toHaveFocus();
+  expect(screen.queryByRole('menu', { name: '계정 메뉴' })).not.toBeInTheDocument();
+  fireEvent.click(trigger);
+  fireEvent.click(screen.getByRole('menuitem', { name: '다크 모드로 전환' }));
+  expect(document.documentElement.dataset.theme).toBe('dark');
+  expect(localStorage.getItem('monitoring.theme')).toBe('dark');
+  localStorage.removeItem('monitoring.theme');
 });
 
 test('the account menu opens on demand and logs out through the session endpoint', async () => {
@@ -900,3 +969,96 @@ function response(body: unknown) {
     json: async () => body,
   } as Response;
 }
+
+test('project menu opens the selected project directly and the all-projects choice shows the list', async () => {
+  app('/xlog?project=sample-a');
+  await waitFor(() => expect(screen.getByLabelText('프로젝트 선택')).toHaveTextContent('Sample A'));
+  fireEvent.click(screen.getByRole('link', { name: '프로젝트' }));
+
+  expect(await screen.findByRole('table', { name: '인스턴스 목록' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Live Agent' })).toHaveAttribute(
+    'href',
+    '/projects/sample-a/instances/live-01',
+  );
+  expect(screen.queryByRole('table', { name: '프로젝트 목록' })).not.toBeInTheDocument();
+
+  await selectOption(screen.getByLabelText('프로젝트 선택'), '전체 프로젝트');
+  expect(await screen.findByRole('table', { name: '프로젝트 목록' })).toBeInTheDocument();
+
+  await selectOption(screen.getByLabelText('프로젝트 선택'), 'Sample A');
+  expect(await screen.findByRole('table', { name: '인스턴스 목록' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('link', { name: '프로젝트 목록으로' }));
+  expect(await screen.findByRole('table', { name: '프로젝트 목록' })).toBeInTheDocument();
+  expect(screen.getByLabelText('프로젝트 선택')).toHaveTextContent('전체 프로젝트');
+});
+
+test('instance edit stages collection changes until save and discards them on cancel', async () => {
+  app('/settings/instances');
+  const edit = await screen.findByRole('button', { name: '인스턴스 live-01 수정' });
+  expect(
+    screen.queryByRole('button', { name: '인스턴스 live-01 수집 설정' }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(edit);
+  const mode = screen.getByRole('combobox', { name: '수집 방식' });
+  const xlog = screen.getByRole('combobox', { name: 'XLog 수집' });
+  await waitFor(() => expect(mode).toBeEnabled());
+  await waitFor(() => expect(xlog).toBeEnabled());
+  await selectOption(mode, 'HTTP 조회');
+  await selectOption(xlog, '사용');
+  expect(methods).not.toContain('PUT');
+  fireEvent.click(screen.getByRole('button', { name: '취소' }));
+  expect(methods).not.toContain('PUT');
+
+  fireEvent.click(edit);
+  expect(screen.getByRole('combobox', { name: '수집 방식' })).toHaveTextContent('웹소켓 연결');
+  expect(screen.getByRole('combobox', { name: 'XLog 수집' })).toHaveTextContent('사용 안 함');
+  await selectOption(screen.getByRole('combobox', { name: '수집 방식' }), 'HTTP 조회');
+  await selectOption(screen.getByRole('combobox', { name: 'XLog 수집' }), '사용');
+  fireEvent.click(screen.getByRole('button', { name: '인스턴스 live-01 저장' }));
+  await waitFor(() => expect(bodies).toContainEqual({ enabled: true }));
+  expect(bodies).toContainEqual({ mode: 'HTTP' });
+  expect(requests.some((url) => url.endsWith('/connection/start'))).toBe(false);
+  await waitFor(() =>
+    expect(screen.queryByRole('combobox', { name: '수집 방식' })).not.toBeInTheDocument(),
+  );
+});
+
+test('instance edit keeps ID read-only and controls websocket connections without saving the form', async () => {
+  app('/settings/instances');
+  fireEvent.click(await screen.findByRole('button', { name: '인스턴스 live-01 수정' }));
+  const id = screen.getByRole('textbox', { name: '인스턴스 ID' });
+  expect(id).toHaveValue('live-01');
+  expect(id).toHaveAttribute('readonly');
+  expect(id).toHaveAccessibleName('인스턴스 ID');
+  const start = await screen.findByRole('button', { name: '연결 시작' });
+  expect(requests.some((url) => url.endsWith('/connection/start'))).toBe(false);
+
+  const name = screen.getByRole('textbox', { name: '인스턴스 live-01 표시명' });
+  const original = (name as HTMLInputElement).value;
+  fireEvent.change(name, { target: { value: 'Changed name' } });
+  expect(start).toBeDisabled();
+  fireEvent.change(name, { target: { value: original } });
+  expect(start).toBeEnabled();
+  fireEvent.click(start);
+  const stop = await screen.findByRole('button', { name: '연결 종료' });
+  await waitFor(() => expect(stop).toBeEnabled());
+  expect(
+    requests.some((url, index) => url.endsWith('/connection/start') && methods[index] === 'POST'),
+  ).toBe(true);
+  expect(methods).not.toContain('PUT');
+  fireEvent.click(stop);
+  await screen.findByRole('button', { name: '연결 시작' });
+  expect(
+    requests.some((url, index) => url.endsWith('/connection/stop') && methods[index] === 'POST'),
+  ).toBe(true);
+  expect(screen.getByRole('heading', { name: '인스턴스 수정' })).toBeInTheDocument();
+});
+
+test('brand navigates from settings to the dashboard', async () => {
+  app('/settings/instances');
+  const brand = await screen.findByRole('link', { name: '종합현황으로 이동' });
+  expect(brand).toHaveAttribute('href', '/');
+  fireEvent.click(brand);
+  expect(await screen.findByRole('heading', { name: '종합 현황' })).toBeVisible();
+});

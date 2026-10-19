@@ -19,11 +19,13 @@ import { Empty, Failure, Loading, RefreshFailure } from '../components/QueryStat
 import StatusLabel, { statusLabels } from '../components/StatusLabel';
 import { LabeledField } from './settings/forms';
 import { useManualRerunPolling } from '../hooks/useManualRerunPolling';
+import { useProjectScope } from '../components/ProjectScope';
 
 export default function CertificatesPage() {
+  const { project: scopedProject, select: selectProject } = useProjectScope();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState({
-    project: searchParams.get('project') ?? '',
+    project: searchParams.get('project') ?? scopedProject,
     status: searchParams.get('status') ?? '',
     expiry: searchParams.get('expiry') === 'soon' ? 'soon' : '',
   });
@@ -101,7 +103,10 @@ export default function CertificatesPage() {
             id="certificate-project-filter"
             aria-label="프로젝트 필터"
             value={filters.project}
-            onChange={(_, project) => setFilters({ ...filters, project })}
+            onChange={(_, project) => {
+              setFilters({ ...filters, project });
+              selectProject(project);
+            }}
             isDisabled={projects.isPending || projects.isError}
           >
             <FormSelectOption

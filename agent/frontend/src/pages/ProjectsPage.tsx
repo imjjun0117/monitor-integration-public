@@ -1,13 +1,20 @@
 // 프로젝트 목록 및 자원 현황 조회 화면
 import { Table, Tbody, Td, Th, Thead, Tr } from '../components/ui';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { getProjects } from '../api';
 import { Empty, Failure, Loading, RefreshFailure } from '../components/QueryState';
 import StatusLabel from '../components/StatusLabel';
+import { useProjectScope } from '../components/ProjectScope';
 
 export default function ProjectsPage() {
+  const { project: selectedProject } = useProjectScope();
   const query = useQuery({ queryKey: ['projects'], queryFn: getProjects, refetchInterval: 15_000 });
+  // 상단에서 선택한 프로젝트는 재선택 없이 인스턴스 목록으로 이동
+  if (selectedProject) {
+    return <Navigate to={`/projects/${encodeURIComponent(selectedProject)}`} replace />;
+  }
+
   if (query.isPending) {
     return <Loading />;
   }

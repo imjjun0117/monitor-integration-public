@@ -1,7 +1,7 @@
 // 프로젝트별 수집 상태와 자원 사용량 비교
-import { chartPeriods, type ChartPeriod } from '../utils/chartPeriod';
+import { chartPeriods, liveWindowMs, type ChartPeriod } from '../utils/chartPeriod';
 import type { DashboardProject, DashboardResourceSample } from '../generated';
-import { useState } from 'react';
+import { useProjectScope } from './ProjectScope';
 import { FormSelect, FormSelectOption } from './ui';
 import MetricChart from './MetricChart';
 
@@ -23,7 +23,7 @@ export default function ProjectComparison({
   period?: ChartPeriod;
   onPeriodChange?: (period: ChartPeriod) => void;
 }) {
-  const [projectId, setProjectId] = useState('');
+  const { project: projectId, select: setProjectId } = useProjectScope();
   const indexed = new Map<string, DashboardResourceSample[]>();
   for (const row of history) {
     const rows = indexed.get(row.project_id) ?? [];
@@ -62,7 +62,8 @@ export default function ProjectComparison({
       <div className="chart-grid">
         {metrics.map((metric) => (
           <MetricChart
-            key={metric.key}
+            key={`${metric.key}/${period}`}
+            liveWindow={liveWindowMs(period)}
             title={metric.title}
             points={[]}
             xKey="sampled_at"

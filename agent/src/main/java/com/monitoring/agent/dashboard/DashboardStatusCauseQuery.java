@@ -15,16 +15,26 @@ import org.springframework.stereotype.Component;
 
 // 제한된 두 번의 일괄 조회로 대시보드 상태 원인 구성
 @Component
-final class DashboardStatusCauseQuery {
+public final class DashboardStatusCauseQuery {
     private final JdbcTemplate db;
     private final ThresholdResolver thresholds;
 
-    DashboardStatusCauseQuery(JdbcTemplate db, ThresholdResolver thresholds) {
+    public DashboardStatusCauseQuery(JdbcTemplate db, ThresholdResolver thresholds) {
         this.db = db;
         this.thresholds = thresholds;
     }
 
     List<Map<String, Object>> find(List<Map<String, Object>> dashboardInstances) {
+        return observations(dashboardInstances, false);
+    }
+
+    // 장애 판정에서도 대시보드와 동일한 기준을 사용하고 정상·미확인 결과 유지
+    public List<Map<String, Object>> observations() {
+        return observations(List.of(), true);
+    }
+
+    private List<Map<String, Object>> observations(
+            List<Map<String, Object>> dashboardInstances, boolean includeHealthy) {
         Set<Scope> scopes = new LinkedHashSet<>();
         for (Map<String, Object> i : dashboardInstances) {
             scopes.add(new Scope(text(i, "project_id"), text(i, "instance_id")));
@@ -59,7 +69,10 @@ final class DashboardStatusCauseQuery {
                                             ? worstStatus(
                                                     persisted, certificateStatus(value, limits))
                                             : persisted;
-            if (status == null || "UP".equals(status) || ("METRIC".equals(kind) && value == null)) {
+            if (!includeHealthy
+                    && (status == null
+                            || "UP".equals(status)
+                            || ("METRIC".equals(kind) && value == null))) {
                 continue;
             }
             boolean nonExpiryCertificate =
@@ -83,7 +96,7 @@ final class DashboardStatusCauseQuery {
                                 ? null
                                 : row.get(key));
             }
-            cause.put("status", status);
+            cause.put("status", status == null ? "UNKNOWN" : status);
             cause.put(
                     "warning_value",
                     limits == null || nonExpiryCertificate ? null : limits.warning());
@@ -191,11 +204,15 @@ final class DashboardStatusCauseQuery {
           then r.message end),r.checked_at
       from check_results_latest r join check_definitions d using(project_id,instance_id,check_id) join instances i using(project_id,instance_id) join projects p using(project_id) where d.enabled and i.enabled and p.enabled and d.monitoring_enabled
       union all
-      select t.project_id,null,'CERTIFICATE','CERTIFICATE_DAYS',null,t.certificate_target_id::varchar,t.hostname,c.days_remaining::numeric,c.status,
+      select t.project_id,b.instance_id,'CERTIFICATE','CERTIFICATE_DAYS',null,t.certificate_target_id::varchar,t.hostname,c.days_remaining::numeric,c.status,
         case when c.chain_valid=false then 'CERT_CHAIN_INVALID' when c.hostname_valid=false then 'CERT_HOSTNAME_INVALID'
           when lower(coalesce(c.signature_algorithm,'')) like '%sha1%' then 'CERT_SHA1_DETECTED'
           when c.days_remaining is null or c.chain_valid is null or c.hostname_valid is null then 'TLS_CHECK_FAILED' end,c.checked_at
-      from certificate_latest c join certificate_targets t using(certificate_target_id) join projects p using(project_id) where t.enabled and p.enabled
+      from certificate_latest c
+      join certificate_targets t using(certificate_target_id)
+      join projects p using(project_id)
+      left join instance_certificate_thresholds b on b.certificate_target_id = t.certificate_target_id
+      where t.enabled and p.enabled
       union all
       select l.project_id,l.instance_id,case l.status_reason when 'CLOCK_SKEW' then 'CLOCK_SKEW' else 'PARTIAL_COLLECTION' end,null,null,null,null,null,'WARN',l.status_reason,l.agent_observed_at
       from instance_snapshot_latest l join instances i using(project_id,instance_id) join projects p using(project_id) where i.enabled and p.enabled and l.status_reason in ('CLOCK_SKEW','PARTIAL_COLLECTION')

@@ -8,29 +8,600 @@ import type { CertificatePage } from '../models/CertificatePage';
 import type { CertificateWrite } from '../models/CertificateWrite';
 import type { CheckPage } from '../models/CheckPage';
 import type { CheckSettingsWrite } from '../models/CheckSettingsWrite';
+import type { CollectorEventPage } from '../models/CollectorEventPage';
+import type { ConnectionState } from '../models/ConnectionState';
 import type { Dashboard } from '../models/Dashboard';
 import type { DbPoolResponse } from '../models/DbPoolResponse';
 import type { Identifier } from '../models/Identifier';
+import type { Incident } from '../models/Incident';
+import type { IncidentAction } from '../models/IncidentAction';
+import type { IncidentDetail } from '../models/IncidentDetail';
+import type { IncidentEvidence } from '../models/IncidentEvidence';
+import type { IncidentPage } from '../models/IncidentPage';
 import type { InstancePage } from '../models/InstancePage';
+import type { InstanceThresholdCertificate } from '../models/InstanceThresholdCertificate';
+import type { InstanceThresholdSettings } from '../models/InstanceThresholdSettings';
+import type { InstanceThresholdWrite } from '../models/InstanceThresholdWrite';
 import type { InstanceUpdate } from '../models/InstanceUpdate';
 import type { InstanceWrite } from '../models/InstanceWrite';
 import type { LoginRequest } from '../models/LoginRequest';
 import type { LogRead } from '../models/LogRead';
 import type { LogSource } from '../models/LogSource';
 import type { LogWrite } from '../models/LogWrite';
+import type { ManagedMenu } from '../models/ManagedMenu';
+import type { ManagedRole } from '../models/ManagedRole';
+import type { MenuPermission } from '../models/MenuPermission';
+import type { MenuWrite } from '../models/MenuWrite';
+import type { PermissionWrite } from '../models/PermissionWrite';
 import type { ProjectPage } from '../models/ProjectPage';
 import type { ProjectWrite } from '../models/ProjectWrite';
 import type { ResourceResponse } from '../models/ResourceResponse';
+import type { RoleUser } from '../models/RoleUser';
+import type { RoleWrite } from '../models/RoleWrite';
 import type { ServiceProfileWrite } from '../models/ServiceProfileWrite';
 import type { SessionUser } from '../models/SessionUser';
 import type { Status } from '../models/Status';
 import type { Threshold } from '../models/Threshold';
+import type { TransportMode } from '../models/TransportMode';
 import type { UserPage } from '../models/UserPage';
 import type { UserWrite } from '../models/UserWrite';
+import type { XlogPage } from '../models/XlogPage';
+import type { XlogSettings } from '../models/XlogSettings';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class DefaultService {
+    /**
+     * @returns IncidentPage Project-scoped incident ledger, ordered by first detection
+     * @throws ApiError
+     */
+    public static listIncidents({
+        project,
+        state = 'ACTIVE',
+        page,
+        size = 50,
+    }: {
+        project?: string,
+        state?: '' | 'ACTIVE' | 'OPEN' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'RECOVERED' | 'MONITORING_STOPPED',
+        page?: number,
+        size?: number,
+    }): CancelablePromise<IncidentPage> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/incidents',
+            query: {
+                'project': project,
+                'state': state,
+                'page': page,
+                'size': size,
+            },
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns IncidentDetail Incident with latest 100 lifecycle events and eligible assignees
+     * @throws ApiError
+     */
+    public static getIncident({
+        id,
+    }: {
+        id: number,
+    }): CancelablePromise<IncidentDetail> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/incidents/{id}',
+            path: {
+                'id': id,
+            },
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+            },
+        });
+    }
+    /**
+     * @returns Incident Updated incident; recovery is controlled by observed health, not manual actions
+     * @throws ApiError
+     */
+    public static actOnIncident({
+        id,
+        requestBody,
+    }: {
+        id: number,
+        requestBody: IncidentAction,
+    }): CancelablePromise<Incident> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/incidents/{id}/actions',
+            path: {
+                'id': id,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+                409: `Resource conflict`,
+            },
+        });
+    }
+    /**
+     * @returns IncidentEvidence Bounded stored evidence; logs require log access, configuration audit requires admin
+     * @throws ApiError
+     */
+    public static getIncidentEvidence({
+        id,
+        at,
+    }: {
+        id: number,
+        /**
+         * Anchor time; defaults to first detection. Returns 15 minutes before and after.
+         */
+        at?: string,
+    }): CancelablePromise<IncidentEvidence> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/incidents/{id}/evidence',
+            path: {
+                'id': id,
+            },
+            query: {
+                'at': at,
+            },
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+            },
+        });
+    }
+    /**
+     * @returns XlogPage Retained collected requests in the permitted project scope, not total traffic.
+     * @throws ApiError
+     */
+    public static getXlog({
+        project = '',
+        instance = '',
+        minutes = 60,
+        path = '',
+        errorsOnly = false,
+        beforeId,
+    }: {
+        project?: string,
+        instance?: string,
+        minutes?: number,
+        path?: string,
+        errorsOnly?: boolean,
+        beforeId?: number,
+    }): CancelablePromise<XlogPage> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/xlog',
+            query: {
+                'project': project,
+                'instance': instance,
+                'minutes': minutes,
+                'path': path,
+                'errorsOnly': errorsOnly,
+                'beforeId': beforeId,
+            },
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns XlogSettings Success
+     * @throws ApiError
+     */
+    public static getXlogSettings({
+        projectId,
+    }: {
+        projectId: string,
+    }): CancelablePromise<XlogSettings> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/projects/{projectId}/xlog-settings',
+            path: {
+                'projectId': projectId,
+            },
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns XlogSettings Success
+     * @throws ApiError
+     */
+    public static saveXlogSettings({
+        projectId,
+        requestBody,
+    }: {
+        projectId: string,
+        requestBody: XlogSettings,
+    }): CancelablePromise<XlogSettings> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/projects/{projectId}/xlog-settings',
+            path: {
+                'projectId': projectId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns ConnectionState Success
+     * @throws ApiError
+     */
+    public static getConnection({
+        projectId,
+        instanceId,
+    }: {
+        projectId: string,
+        instanceId: string,
+    }): CancelablePromise<ConnectionState> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/projects/{projectId}/instances/{instanceId}/connection',
+            path: {
+                'projectId': projectId,
+                'instanceId': instanceId,
+            },
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns ConnectionState Success
+     * @throws ApiError
+     */
+    public static saveConnectionMode({
+        projectId,
+        instanceId,
+        requestBody,
+    }: {
+        projectId: string,
+        instanceId: string,
+        requestBody: TransportMode,
+    }): CancelablePromise<ConnectionState> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/projects/{projectId}/instances/{instanceId}/connection',
+            path: {
+                'projectId': projectId,
+                'instanceId': instanceId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns ConnectionState Success
+     * @throws ApiError
+     */
+    public static startConnection({
+        projectId,
+        instanceId,
+    }: {
+        projectId: string,
+        instanceId: string,
+    }): CancelablePromise<ConnectionState> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/projects/{projectId}/instances/{instanceId}/connection/start',
+            path: {
+                'projectId': projectId,
+                'instanceId': instanceId,
+            },
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns ConnectionState Success
+     * @throws ApiError
+     */
+    public static stopConnection({
+        projectId,
+        instanceId,
+    }: {
+        projectId: string,
+        instanceId: string,
+    }): CancelablePromise<ConnectionState> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/projects/{projectId}/instances/{instanceId}/connection/stop',
+            path: {
+                'projectId': projectId,
+                'instanceId': instanceId,
+            },
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns CollectorEventPage Success
+     * @throws ApiError
+     */
+    public static getCollectorEvents({
+        projectId,
+        instanceId,
+        kind = 'XLOG',
+        beforeId,
+    }: {
+        projectId: string,
+        instanceId: string,
+        kind?: 'XLOG' | 'LOG',
+        beforeId?: number,
+    }): CancelablePromise<CollectorEventPage> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/projects/{projectId}/instances/{instanceId}/events',
+            path: {
+                'projectId': projectId,
+                'instanceId': instanceId,
+            },
+            query: {
+                'kind': kind,
+                'beforeId': beforeId,
+            },
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns ManagedRole Success
+     * @throws ApiError
+     */
+    public static listRoles(): CancelablePromise<Array<ManagedRole>> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/settings/roles',
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+                409: `Resource conflict`,
+            },
+        });
+    }
+    /**
+     * @returns any Success
+     * @throws ApiError
+     */
+    public static createRole({
+        requestBody,
+    }: {
+        requestBody: RoleWrite,
+    }): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/settings/roles',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+                409: `Resource conflict`,
+            },
+        });
+    }
+    /**
+     * @returns void
+     * @throws ApiError
+     */
+    public static updateRole({
+        roleId,
+        requestBody,
+    }: {
+        roleId: string,
+        requestBody: RoleWrite,
+    }): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/settings/roles/{roleId}',
+            path: {
+                'roleId': roleId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+                409: `Resource conflict`,
+            },
+        });
+    }
+    /**
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteRole({
+        roleId,
+    }: {
+        roleId: string,
+    }): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/settings/roles/{roleId}',
+            path: {
+                'roleId': roleId,
+            },
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+                409: `Resource conflict`,
+            },
+        });
+    }
+    /**
+     * @returns RoleUser Success
+     * @throws ApiError
+     */
+    public static listRoleUsers({
+        roleId,
+    }: {
+        roleId: string,
+    }): CancelablePromise<Array<RoleUser>> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/settings/roles/{roleId}/users',
+            path: {
+                'roleId': roleId,
+            },
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+                409: `Resource conflict`,
+            },
+        });
+    }
+    /**
+     * @returns void
+     * @throws ApiError
+     */
+    public static assignRoleUsers({
+        roleId,
+        requestBody,
+    }: {
+        roleId: string,
+        requestBody: Array<string>,
+    }): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/settings/roles/{roleId}/users',
+            path: {
+                'roleId': roleId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+                409: `Resource conflict`,
+            },
+        });
+    }
+    /**
+     * @returns ManagedMenu Success
+     * @throws ApiError
+     */
+    public static listMenus(): CancelablePromise<Array<ManagedMenu>> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/settings/menus',
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns void
+     * @throws ApiError
+     */
+    public static updateMenu({
+        menuId,
+        requestBody,
+    }: {
+        menuId: string,
+        requestBody: MenuWrite,
+    }): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/settings/menus/{menuId}',
+            path: {
+                'menuId': menuId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns MenuPermission Success
+     * @throws ApiError
+     */
+    public static listPermissions(): CancelablePromise<Array<MenuPermission>> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/settings/permissions',
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
+    /**
+     * @returns void
+     * @throws ApiError
+     */
+    public static updatePermissions({
+        role,
+        requestBody,
+    }: {
+        role: string,
+        requestBody: Array<PermissionWrite>,
+    }): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/settings/permissions/{role}',
+            path: {
+                'role': role,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+            },
+        });
+    }
     /**
      * @returns LogSource Configured log files (administrator or assigned operator only)
      * @throws ApiError
@@ -303,14 +874,20 @@ export class DefaultService {
      * @throws ApiError
      */
     public static getDashboard({
+        project = '',
+        instance = '',
         period = '24h',
     }: {
-        period?: '24h' | '7d' | '30d' | '365d',
+        project?: string,
+        instance?: string,
+        period?: '5m' | '15m' | '1h' | '24h' | '7d' | '30d' | '365d',
     }): CancelablePromise<Dashboard> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/dashboard',
             query: {
+                'project': project,
+                'instance': instance,
                 'period': period,
             },
             errors: {
@@ -624,11 +1201,11 @@ export class DefaultService {
         projectId,
         instanceId,
         period = '24h',
-        maxPoints = 1000,
+        maxPoints = 20000,
     }: {
         projectId: Identifier,
         instanceId: Identifier,
-        period?: '24h' | '7d' | '30d' | '365d',
+        period?: '5m' | '15m' | '1h' | '24h' | '7d' | '30d' | '365d',
         maxPoints?: number,
     }): CancelablePromise<ResourceResponse> {
         return __request(OpenAPI, {
@@ -656,11 +1233,11 @@ export class DefaultService {
         projectId,
         instanceId,
         period = '24h',
-        maxPoints = 1000,
+        maxPoints = 20000,
     }: {
         projectId: Identifier,
         instanceId: Identifier,
-        period?: '24h' | '7d' | '30d' | '365d',
+        period?: '5m' | '15m' | '1h' | '24h' | '7d' | '30d' | '365d',
         maxPoints?: number,
     }): CancelablePromise<DbPoolResponse> {
         return __request(OpenAPI, {
@@ -1030,6 +1607,86 @@ export class DefaultService {
                 403: `CSRF token missing or access denied`,
                 404: `Resource not found`,
                 429: `Check already running or rate limited`,
+            },
+        });
+    }
+    /**
+     * @returns InstanceThresholdSettings Effective instance thresholds and responsible email addresses
+     * @throws ApiError
+     */
+    public static getInstanceThresholds({
+        projectId,
+        instanceId,
+    }: {
+        projectId: Identifier,
+        instanceId: Identifier,
+    }): CancelablePromise<InstanceThresholdSettings> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/projects/{projectId}/instances/{instanceId}/thresholds',
+            path: {
+                'projectId': projectId,
+                'instanceId': instanceId,
+            },
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+            },
+        });
+    }
+    /**
+     * @returns InstanceThresholdSettings Saved instance thresholds and responsible email addresses; does not send mail
+     * @throws ApiError
+     */
+    public static saveInstanceThresholds({
+        projectId,
+        instanceId,
+        requestBody,
+    }: {
+        projectId: Identifier,
+        instanceId: Identifier,
+        requestBody: InstanceThresholdWrite,
+    }): CancelablePromise<InstanceThresholdSettings> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/projects/{projectId}/instances/{instanceId}/thresholds',
+            path: {
+                'projectId': projectId,
+                'instanceId': instanceId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request`,
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
+            },
+        });
+    }
+    /**
+     * @returns InstanceThresholdCertificate Available enabled certificate targets for this instance
+     * @throws ApiError
+     */
+    public static getInstanceThresholdCertificates({
+        projectId,
+        instanceId,
+    }: {
+        projectId: Identifier,
+        instanceId: Identifier,
+    }): CancelablePromise<Array<InstanceThresholdCertificate>> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/projects/{projectId}/instances/{instanceId}/thresholds/certificates',
+            path: {
+                'projectId': projectId,
+                'instanceId': instanceId,
+            },
+            errors: {
+                401: `Authentication failed`,
+                403: `CSRF token missing or access denied`,
+                404: `Resource not found`,
             },
         });
     }

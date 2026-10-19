@@ -83,6 +83,34 @@ public final class ResourceQuery {
                     case "db_pool_samples" -> "pool_id,";
                     default -> "";
                 };
+        // 하루는 실제 수집 시각과 값을 유지하고 디스크·풀별 응답 크기 제한
+        if (period.compareTo(Duration.ofDays(1)) <= 0) {
+            String identity =
+                    partition.isEmpty() ? "" : "partition by " + partition.replace(",", "");
+            return db.queryForList(
+                    """
+                    select *
+                    from (
+                        select
+                            samples.*
+                            ,row_number() over (%s order by sampled_at desc) as history_position
+                        from %s samples
+                        where
+                            project_id = ?
+                            and instance_id = ?
+                            and sampled_at >= now() - (? * interval '1 second')
+                            and sampled_at <= now()
+                    ) history
+                    where history_position <= ?
+                    order by %s sampled_at
+                    """
+                            .formatted(identity, table, partition),
+                    projectId,
+                    instanceId,
+                    period.toSeconds(),
+                    maxPoints);
+        }
+
         // 최근 구간에 치우치지 않도록 전체 조회 기간의 디스크·풀별 표시 개수 제한
         long bucketSeconds = Math.max(1, (period.toSeconds() + maxPoints - 1) / maxPoints);
         return db.queryForList(
@@ -124,6 +152,9 @@ public final class ResourceQuery {
 
     public static Duration duration(String period) {
         return switch (period) {
+            case "5m" -> Duration.ofMinutes(5);
+            case "15m" -> Duration.ofMinutes(15);
+            case "1h" -> Duration.ofHours(1);
             case "24h" -> Duration.ofHours(24);
             case "7d" -> Duration.ofDays(7);
             case "30d" -> Duration.ofDays(30);
@@ -133,7 +164,7 @@ public final class ResourceQuery {
     }
 
     private void validatePoints(int maxPoints) {
-        if (maxPoints < 1 || maxPoints > 1000) {
+        if (maxPoints < 1 || maxPoints > 20000) {
             throw new IllegalArgumentException("POINTS_INVALID");
         }
     }

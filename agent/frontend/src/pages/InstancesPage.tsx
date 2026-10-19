@@ -24,7 +24,7 @@ export default function InstancesPage() {
   const instances = query.data?.items ?? [];
   return (
     <>
-      <PageBackLink to="/projects">프로젝트 목록으로</PageBackLink>
+      <PageBackLink to="/projects?project=">프로젝트 목록으로</PageBackLink>
       <RefreshFailure
         visible={query.isError && Boolean(query.data)}
         updatedAt={query.dataUpdatedAt}
@@ -47,6 +47,7 @@ export default function InstancesPage() {
               <Th>내부 점검</Th>
               <Th>최근 수집</Th>
               <Th>상태</Th>
+              <Th>설정</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -70,6 +71,13 @@ export default function InstancesPage() {
                 </Td>
                 <Td>
                   <StatusLabel status={instance.status} />
+                </Td>
+                <Td>
+                  <Link
+                    to={`/projects/${projectId}/instances/${instance.instance_id}?tab=thresholds`}
+                  >
+                    임계치 관리
+                  </Link>
                 </Td>
               </Tr>
             ))}

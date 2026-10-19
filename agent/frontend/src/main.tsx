@@ -7,6 +7,9 @@ import './tailadmin.css';
 import App from './App';
 import PermissionProvider from './components/PermissionProvider';
 import { LOGIN_PATH, isUnauthorized } from './api';
+import { initializeTheme } from './theme';
+
+initializeTheme();
 
 // 세션 만료 시 반복되는 401 오류를 화면별로 표시하지 않고 로그인 화면으로 한 번 이동
 let redirecting = false;

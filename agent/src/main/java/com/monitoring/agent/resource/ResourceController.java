@@ -22,7 +22,7 @@ public final class ResourceController {
             @PathVariable("projectId") String projectId,
             @PathVariable("instanceId") String instanceId,
             @RequestParam(name = "period", defaultValue = "24h") String period,
-            @RequestParam(name = "max_points", defaultValue = "1000") int maxPoints) {
+            @RequestParam(name = "max_points", defaultValue = "20000") int maxPoints) {
         return query.resources(projectId, instanceId, period, maxPoints);
     }
 
@@ -31,7 +31,7 @@ public final class ResourceController {
             @PathVariable("projectId") String projectId,
             @PathVariable("instanceId") String instanceId,
             @RequestParam(name = "period", defaultValue = "24h") String period,
-            @RequestParam(name = "max_points", defaultValue = "1000") int maxPoints) {
+            @RequestParam(name = "max_points", defaultValue = "20000") int maxPoints) {
         return query.pools(projectId, instanceId, period, maxPoints);
     }
 }

@@ -13,7 +13,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,6 +21,11 @@ class CertificateCheckServiceTest {
     @Test
     void workerAndQueueLimitsRejectExcessWork() throws Exception {
         JdbcTemplate db = mock(JdbcTemplate.class);
+        when(db.queryForObject(
+                        anyString(),
+                        org.mockito.ArgumentMatchers.eq(Boolean.class),
+                        any(Object[].class)))
+                .thenReturn(true);
         CertificateChecker checker = mock(CertificateChecker.class);
         CertificateResultStore results = mock(CertificateResultStore.class);
         ThresholdResolver thresholds = thresholds(30d, 7d);
@@ -51,6 +55,11 @@ class CertificateCheckServiceTest {
     @Test
     void acceptedSubmissionDoesNotWaitForTlsAndExecutorShutsDown() throws Exception {
         JdbcTemplate db = mock(JdbcTemplate.class);
+        when(db.queryForObject(
+                        anyString(),
+                        org.mockito.ArgumentMatchers.eq(Boolean.class),
+                        any(Object[].class)))
+                .thenReturn(true);
         CertificateChecker checker = mock(CertificateChecker.class);
         CertificateResultStore results = mock(CertificateResultStore.class);
         ThresholdResolver thresholds = thresholds(30d, 7d);
@@ -109,6 +118,11 @@ class CertificateCheckServiceTest {
     @Test
     void certificateStatusUsesTheCurrentProjectThresholdForEveryRun() throws Exception {
         JdbcTemplate db = mock(JdbcTemplate.class);
+        when(db.queryForObject(
+                        anyString(),
+                        org.mockito.ArgumentMatchers.eq(Boolean.class),
+                        any(Object[].class)))
+                .thenReturn(true);
         CertificateChecker checker = mock(CertificateChecker.class);
         CertificateResultStore results = mock(CertificateResultStore.class);
         ThresholdResolver thresholds = thresholds(45d, 14d);
@@ -145,7 +159,7 @@ class CertificateCheckServiceTest {
                                     true,
                                     "SHA256withRSA",
                                     "WARN"));
-            verify(thresholds).resolve("sample-a", null);
+            verify(thresholds).resolveCertificate("sample-a", 11L);
             verify(checker)
                     .check(
                             "threshold.example",
@@ -157,15 +171,45 @@ class CertificateCheckServiceTest {
         }
     }
 
+    @Test
+    void queuedCheckSkipsDisabledProjectOrTarget() {
+        JdbcTemplate db = mock(JdbcTemplate.class);
+        when(db.queryForObject(
+                        anyString(),
+                        org.mockito.ArgumentMatchers.eq(Boolean.class),
+                        any(Object[].class)))
+                .thenReturn(false);
+        CertificateChecker checker = mock(CertificateChecker.class);
+        CertificateResultStore results = mock(CertificateResultStore.class);
+        ThresholdResolver thresholds = mock(ThresholdResolver.class);
+        CertificateCheckService service =
+                new CertificateCheckService(db, checker, results, thresholds, 1, 1);
+        try {
+            assertEquals(
+                    CertificateCheckService.Submission.ACCEPTED,
+                    service.submit(target(1L, "one")));
+        } finally {
+            service.close();
+        }
+        org.mockito.Mockito.verifyNoInteractions(checker, results, thresholds);
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(db).queryForObject(
+                sql.capture(),
+                org.mockito.ArgumentMatchers.eq(Boolean.class),
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(3L),
+                org.mockito.ArgumentMatchers.eq("sample-a"));
+        assertTrue(sql.getValue().contains("and p.enabled"));
+        assertTrue(sql.getValue().contains("and t.enabled"));
+    }
+
     private CertificateCheckService.Target target(long id, String hostname) {
         return new CertificateCheckService.Target(id, "sample-a", hostname, 443, hostname, 3L);
     }
 
     private ThresholdResolver thresholds(double warning, double critical) {
         ThresholdResolver thresholds = mock(ThresholdResolver.class);
-        ThresholdResolver.Resolved resolved = mock(ThresholdResolver.Resolved.class);
-        when(thresholds.resolve(anyString(), isNull())).thenReturn(resolved);
-        when(resolved.get("CERTIFICATE_DAYS"))
+        when(thresholds.resolveCertificate(anyString(), anyLong()))
                 .thenReturn(new ThresholdResolver.Limits(warning, critical));
         return thresholds;
     }

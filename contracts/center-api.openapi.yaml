@@ -7,6 +7,337 @@ servers:
 security:
   - sessionCookie: []
 paths:
+  /incidents:
+    get:
+      operationId: listIncidents
+      parameters:
+        - { name: project, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string, default: ACTIVE, enum: ['', ACTIVE, OPEN, ACKNOWLEDGED, IN_PROGRESS, RECOVERED, MONITORING_STOPPED] } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: Project-scoped incident ledger, ordered by first detection
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /incidents/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      operationId: getIncident
+      responses:
+        '200':
+          description: Incident with latest 100 lifecycle events and eligible assignees
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /incidents/{id}/actions:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      operationId: actOnIncident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IncidentAction' }
+      responses:
+        '200':
+          description: Updated incident; recovery is controlled by observed health, not manual actions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Incident' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /incidents/{id}/evidence:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      operationId: getIncidentEvidence
+      parameters:
+        - { name: at, in: query, schema: { type: string, format: date-time }, description: Anchor time; defaults to first detection. Returns 15 minutes before and after. }
+      responses:
+        '200':
+          description: Bounded stored evidence; logs require log access, configuration audit requires admin
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentEvidence' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /xlog:
+    get:
+      operationId: getXlog
+      parameters:
+        - {name: project, in: query, schema: {type: string, default: ''}}
+        - {name: instance, in: query, schema: {type: string, default: ''}}
+        - {name: minutes, in: query, schema: {type: integer, minimum: 5, maximum: 1440, default: 60}}
+        - {name: path, in: query, schema: {type: string, maxLength: 200, default: ''}}
+        - {name: errorsOnly, in: query, schema: {type: boolean, default: false}}
+        - {name: beforeId, in: query, schema: {type: integer, format: int64, minimum: 0, default: 0}}
+      responses:
+        '200':
+          description: Retained collected requests in the permitted project scope, not total traffic.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/XlogPage'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /projects/{projectId}/xlog-settings:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getXlogSettings
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/XlogSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: saveXlogSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/XlogSettings' }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/XlogSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{projectId}/instances/{instanceId}/connection:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: instanceId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getConnection
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConnectionState' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: saveConnectionMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransportMode' }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConnectionState' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{projectId}/instances/{instanceId}/connection/start:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: instanceId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: startConnection
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConnectionState' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{projectId}/instances/{instanceId}/connection/stop:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: instanceId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: stopConnection
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConnectionState' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /projects/{projectId}/instances/{instanceId}/events:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: instanceId, in: path, required: true, schema: { type: string } }
+      - { name: kind, in: query, schema: { type: string, enum: [XLOG, LOG], default: XLOG } }
+      - { name: beforeId, in: query, schema: { type: integer, format: int64, default: 0 } }
+    get:
+      operationId: getCollectorEvents
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CollectorEventPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /settings/roles:
+    get:
+      operationId: listRoles
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ManagedRole' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    post:
+      operationId: createRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleWrite' }
+      responses:
+        '201':
+          description: Success
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /settings/roles/{roleId}:
+    parameters:
+      - { name: roleId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: updateRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleWrite' }
+      responses:
+        '204':
+          description: Success
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      operationId: deleteRole
+      responses:
+        '204':
+          description: Success
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /settings/roles/{roleId}/users:
+    parameters:
+      - { name: roleId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listRoleUsers
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RoleUser' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    put:
+      operationId: assignRoleUsers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: array, maxItems: 1000, uniqueItems: true, items: { type: string } }
+      responses:
+        '204':
+          description: Success
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /settings/menus:
+    get:
+      operationId: listMenus
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ManagedMenu' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /settings/menus/{menuId}:
+    parameters:
+      - { name: menuId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: updateMenu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MenuWrite' }
+      responses:
+        '204':
+          description: Success
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /settings/permissions:
+    get:
+      operationId: listPermissions
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MenuPermission' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /settings/permissions/{role}:
+    parameters:
+      - { name: role, in: path, required: true, schema: { type: string, maxLength: 20 } }
+    put:
+      operationId: updatePermissions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: array, items: { $ref: '#/components/schemas/PermissionWrite' } }
+      responses:
+        '204':
+          description: Success
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '400': { $ref: '#/components/responses/BadRequest' }
   /projects/{projectId}/instances/{instanceId}/logs:
     get:
       operationId: listLogs
@@ -182,6 +513,8 @@ paths:
     get:
       operationId: getDashboard
       parameters:
+        - {name: project, in: query, schema: {type: string, default: ''}}
+        - {name: instance, in: query, schema: {type: string, default: ''}}
         - {$ref: '#/components/parameters/Period'}
       responses:
         '200':
@@ -548,6 +881,55 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '429': {$ref: '#/components/responses/RateLimited'}
+  /projects/{projectId}/instances/{instanceId}/thresholds:
+    parameters:
+      - {$ref: '#/components/parameters/ProjectId'}
+      - {$ref: '#/components/parameters/InstanceId'}
+    get:
+      operationId: getInstanceThresholds
+      responses:
+        '200':
+          description: Effective instance thresholds and responsible email addresses
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InstanceThresholdSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      operationId: saveInstanceThresholds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/InstanceThresholdWrite'}
+      responses:
+        '200':
+          description: Saved instance thresholds and responsible email addresses; does not send mail
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InstanceThresholdSettings'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /projects/{projectId}/instances/{instanceId}/thresholds/certificates:
+    parameters:
+      - {$ref: '#/components/parameters/ProjectId'}
+      - {$ref: '#/components/parameters/InstanceId'}
+    get:
+      operationId: getInstanceThresholdCertificates
+      responses:
+        '200':
+          description: Available enabled certificate targets for this instance
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/InstanceThresholdCertificate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /settings/thresholds:
     get:
       operationId: listThresholds
@@ -618,11 +1000,11 @@ components:
     Period:
       name: period
       in: query
-      schema: {type: string, enum: [24h, 7d, 30d, 365d], default: 24h}
+      schema: {type: string, enum: [5m, 15m, 1h, 24h, 7d, 30d, 365d], default: 24h}
     MaxPoints:
       name: max_points
       in: query
-      schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}
+      schema: {type: integer, minimum: 1, maximum: 20000, default: 20000}
   responses:
     BadRequest:
       description: Invalid request
@@ -655,6 +1037,192 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
   schemas:
+    Incident:
+      type: object
+      additionalProperties: false
+      required: [incident_id, project_id, project_name, instance_id, instance_name, kind, metric_key, subject_id, subject_name, severity, state, opened_at, last_detected_at, closed_at, assignee, version, first_observation, latest_observation]
+      properties:
+        incident_id: { type: integer, format: int64 }
+        project_id: { type: string }
+        project_name: { type: string }
+        instance_id: { type: [string, 'null'] }
+        instance_name: { type: [string, 'null'] }
+        kind: { type: string, enum: [COLLECTION, METRIC, CHECK, CERTIFICATE] }
+        metric_key: { type: [string, 'null'] }
+        subject_id: { type: [string, 'null'] }
+        subject_name: { type: [string, 'null'] }
+        severity: { type: string, enum: [WARN, DOWN] }
+        state: { type: string, enum: [OPEN, ACKNOWLEDGED, IN_PROGRESS, RECOVERED, MONITORING_STOPPED] }
+        opened_at: { type: string, format: date-time }
+        last_detected_at: { type: string, format: date-time }
+        closed_at: { type: [string, 'null'], format: date-time }
+        assignee: { type: [string, 'null'] }
+        version: { type: integer, format: int64 }
+        first_observation: { $ref: '#/components/schemas/DashboardStatusCause' }
+        latest_observation: { $ref: '#/components/schemas/DashboardStatusCause' }
+    IncidentPage:
+      type: object
+      required: [items, page, size, total]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Incident' } }
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer, format: int64 }
+    IncidentDetail:
+      type: object
+      required: [incident, events, assignees]
+      properties:
+        incident: { $ref: '#/components/schemas/Incident' }
+        events: { type: array, items: { $ref: '#/components/schemas/IncidentEvent' } }
+        assignees: { type: array, items: { type: string } }
+    IncidentEvent:
+      type: object
+      required: [event_id, occurred_at, actor, event_type, note, assignee]
+      properties:
+        event_id: { type: integer, format: int64 }
+        occurred_at: { type: string, format: date-time }
+        actor: { type: string }
+        event_type: { type: string }
+        note: { type: [string, 'null'] }
+        assignee: { type: [string, 'null'] }
+    IncidentAction:
+      type: object
+      additionalProperties: false
+      required: [version, action]
+      properties:
+        version: { type: integer, format: int64, minimum: 0 }
+        action: { type: string, enum: [ACKNOWLEDGE, START, ASSIGN, COMMENT] }
+        assignee: { type: [string, 'null'] }
+        note: { type: [string, 'null'], maxLength: 2000 }
+    IncidentEvidence:
+      type: object
+      required: [from, to, logs_allowed, changes_allowed, resources, checks, logs, changes]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        logs_allowed: { type: boolean }
+        changes_allowed: { type: boolean }
+        resources: { type: array, items: { $ref: '#/components/schemas/IncidentResource' } }
+        checks: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/IncidentCheck' } }
+        logs: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/IncidentLog' } }
+        changes: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/IncidentChange' } }
+    IncidentResource:
+      type: object
+      required: [sampled_at, system_cpu_ratio, heap_ratio, memory_ratio, disk_ratio, db_pool_ratio]
+      properties:
+        sampled_at: { type: string, format: date-time }
+        system_cpu_ratio: { type: [number, 'null'] }
+        heap_ratio: { type: [number, 'null'] }
+        memory_ratio: { type: [number, 'null'] }
+        disk_ratio: { type: [number, 'null'] }
+        db_pool_ratio: { type: [number, 'null'] }
+    IncidentCheck:
+      type: object
+      required: [instance_id, check_id, name, category, checked_at, central_received_at, status, duration_ms, result_code]
+      properties:
+        instance_id: { type: string }
+        check_id: { type: string }
+        name: { type: [string, 'null'] }
+        category: { type: [string, 'null'] }
+        checked_at: { type: [string, 'null'], format: date-time }
+        central_received_at: { type: [string, 'null'], format: date-time }
+        status: { $ref: '#/components/schemas/Status' }
+        duration_ms: { type: [number, 'null'] }
+        result_code: { type: [string, 'null'] }
+    IncidentLog:
+      type: object
+      required: [id, received_at, text]
+      properties:
+        id: { type: integer, format: int64 }
+        received_at: { type: string, format: date-time }
+        text: { type: [string, 'null'], maxLength: 8192 }
+    IncidentChange:
+      type: object
+      required: [audit_id, occurred_at, actor, action, entity_type, target_id]
+      properties:
+        audit_id: { type: integer, format: int64 }
+        occurred_at: { type: string, format: date-time }
+        actor: { type: string }
+        action: { type: string }
+        entity_type: { type: string }
+        target_id: { type: string }
+    XlogSettings:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+    TransportMode:
+      type: object
+      required: [mode]
+      properties:
+        mode: { type: string, enum: [HTTP, WSS] }
+    ConnectionState:
+      type: object
+      required: [state]
+      properties:
+        state: { type: string }
+        mode: { type: string, enum: [HTTP, WSS] }
+        xlog_enabled: { type: boolean }
+        reason: { type: string }
+        dropped: { type: integer, format: int64 }
+        last_received_at: { type: string }
+    XlogPage:
+      type: object
+      required: [items, summary, enabled_projects, eligible_instances, connected_instances]
+      properties:
+        enabled_projects: {type: integer}
+        eligible_instances: {type: integer}
+        connected_instances: {type: integer}
+        summary:
+          type: object
+          required: [count, errors, average_ms, p95_ms]
+          properties:
+            count: {type: integer}
+            errors: {type: integer}
+            average_ms: {type: number}
+            p95_ms: {type: number}
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, project_id, instance_id, project_name, instance_name, received_at, payload]
+            properties:
+              id: {type: integer, format: int64}
+              project_id: {type: string}
+              instance_id: {type: string}
+              project_name: {type: string}
+              instance_name: {type: string}
+              received_at: {type: string}
+              payload:
+                type: object
+                required: [started_at, duration_ms, method, path, status]
+                properties:
+                  started_at: {type: integer, format: int64}
+                  duration_ms: {type: integer, format: int64}
+                  method: {type: string}
+                  path: {type: string}
+                  status: {type: integer}
+    CollectorEventPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, received_at, payload]
+            properties:
+              id: { type: integer, format: int64 }
+              received_at: { type: string }
+              payload:
+                type: object
+                properties:
+                  started_at: { type: integer, format: int64 }
+                  duration_ms: { type: integer, format: int64 }
+                  method: { type: string }
+                  path: { type: string }
+                  status: { type: integer }
+                  text: { type: string }
     LogWrite:
       type: object
       additionalProperties: false
@@ -704,11 +1272,72 @@ components:
       properties:
         username: {type: string}
         password: {type: string, format: password}
+    ManagedMenu:
+      type: object
+      required: [menuId, label, route, sortOrder, enabled, canRead, canWrite]
+      properties:
+        menuId: { type: string }
+        label: { type: string }
+        route: { type: string }
+        sortOrder: { type: integer }
+        enabled: { type: boolean }
+        canRead: { type: boolean }
+        canWrite: { type: boolean }
+    MenuWrite:
+      type: object
+      required: [label, sortOrder, enabled]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 60 }
+        sortOrder: { type: integer, minimum: 0, maximum: 999 }
+        enabled: { type: boolean }
+    PermissionWrite:
+      type: object
+      required: [menuId, canRead, canWrite]
+      properties:
+        menuId: { type: string }
+        canRead: { type: boolean }
+        canWrite: { type: boolean }
+    MenuPermission:
+      allOf:
+        - { $ref: '#/components/schemas/PermissionWrite' }
+        - type: object
+          required: [role, label]
+          properties:
+            role: { type: string, maxLength: 20 }
+            label: { type: string }
+    RoleWrite:
+      type: object
+      required: [roleId, name, description, baseRole, enabled]
+      properties:
+        roleId: {type: string, pattern: "^[A-Z][A-Z0-9_]{1,19}$"}
+        name: {type: string, minLength: 1, maxLength: 60}
+        description: {type: string, maxLength: 500}
+        baseRole: {type: string, enum: [ADMIN, OPERATOR, VIEWER]}
+        enabled: {type: boolean}
+    ManagedRole:
+      allOf:
+        - {$ref: "#/components/schemas/RoleWrite"}
+        - type: object
+          required: [builtin, userCount]
+          properties:
+            builtin: {type: boolean}
+            userCount: {type: integer, minimum: 0}
+    RoleUser:
+      type: object
+      required: [username, role, enabled, assigned]
+      properties:
+        username: {type: string}
+        role: {type: string}
+        enabled: {type: boolean}
+        assigned: {type: boolean}
     SessionUser:
       type: object
       required: [username, role]
       properties:
+        menus: { type: array, items: { $ref: '#/components/schemas/ManagedMenu' } }
         username: {type: string}
+        role_id: {type: string}
+        role_name: {type: string}
         role: {type: string, enum: [ADMIN, OPERATOR, VIEWER]}
         project_ids: {type: array, items: {type: string}}
     ManagedUser:
@@ -716,7 +1345,8 @@ components:
       required: [username, role, enabled, project_ids, created_at, updated_at]
       properties:
         username: {type: string}
-        role: {type: string, enum: [ADMIN, OPERATOR, VIEWER]}
+        role: {type: string, maxLength: 20}
+        role_name: {type: string}
         enabled: {type: boolean}
         project_ids: {type: array, items: {type: string}}
         created_at: {type: string, format: date-time}
@@ -727,7 +1357,7 @@ components:
       properties:
         username: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._@-]{1,79}$'}
         password: {type: string, format: password, writeOnly: true, description: Required on creation; blank on update preserves existing password. Supplied passwords need at least 12 characters and at most 72 UTF-8 bytes.}
-        role: {type: string, enum: [ADMIN, OPERATOR, VIEWER]}
+        role: {type: string, maxLength: 20}
         enabled: {type: boolean}
         projectIds: {type: array, maxItems: 200, uniqueItems: true, items: {$ref: '#/components/schemas/Identifier'}}
     UserPage:
@@ -1267,3 +1897,57 @@ components:
           DB_POOL, API_LATENCY_MS, CERTIFICATE_DAYS]}
         warningValue: {type: number, minimum: 0}
         criticalValue: {type: number, minimum: 0}
+
+    RecipientEmails:
+      type: array
+      maxItems: 10
+      items: {type: string, format: email, maxLength: 254}
+    InstanceThresholdMetricKey:
+      type: string
+      enum: [SYSTEM_CPU, PHYSICAL_MEMORY, JVM_HEAP, DISK, DB_POOL, API_LATENCY_MS, CERTIFICATE_DAYS]
+    InstanceThresholdMetric:
+      type: object
+      required: [metricKey, warningValue, criticalValue, defaultWarningValue, defaultCriticalValue, useDefault, recipientEmails]
+      properties:
+        metricKey: {$ref: '#/components/schemas/InstanceThresholdMetricKey'}
+        warningValue: {type: number, minimum: 0}
+        criticalValue: {type: number, minimum: 0}
+        defaultWarningValue: {type: number, minimum: 0}
+        defaultCriticalValue: {type: number, minimum: 0}
+        useDefault: {type: boolean}
+        recipientEmails: {$ref: '#/components/schemas/RecipientEmails'}
+        certificateTargetId: {type: [integer, 'null'], format: int64}
+        certificateTargetLabel: {type: [string, 'null']}
+    InstanceThresholdSettings:
+      type: object
+      required: [projectName, instanceName, recipientEmails, metrics]
+      properties:
+        projectName: {type: string}
+        instanceName: {type: string}
+        recipientEmails: {$ref: '#/components/schemas/RecipientEmails'}
+        metrics: {type: array, minItems: 0, maxItems: 7, items: {$ref: '#/components/schemas/InstanceThresholdMetric'}}
+    InstanceThresholdWrite:
+      type: object
+      required: [recipientEmails, metrics]
+      properties:
+        recipientEmails: {$ref: '#/components/schemas/RecipientEmails'}
+        metrics:
+          type: array
+          minItems: 0
+          maxItems: 7
+          items:
+            type: object
+            required: [metricKey, warningValue, criticalValue, useDefault, recipientEmails]
+            properties:
+              metricKey: {$ref: '#/components/schemas/InstanceThresholdMetricKey'}
+              warningValue: {type: number, minimum: 0}
+              criticalValue: {type: number, minimum: 0}
+              useDefault: {type: boolean}
+              recipientEmails: {$ref: '#/components/schemas/RecipientEmails'}
+              certificateTargetId: {type: [integer, 'null'], format: int64}
+    InstanceThresholdCertificate:
+      type: object
+      required: [id, label]
+      properties:
+        id: {type: integer, format: int64}
+        label: {type: string}

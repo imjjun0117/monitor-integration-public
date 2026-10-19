@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button, FormSelect, FormSelectOption, TextInput } from '../../components/ui';
 import { Table, Tbody, Td, Th, Thead, Tr } from '../../components/ui';
 import { createUser, getProjects, getUsers, updateUser } from '../../api';
-import { UserWrite, type ManagedUser } from '../../generated';
+import { DefaultService, type UserWrite, type ManagedUser } from '../../generated';
 import { roleLabels, usePermissions } from '../../components/PermissionContext';
 import { Empty, Failure, Loading, RefreshFailure } from '../../components/QueryState';
 import { BooleanSelect, LabeledField, SecretInput, SettingsDialog } from './forms';
@@ -12,13 +12,14 @@ import { BooleanSelect, LabeledField, SecretInput, SettingsDialog } from './form
 const emptyUser = (): UserWrite => ({
   username: '',
   password: '',
-  role: UserWrite.role.VIEWER,
+  role: 'VIEWER',
   enabled: true,
   projectIds: [],
 });
 export default function UserSettingsTab() {
   const [page, setPage] = useState(0);
   const users = useQuery({ queryKey: ['users', page], queryFn: () => getUsers(page) });
+  const roles = useQuery({ queryKey: ['roles'], queryFn: () => DefaultService.listRoles() });
   const projects = useQuery({ queryKey: ['projects'], queryFn: getProjects });
   const [draft, setDraft] = useState<UserWrite>();
   const [editing, setEditing] = useState(false);
@@ -31,7 +32,9 @@ export default function UserSettingsTab() {
       setDraft(undefined);
       setValidation(undefined);
       await Promise.all(
-        ['users', 'audit', 'session'].map((key) => client.invalidateQueries({ queryKey: [key] })),
+        ['users', 'roles', 'role-users', 'audit', 'session'].map((key) =>
+          client.invalidateQueries({ queryKey: [key] }),
+        ),
       );
       if (editing && value.username === username && value.password) {
         window.location.assign('/login');
@@ -45,7 +48,7 @@ export default function UserSettingsTab() {
     setDraft({
       username: user.username,
       password: '',
-      role: user.role as unknown as UserWrite.role,
+      role: user.role,
       enabled: user.enabled,
       projectIds: user.role === 'ADMIN' ? [] : user.project_ids,
     });
@@ -121,7 +124,7 @@ export default function UserSettingsTab() {
                       <small className="user-account-note">내 계정</small>
                     )}
                   </Td>
-                  <Td>{roleLabels[user.role]}</Td>
+                  <Td>{user.role_name ?? roleLabels[user.role] ?? user.role}</Td>
                   <Td>
                     {user.role === 'ADMIN'
                       ? '전체 프로젝트'
@@ -221,14 +224,16 @@ export default function UserSettingsTab() {
               onChange={(_, role) =>
                 setDraft({
                   ...draft,
-                  role: role as UserWrite.role,
+                  role: role,
                   projectIds: role === 'ADMIN' ? [] : draft.projectIds,
                 })
               }
             >
-              {Object.entries(roleLabels).map(([value, label]) => (
-                <FormSelectOption key={value} value={value} label={label} />
-              ))}
+              {(roles.data ?? [])
+                .filter((role) => role.enabled || role.roleId === draft.role)
+                .map(({ roleId: value, name: label }) => (
+                  <FormSelectOption key={value} value={value} label={label} />
+                ))}
             </FormSelect>
           </LabeledField>
           {editing && draft.username === username ? (

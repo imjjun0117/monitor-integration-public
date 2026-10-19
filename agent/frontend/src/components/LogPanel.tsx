@@ -10,10 +10,11 @@ import { BooleanSelect, LabeledField, NumberInput, SettingsDialog } from '../pag
 const messages: Record<string, string> = {
   LOG_DISABLED: '미사용으로 설정된 로그입니다.',
   LOG_ROOTS_NOT_CONFIGURED:
-    'Collector web.xml에 로그 허용 폴더(logAllowedRoots)를 설정해야 합니다.',
+    'Collector 설정의 monitor.log.allowed-roots에 로그 허용 폴더를 설정해야 합니다.',
   LOG_PATH_NOT_ALLOWED: '이 경로는 Collector의 로그 허용 폴더에 포함되지 않습니다.',
   LOG_FILE_UNAVAILABLE:
     '로그 파일이 없거나 WAS 계정으로 읽을 수 없습니다. 경로와 파일 권한을 확인하세요.',
+  LOG_FILE_NOT_FOUND: '대상 로그 파일이 없습니다. 경로와 파일명에 포함된 날짜를 확인하세요.',
   LOG_ACCESS_DENIED: 'WAS 계정에 로그 파일 읽기 권한이 없습니다.',
   LOG_NOT_REGULAR_FILE: '폴더가 아닌 로그 파일 경로를 입력하세요.',
   LOG_READER_BUSY: '다른 로그 요청을 처리 중입니다. 잠시 후 다시 시작하세요.',
@@ -135,7 +136,7 @@ function LogViewer({
   instanceId: string;
   source: LogSource;
 }) {
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(false);
   const [visible, setVisible] = useState(document.visibilityState !== 'hidden');
   const [text, setText] = useState('');
   const [error, setError] = useState('');
@@ -143,12 +144,22 @@ function LogViewer({
   const [busy, setBusy] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [retryAt, setRetryAt] = useState(0);
+  const [lastRead, setLastRead] = useState<number>();
+  const [lastChange, setLastChange] = useState<number>();
+  const [newCharacters, setNewCharacters] = useState(0);
   const cursor = useRef<string | undefined>(undefined);
   const output = useRef<HTMLPreElement>(null);
   const config = `${source.path}/${source.encoding}`;
   useEffect(() => {
     cursor.current = undefined;
     setText('');
+    setPlaying(false);
+    setError('');
+    setNotice('');
+    setRetryAt(0);
+    setLastRead(undefined);
+    setLastChange(undefined);
+    setNewCharacters(0);
   }, [config]);
   useEffect(() => {
     if (!source.enabled) {
@@ -184,6 +195,12 @@ function LogViewer({
           return;
         }
         const hadCursor = cursor.current !== undefined;
+        const readAt = Date.now();
+        setLastRead(readAt);
+        setNewCharacters(result.text.length);
+        if (result.text.length > 0) {
+          setLastChange(readAt);
+        }
         setError('');
         cursor.current = result.cursor;
         setText((previous) => appendLogText(previous, result.text, result.reset));
@@ -276,6 +293,17 @@ function LogViewer({
                 : '조회 중지'}
         </span>
       </div>
+      <div className="log-read-status" role="status">
+        {lastRead ? (
+          <>
+            마지막 조회 {new Date(lastRead).toLocaleTimeString()} ·{' '}
+            {newCharacters ? `추가된 내용 ${newCharacters.toLocaleString()}자` : '새 로그 없음'}
+            {lastChange && <> · 마지막 내용 수신 {new Date(lastChange).toLocaleTimeString()}</>}
+          </>
+        ) : (
+          '조회 시작을 누르면 새로 추가되는 내용을 가져옵니다.'
+        )}
+      </div>
       {error && <Alert variant="danger" title={error} />}
       {notice && <Alert variant="info" title={notice} />}
       <pre ref={output} className="log-output" tabIndex={0} aria-label="로그 원문">
@@ -340,7 +368,7 @@ function LogSettings({
       <LabeledField
         id="log-path"
         label="파일 경로"
-        help="대상 서버의 절대 경로를 입력하세요. Collector에서 허용한 폴더 안의 파일만 읽습니다."
+        help="대상 서버의 절대 경로를 입력하세요. 날짜별 로그는 catalina.{yyyy-MM-dd}.log 형식으로 등록하면 날짜가 바뀔 때 새 파일을 읽습니다. Collector에서 허용한 폴더만 읽습니다."
       >
         <TextInput
           id="log-path"

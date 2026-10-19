@@ -51,18 +51,18 @@ test('custom login and responsive dashboard meet visual behavior gates', async (
     await page.setViewportSize(viewport);
     await page.context().clearCookies();
     await page.goto('/login');
-    const loginBrand = page.getByText('Hermes Monitoring', { exact: true });
+    const loginBrand = page.getByText('Monitoring', { exact: true });
     await expect(loginBrand).toHaveCount(1);
     await expect(loginBrand).toBeVisible();
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.locator('h1')).toHaveText('로그인');
+    await expect(page.locator('h1')).toHaveText('Login');
     await expect(page.getByText(/Hermes|운영|Please sign in|통합 모니터링/)).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.screenshot({ path: resolve(screenshotDirectory, `login-${viewport.name}.png`), fullPage: true });
 
     await login(page);
-    await expect(page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link')).toHaveCount(5);
+    await expect(page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link')).toHaveCount(7);
     await expect(page.getByRole('link', { name: '종합 현황' })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('heading', { name: /평균/ })).toHaveCount(0);
     await expect(page.locator('.project-card')).toHaveCount(2);

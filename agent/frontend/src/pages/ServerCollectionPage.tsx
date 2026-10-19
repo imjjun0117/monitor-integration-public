@@ -6,13 +6,15 @@ import { getDashboard } from '../api';
 import { Empty, Failure, Loading, RefreshFailure } from '../components/QueryState';
 import PageBackLink from '../components/PageBackLink';
 import StatusLabel from '../components/StatusLabel';
+import { useProjectScope } from '../components/ProjectScope';
 
 export default function ServerCollectionPage() {
+  const { project } = useProjectScope();
   const [params, setParams] = useSearchParams();
   const normalOnly = params.get('collection') === 'UP';
   const query = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: () => getDashboard(),
+    queryKey: ['dashboard', '24h', project, params.get('instance') ?? ''],
+    queryFn: () => getDashboard('24h', project, params.get('instance') ?? ''),
     refetchInterval: 15_000,
   });
   if (query.isPending) {

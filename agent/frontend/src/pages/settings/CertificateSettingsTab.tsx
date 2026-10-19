@@ -15,9 +15,14 @@ import {
 } from './forms';
 import { useInvalidateMutation } from './useInvalidateMutation';
 import { emptyCertificate, validateCertificate } from './validation';
+import { useProjectScope } from '../../components/ProjectScope';
 
 export default function CertificateSettingsTab() {
-  const query = useQuery({ queryKey: ['certificates', {}], queryFn: () => getCertificates() });
+  const { project } = useProjectScope();
+  const query = useQuery({
+    queryKey: ['certificates', { project }],
+    queryFn: () => getCertificates({ project }),
+  });
   const projects = useQuery({ queryKey: ['projects'], queryFn: getProjects });
   const [value, setValue] = useState<CertificateWrite>(emptyCertificate());
   const [validation, setValidation] = useState<string>();
@@ -219,7 +224,7 @@ function CertificateRow({
         </div>
         <SettingsDialog
           id={`edit-certificate-${certificate.certificate_target_id}`}
-          title={`인증서 대상 ${certificate.hostname} 수정`}
+          title="인증서 대상 수정"
           submitLabel="저장"
           submitAriaLabel={`인증서 ${certificate.certificate_target_id} 저장`}
           isOpen={editing}
@@ -232,7 +237,7 @@ function CertificateRow({
         >
           <LabeledField
             id={`certificate-${certificate.certificate_target_id}-project`}
-            label={`프로젝트 ID (${certificate.certificate_target_id})`}
+            label="프로젝트"
           >
             <ProjectSelect
               id={`certificate-${certificate.certificate_target_id}-project`}
@@ -243,10 +248,7 @@ function CertificateRow({
               preserveCurrent
             />
           </LabeledField>
-          <LabeledField
-            id={`certificate-${certificate.certificate_target_id}-host`}
-            label={`호스트 (${certificate.certificate_target_id})`}
-          >
+          <LabeledField id={`certificate-${certificate.certificate_target_id}-host`} label="호스트">
             <TextInput
               id={`certificate-${certificate.certificate_target_id}-host`}
               aria-label={`인증서 ${certificate.certificate_target_id} 호스트`}
@@ -256,7 +258,7 @@ function CertificateRow({
           </LabeledField>
           <LabeledField
             id={`certificate-${certificate.certificate_target_id}-sni`}
-            label={`SNI 호스트 (${certificate.certificate_target_id})`}
+            label="SNI 호스트"
           >
             <TextInput
               id={`certificate-${certificate.certificate_target_id}-sni`}
@@ -267,14 +269,14 @@ function CertificateRow({
           </LabeledField>
           <NumberInput
             id={`certificate-${certificate.certificate_target_id}-port`}
-            label={`포트 (${certificate.certificate_target_id})`}
+            label="포트"
             ariaLabel={`인증서 ${certificate.certificate_target_id} 포트`}
             value={draft.port}
             onChange={(port) => setDraft({ ...draft, port })}
           />
           <NumberInput
             id={`certificate-${certificate.certificate_target_id}-check-interval`}
-            label={`점검 간격(분) (${certificate.certificate_target_id})`}
+            label="점검 간격(분)"
             ariaLabel={`인증서 ${certificate.certificate_target_id} 점검 간격`}
             help="1분 이상"
             min={1}

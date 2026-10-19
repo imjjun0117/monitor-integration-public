@@ -32,7 +32,10 @@ public class UserAdminController {
         }
         var rows =
                 db.queryForList(
-                        "select username,role,enabled,created_at,updated_at from app_users order by username limit ? offset ?",
+                        "select u.username,u.role,r.name as"
+                            + " role_name,u.enabled,u.created_at,u.updated_at from app_users u join"
+                            + " app_roles r on r.role_id=u.role order by u.username limit ? offset"
+                            + " ?",
                         size,
                         (long) page * size);
         var assignments =
@@ -99,7 +102,9 @@ public class UserAdminController {
                     username);
         } else {
             db.update(
-                    "update app_users set role=?,enabled=?,password_hash=?,security_version=security_version+1,updated_at=now() where username=?",
+                    "update app_users set"
+                        + " role=?,enabled=?,password_hash=?,security_version=security_version+1,updated_at=now()"
+                        + " where username=?",
                     value.role(),
                     value.enabled(),
                     passwords.encode(value.password()),
@@ -137,8 +142,12 @@ public class UserAdminController {
         if (value == null
                 || value.username() == null
                 || !value.username().matches("[A-Za-z0-9][A-Za-z0-9._@-]{1,79}")
-                || !List.of("ADMIN", "OPERATOR", "VIEWER")
-                        .contains(value.role() == null ? "" : value.role())
+                || !Boolean.TRUE.equals(
+                        db.queryForObject(
+                                "select exists(select 1 from app_roles where role_id=? and"
+                                    + " enabled)",
+                                Boolean.class,
+                                value.role()))
                 || value.enabled() == null
                 || value.projectIds() == null
                 || value.projectIds().size() > 200

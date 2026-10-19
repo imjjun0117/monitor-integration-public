@@ -22,13 +22,26 @@ public final class CertificateScheduler {
         List<Map<String, Object>> targets =
                 db.queryForList(
                         """
-            select t.certificate_target_id,t.project_id,t.hostname,t.port,t.sni_hostname,
-              t.target_version
-            from certificate_targets t
-            left join certificate_latest l using(certificate_target_id)
-            where t.enabled and (l.checked_at is null
-              or l.checked_at < now()-(t.check_interval_minutes * interval '1 minute'))
-            """);
+                        select
+                            t.certificate_target_id
+                            ,t.project_id
+                            ,t.hostname
+                            ,t.port
+                            ,t.sni_hostname
+                            ,t.target_version
+                        from certificate_targets t
+                        join projects p using(project_id)
+                        left join certificate_latest l using(certificate_target_id)
+                        where
+                            t.enabled
+                            and p.enabled
+                            and (
+                                l.checked_at is null
+                                or l.checked_at < now() - (
+                                    t.check_interval_minutes * interval '1 minute'
+                                )
+                            )
+                        """);
         for (Map<String, Object> target : targets) {
             checks.submit(CertificateCheckService.Target.from(target));
         }

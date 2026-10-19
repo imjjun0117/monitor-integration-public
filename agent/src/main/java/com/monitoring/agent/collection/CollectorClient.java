@@ -17,6 +17,23 @@ import javax.net.ssl.SSLSocketFactory;
 
 // 허용된 대상에 토큰 인증으로 Collector HTTP 요청
 public final class CollectorClient {
+    private com.monitoring.agent.transport.CollectorTransportHub transport;
+
+    public void setTransport(com.monitoring.agent.transport.CollectorTransportHub value) {
+        transport = value;
+    }
+
+    public byte[] startConnection(String base, String token, String body) throws Exception {
+        return execute(
+                "POST",
+                base,
+                "connection/start",
+                null,
+                token,
+                body.getBytes(StandardCharsets.UTF_8),
+                202);
+    }
+
     public static final int MAX_RESPONSE_BYTES = 1024 * 1024;
     private static final int CONNECT_TIMEOUT_MILLIS = 2_000;
     private static final int READ_TIMEOUT_MILLIS = 3_000;
@@ -70,6 +87,11 @@ public final class CollectorClient {
             int expectedStatus)
             throws Exception {
         rejectHeaderInjection(token);
+        if (transport != null
+                && !endpoint.startsWith("connection/")
+                && transport.usesWebsocket(base)) {
+            return transport.request(base, endpoint, query, body);
+        }
         SsrfGuard.ResolvedTarget target = guard.resolve(base);
         URI uri = target.uri();
         String requestTarget = endpointPath(uri, endpoint, query);

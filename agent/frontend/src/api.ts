@@ -17,6 +17,23 @@ import type {
   ServiceProfile,
 } from './generated';
 import { ApiError, DefaultService, OpenAPI, Status } from './generated';
+import type { Incident, IncidentAction } from './generated';
+
+export function getIncidents(project: string, state: Incident['state'] | 'ACTIVE' | '', page = 0) {
+  return DefaultService.listIncidents({ project: project || undefined, state, page, size: 50 });
+}
+
+export function getIncident(id: number) {
+  return DefaultService.getIncident({ id });
+}
+
+export function getIncidentEvidence(id: number, at?: string) {
+  return DefaultService.getIncidentEvidence({ id, at });
+}
+
+export function actOnIncident(id: number, requestBody: IncidentAction) {
+  return DefaultService.actOnIncident({ id, requestBody });
+}
 import type { LogWrite } from './generated';
 export type { LogSource, LogWrite } from './generated';
 
@@ -83,8 +100,14 @@ export function logout(): Promise<void> {
   return DefaultService.logout();
 }
 
-export function getDashboard(period: ChartPeriod = '24h'): Promise<Dashboard> {
-  return DefaultService.getDashboard({ period });
+export function getDashboard(
+  period: ChartPeriod = '24h',
+  project = '',
+  instance = '',
+): Promise<Dashboard> {
+  return DefaultService.getDashboard(
+    project || instance ? { period, project, instance } : { period },
+  );
 }
 
 export function getProjects(): Promise<ProjectPage> {
@@ -100,7 +123,12 @@ export function getResources(
   instanceId: string,
   period: ChartPeriod,
 ): Promise<ResourceResponse> {
-  return DefaultService.getResources({ projectId, instanceId, period, maxPoints: 1000 });
+  return DefaultService.getResources({
+    projectId,
+    instanceId,
+    period,
+    maxPoints: ['5m', '15m', '1h', '24h'].includes(period) ? 20000 : 1000,
+  });
 }
 
 export function getDbPools(
@@ -108,7 +136,12 @@ export function getDbPools(
   instanceId: string,
   period: ChartPeriod,
 ): Promise<DbPoolResponse> {
-  return DefaultService.getDbPools({ projectId, instanceId, period, maxPoints: 1000 });
+  return DefaultService.getDbPools({
+    projectId,
+    instanceId,
+    period,
+    maxPoints: ['5m', '15m', '1h', '24h'].includes(period) ? 20000 : 1000,
+  });
 }
 
 export function getInternalChecks(
@@ -266,4 +299,20 @@ export function getAudit(page = 0, project = '', actor = '') {
     project: project || undefined,
     actor: actor || undefined,
   });
+}
+
+export function getInstanceThresholds(projectId: string, instanceId: string) {
+  return DefaultService.getInstanceThresholds({ projectId, instanceId });
+}
+
+export function saveInstanceThresholds(
+  projectId: string,
+  instanceId: string,
+  value: import('./generated').InstanceThresholdWrite,
+) {
+  return DefaultService.saveInstanceThresholds({ projectId, instanceId, requestBody: value });
+}
+
+export function getInstanceThresholdCertificates(projectId: string, instanceId: string) {
+  return DefaultService.getInstanceThresholdCertificates({ projectId, instanceId });
 }

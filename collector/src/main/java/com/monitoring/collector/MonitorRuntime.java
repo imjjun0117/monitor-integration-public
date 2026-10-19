@@ -23,6 +23,8 @@ public final class MonitorRuntime {
     private final List<MonitorCollectorBuilder.DiskTarget> disks;
     private final List<DbPoolMetricsProvider> dbPools;
     private final SnapshotSources snapshotSources;
+    private String environment;
+    private String contextPath;
     private final BoundedCheckExecutor executor = new BoundedCheckExecutor(2, 20);
 
     MonitorRuntime(
@@ -58,9 +60,15 @@ public final class MonitorRuntime {
         value.put("agent_version", "0.1.0");
         Map<String, Object> attributes = new LinkedHashMap<String, Object>();
         attributes.put("display_name", instanceId);
-        attributes.put("environment", System.getProperty("monitor.environment", "unknown"));
+        attributes.put(
+                "environment",
+                environment == null
+                        ? System.getProperty("monitor.environment", "unknown")
+                        : environment);
         attributes.put("host_name", hostName());
-        attributes.put("context_path", System.getProperty("monitor.context-path", ""));
+        attributes.put(
+                "context_path",
+                contextPath == null ? System.getProperty("monitor.context-path", "") : contextPath);
         value.put("attributes", attributes);
         value.put("capabilities", capabilities());
         List<Map<String, Object>> definitions = new ArrayList<Map<String, Object>>();
@@ -92,6 +100,16 @@ public final class MonitorRuntime {
 
     public boolean isAuthorized(String supplied) {
         return TokenVerifier.matches(token, supplied);
+    }
+
+    // Builder 초기화 단계에서 웹앱별 표시 정보 전달
+    void configureAttributes(String environment, String contextPath) {
+        this.environment = environment;
+        this.contextPath = contextPath;
+    }
+
+    String authenticationToken() {
+        return token;
     }
 
     public String runCheck(String id) {

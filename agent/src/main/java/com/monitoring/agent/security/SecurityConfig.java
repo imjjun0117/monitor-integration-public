@@ -28,9 +28,11 @@ public class SecurityConfig {
     UserDetailsService users(DataSource dataSource) {
         JdbcUserDetailsManager users = new JdbcUserDetailsManager(dataSource);
         users.setUsersByUsernameQuery(
-                "select username,password_hash,enabled from app_users where username=?");
+                "select u.username,u.password_hash,(u.enabled and r.enabled) from app_users u join"
+                    + " app_roles r on r.role_id=u.role where u.username=?");
         users.setAuthoritiesByUsernameQuery(
-                "select username,concat('ROLE_',role) from app_users where username=?");
+                "select u.username,concat('ROLE_',r.base_role) from app_users u join app_roles r on"
+                    + " r.role_id=u.role where u.username=?");
         return users;
     }
 
@@ -54,6 +56,7 @@ public class SecurityConfig {
                         auth ->
                                 auth.requestMatchers(
                                                 "/login",
+                                                "/collector/connect",
                                                 "/actuator/health",
                                                 "/assets/**",
                                                 "/index.html",
@@ -70,7 +73,9 @@ public class SecurityConfig {
                                                 (request, response, authentication) -> {
                                                     Long version =
                                                             db.queryForObject(
-                                                                    "select security_version from app_users where username=?",
+                                                                    "select security_version from"
+                                                                        + " app_users where"
+                                                                        + " username=?",
                                                                     Long.class,
                                                                     authentication.getName());
                                                     request.getSession()

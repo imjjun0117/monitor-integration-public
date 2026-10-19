@@ -29,6 +29,8 @@ public final class CheckRunService implements DisposableBean {
         QUEUE_FULL
     }
 
+    @Autowired(required = false)
+    private com.monitoring.agent.transport.CollectorTransportHub transport;
     private final JdbcTemplate db;
     private final TokenCipher cipher;
     private final CheckResultStore store;
@@ -59,12 +61,14 @@ public final class CheckRunService implements DisposableBean {
                             @Override
                             public byte[] runChecks(String base, String token, String body)
                                     throws Exception {
+                                client.setTransport(transport);
                                 return client.runChecks(base, token, body);
                             }
 
                             @Override
                             public byte[] getResults(String base, String token, String jobId)
                                     throws Exception {
+                                client.setTransport(transport);
                                 return client.getResults(base, token, jobId);
                             }
                         },

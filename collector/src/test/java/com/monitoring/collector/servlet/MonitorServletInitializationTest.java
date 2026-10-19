@@ -30,6 +30,17 @@ public class MonitorServletInitializationTest {
     private static final String PRIVATE_DETAIL = "private-credential-and-path-must-not-be-in-json";
 
     @Test
+    public void invalidTransportConfigurationAfterRuntimeBuildStillReturnsInitializationFailure()
+            throws Exception {
+        verify(
+                ValidConfigurer.class.getName(),
+                "INIT_FAILED",
+                "INITIALIZATION_EXCEPTION",
+                IllegalArgumentException.class,
+                true);
+    }
+
+    @Test
     public void missingConfigurerIdentifiesTheClassFailureAndLogsTheException() throws Exception {
         verify(
                 "not.present.MonitorConfigurer",
@@ -103,7 +114,11 @@ public class MonitorServletInitializationTest {
                                     .getCodeSource()
                                     .getLocation(),
                             JsonParser.class.getProtectionDomain().getCodeSource().getLocation(),
-                            ServletConfig.class.getProtectionDomain().getCodeSource().getLocation()
+                            ServletConfig.class.getProtectionDomain().getCodeSource().getLocation(),
+                            com.neovisionaries.ws.client.WebSocket.class
+                                    .getProtectionDomain()
+                                    .getCodeSource()
+                                    .getLocation()
                         },
                         null);
         URLClassLoader appLoader =
@@ -146,7 +161,9 @@ public class MonitorServletInitializationTest {
                                         return context;
                                     }
                                     if ("getInitParameter".equals(method.getName())) {
-                                        return configurer;
+                                        return "configurerClass".equals(args[0])
+                                                ? configurer
+                                                : null;
                                     }
                                     return null;
                                 }
@@ -206,6 +223,16 @@ public class MonitorServletInitializationTest {
 
     private void verify(final String configurer, String code, String reason, Class<?> exceptionType)
             throws Exception {
+        verify(configurer, code, reason, exceptionType, false);
+    }
+
+    private void verify(
+            final String configurer,
+            String code,
+            String reason,
+            Class<?> exceptionType,
+            final boolean invalidTransport)
+            throws Exception {
         final List<Throwable> logged = new ArrayList<Throwable>();
         final ServletContext context =
                 (ServletContext)
@@ -215,6 +242,14 @@ public class MonitorServletInitializationTest {
                                 new InvocationHandler() {
                                     public Object invoke(
                                             Object proxy, Method method, Object[] args) {
+                                        if (invalidTransport
+                                                && "getResourceAsStream".equals(method.getName())) {
+                                            return new java.io.ByteArrayInputStream(
+                                                    "monitor.central.url=http://invalid.example/collector/connect"
+                                                            .getBytes(
+                                                                    java.nio.charset.Charset
+                                                                            .forName("UTF-8")));
+                                        }
                                         if ("log".equals(method.getName())
                                                 && args.length == 2
                                                 && args[1] instanceof Throwable) {
@@ -238,6 +273,9 @@ public class MonitorServletInitializationTest {
                     }
 
                     public String getInitParameter(String name) {
+                        if (invalidTransport && "configLocation".equals(name)) {
+                            return "/WEB-INF/monitor.properties";
+                        }
                         return "configurerClass".equals(name) ? configurer : null;
                     }
 
@@ -272,7 +310,7 @@ public class MonitorServletInitializationTest {
             assertEquals(503, status[0]);
             JsonObject json = new JsonParser().parse(body.toString()).getAsJsonObject();
             assertEquals(code, json.get("code").getAsString());
-            assertEquals(reason, json.get("reason").getAsString());
+            assertEquals(logged.toString(), reason, json.get("reason").getAsString());
             assertEquals(exceptionType.getName(), json.get("exception_type").getAsString());
             assertFalse(body.toString().contains(PRIVATE_DETAIL));
             assertFalse(body.toString().contains(configurer));
@@ -291,6 +329,12 @@ public class MonitorServletInitializationTest {
         }
     }
 
+    public static final class ValidConfigurer implements MonitorCollectorConfigurer {
+        public void configure(MonitorCollectorBuilder builder, ServletContext context) {
+            builder.identity("sample-a", "prod").token("01234567890123456789012345678901");
+        }
+    }
+
     public static final class MissingDependencyConfigurer implements MonitorCollectorConfigurer {
         public void configure(MonitorCollectorBuilder builder, ServletContext context) {
             throw new NoClassDefFoundError(PRIVATE_DETAIL);
@@ -305,7 +349,7 @@ public class MonitorServletInitializationTest {
 
     public static final class ShortTokenConfigurer implements MonitorCollectorConfigurer {
         public void configure(MonitorCollectorBuilder builder, ServletContext context) {
-            builder.identity("sample-campus", "prod").token("short");
+            builder.identity("sample-b", "prod").token("short");
         }
     }
 

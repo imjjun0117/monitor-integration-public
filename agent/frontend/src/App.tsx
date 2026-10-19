@@ -1,12 +1,18 @@
 // 로그인 사용자 권한에 따라 메뉴 및 화면 경로 구성
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState, useId, Fragment, type ReactNode } from 'react';
+import { Link, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import UserMenu from './components/UserMenu';
 import { usePermissions } from './components/PermissionContext';
 import { Modal } from './components/ui';
 import './app.css';
+import './monitoring-theme.css';
+import { menuForPath } from './components/PermissionProvider';
+import { Alert } from './components/ui';
+import { ProjectScopeProvider, ProjectSelector, useProjectScope } from './components/ProjectScope';
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const IncidentsPage = lazy(() => import('./pages/incidents/IncidentsPage'));
+const IncidentDetailPage = lazy(() => import('./pages/incidents/IncidentDetailPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const InstancesPage = lazy(() => import('./pages/InstancesPage'));
 const ServerCollectionPage = lazy(() => import('./pages/ServerCollectionPage'));
@@ -14,6 +20,8 @@ const InstanceDetailPage = lazy(() => import('./pages/InstanceDetailPage'));
 const ApiMonitoringPage = lazy(() => import('./pages/ApiMonitoringPage'));
 const CertificatesPage = lazy(() => import('./pages/CertificatesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const XlogPage = lazy(() => import('./pages/XlogPage'));
+const LiveLogsPage = lazy(() => import('./pages/LiveLogsPage'));
 
 type NavigationItem = {
   label: string;
@@ -25,6 +33,12 @@ type NavigationItem = {
 const navigation: NavigationItem[] = [
   { label: '종합 현황', to: '/', matches: (path) => path === '/', icon: <OverviewIcon /> },
   {
+    label: '장애 관리',
+    to: '/incidents',
+    matches: (path) => path.startsWith('/incidents'),
+    icon: <PulseIcon />,
+  },
+  {
     label: '프로젝트',
     to: '/projects',
     matches: (path) => path.startsWith('/projects') || path === '/instances',
@@ -34,6 +48,13 @@ const navigation: NavigationItem[] = [
     label: 'API 모니터링',
     to: '/api-monitoring',
     matches: (path) => path.startsWith('/api-monitoring'),
+    icon: <PulseIcon />,
+  },
+  { label: 'XLog', to: '/xlog', matches: (path) => path.startsWith('/xlog'), icon: <PulseIcon /> },
+  {
+    label: '실시간 로그',
+    to: '/logs',
+    matches: (path) => path.startsWith('/logs'),
     icon: <PulseIcon />,
   },
   {
@@ -51,7 +72,16 @@ const navigation: NavigationItem[] = [
 ];
 
 export default function App() {
+  return (
+    <ProjectScopeProvider>
+      <AppLayout />
+    </ProjectScopeProvider>
+  );
+}
+
+function AppLayout() {
   const { pathname, search } = useLocation();
+  const { project } = useProjectScope();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => {
@@ -99,7 +129,10 @@ export default function App() {
               <h1 className="topbar-title">{pageTitle(pathname, search)}</h1>
             </div>
           </div>
-          <UserMenu />
+          <div className="topbar-actions">
+            <ProjectSelector />
+            <UserMenu />
+          </div>
         </header>
         <main id="main-content" tabIndex={-1}>
           <Suspense
@@ -110,19 +143,25 @@ export default function App() {
               </div>
             }
           >
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/instances" element={<ServerCollectionPage />} />
-              <Route path="/projects/:projectId" element={<InstancesPage />} />
-              <Route
-                path="/projects/:projectId/instances/:instanceId"
-                element={<InstanceDetailPage />}
-              />
-              <Route path="/api-monitoring" element={<ApiMonitoringPage />} />
-              <Route path="/certificates" element={<CertificatesPage />} />
-              <Route path="/settings/*" element={<SettingsPage />} />
-            </Routes>
+            <RouteAccess>
+              <Routes key={project}>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/incidents" element={<IncidentsPage />} />
+                <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
+                <Route path="/projects" element={<ProjectsPage />} />
+                <Route path="/instances" element={<ServerCollectionPage />} />
+                <Route path="/projects/:projectId" element={<InstancesPage />} />
+                <Route
+                  path="/projects/:projectId/instances/:instanceId"
+                  element={<InstanceDetailPage />}
+                />
+                <Route path="/api-monitoring" element={<ApiMonitoringPage />} />
+                <Route path="/certificates" element={<CertificatesPage />} />
+                <Route path="/xlog" element={<XlogPage />} />
+                <Route path="/logs" element={<LiveLogsPage />} />
+                <Route path="/settings/*" element={<SettingsPage />} />
+              </Routes>
+            </RouteAccess>
           </Suspense>
         </main>
       </div>
@@ -130,19 +169,33 @@ export default function App() {
   );
 }
 
+// 메뉴 권한이 없는 화면은 데이터 조회 전에 차단
+function RouteAccess({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const { isAdmin, menus } = usePermissions();
+  if (!isAdmin && !menus?.find((menu) => menu.menuId === menuForPath(pathname))?.canRead) {
+    return (
+      <Alert variant="warning" title="이 화면에 접근할 권한이 없습니다.">
+        담당 관리자에게 메뉴 권한을 요청하세요.
+      </Alert>
+    );
+  }
+  return children;
+}
+
 function currentSection(pathname: string) {
   return navigation.find((item) => item.matches(pathname))?.label ?? '';
 }
 
-function Brand() {
+function Brand({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <div className="brand">
+    <Link className="brand" to="/" aria-label="종합현황으로 이동" onClick={onNavigate}>
       <img className="brand-mark" src="/monitoring.svg" alt="" />
       <span className="brand-text">
-        <strong>Hermes Monitoring</strong>
+        <strong>Monitoring</strong>
         <small>운영 모니터링</small>
       </span>
-    </div>
+    </Link>
   );
 }
 
@@ -156,6 +209,9 @@ function pageTitle(pathname: string, search: string) {
   if (segments[1] === 'projects' && segments[2]) {
     return segments[4] ? `${segments[2]} / ${segments[4]}` : `${segments[2]} 인스턴스`;
   }
+  if (pathname.startsWith('/settings/')) {
+    return settingsItems.find((item) => pathname === `/settings/${item.to}`)?.label ?? '설정';
+  }
   return currentSection(pathname);
 }
 
@@ -165,42 +221,107 @@ const settingsItems = [
   { to: 'thresholds', label: '임계치 관리' },
   { to: 'certificates', label: '인증서 대상 관리' },
   { to: 'users', label: '사용자 관리' },
+  { to: 'roles', label: '역할·권한 관리' },
+  { to: 'menus', label: '메뉴 관리' },
   { to: 'audit', label: '변경 이력' },
 ];
 function Sidebar({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
-  const { isAdmin } = usePermissions();
+  const { isAdmin, menus } = usePermissions();
+  const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith('/settings'));
+  const submenuId = useId();
+  useEffect(() => {
+    if (pathname.startsWith('/settings')) {
+      setSettingsOpen(true);
+    }
+  }, [pathname]);
+  const visibleNavigation = navigation
+    .map((item) => {
+      const menu = menus?.find((value) => value.menuId === menuForPath(item.to));
+      return {
+        ...item,
+        label: menu?.label ?? item.label,
+        sort: menu?.sortOrder ?? navigation.indexOf(item),
+      };
+    })
+    .filter(
+      (item) => isAdmin || menus?.find((menu) => menu.menuId === menuForPath(item.to))?.canRead,
+    )
+    .sort((left, right) => left.sort - right.sort);
   return (
     <>
-      <Brand />
+      <Brand onNavigate={onNavigate} />
       <nav aria-label="주 메뉴" className="primary-navigation">
         <span className="nav-group-label">관제</span>
-        {navigation.slice(0, 4).map((item) => (
-          <NavigationLink key={item.to} item={item} pathname={pathname} onNavigate={onNavigate} />
-        ))}
+        {visibleNavigation
+          .filter((item) => !item.to.startsWith('/settings'))
+          .map((item) => (
+            <NavigationLink key={item.to} item={item} pathname={pathname} onNavigate={onNavigate} />
+          ))}
         <span className="nav-group-label nav-group-management">관리</span>
-        <NavigationLink item={navigation[4]} pathname={pathname} onNavigate={onNavigate} />
+        {visibleNavigation
+          .filter((item) => item.to.startsWith('/settings'))
+          .map((item) => (
+            <button
+              key={item.to}
+              type="button"
+              className={`nav-link settings-menu-toggle${item.matches(pathname) ? ' active' : ''}`}
+              aria-label={item.label}
+              title={item.label}
+              aria-expanded={settingsOpen}
+              aria-controls={submenuId}
+              onClick={() => setSettingsOpen((value) => !value)}
+            >
+              <span className="nav-icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              <span className="nav-label">{item.label}</span>
+              <span className="nav-arrow" aria-hidden="true">
+                {lineIcon(<path d="m9 6 6 6-6 6" />)}
+              </span>
+            </button>
+          ))}
       </nav>
-      {pathname.startsWith('/settings') && (
-        <nav className="sidebar-submenu" aria-label="설정 하위 메뉴">
-          {settingsItems
-            .filter((item) => isAdmin || !['projects', 'users', 'audit'].includes(item.to))
-            .map((item) => (
-              <NavLink
-                key={item.to}
-                to={`/settings/${item.to}`}
-                onClick={onNavigate}
-                className={({ isActive }) => (isActive ? 'submenu-link active' : 'submenu-link')}
-              >
-                <span className="submenu-dot" />
-                {item.label}
-              </NavLink>
-            ))}
-        </nav>
+      {visibleNavigation.some((item) => item.to.startsWith('/settings')) && (
+        <div
+          id={submenuId}
+          className={`settings-menu-panel${settingsOpen ? ' expanded' : ''}`}
+          aria-hidden={!settingsOpen}
+          inert={!settingsOpen}
+        >
+          <div className="settings-menu-clip">
+            <nav className="sidebar-submenu" aria-label="설정 하위 메뉴">
+              {settingsItems
+                .filter(
+                  (item) =>
+                    isAdmin ||
+                    !['projects', 'users', 'menus', 'permissions', 'roles', 'audit'].includes(
+                      item.to,
+                    ),
+                )
+                .map((item, index) => (
+                  <Fragment key={item.to}>
+                    {(index === 0 || item.to === 'users') && (
+                      <span className="settings-nav-group">
+                        {index === 0 ? '모니터링 설정' : '접근·권한 관리'}
+                      </span>
+                    )}
+                    <NavLink
+                      key={item.to}
+                      to={`/settings/${item.to}`}
+                      onClick={onNavigate}
+                      className={({ isActive }) =>
+                        isActive ? 'submenu-link active' : 'submenu-link'
+                      }
+                    >
+                      <span className="submenu-dot" />
+                      {item.label}
+                    </NavLink>
+                  </Fragment>
+                ))}
+            </nav>
+          </div>
+        </div>
       )}
-      <div className="sidebar-footer">
-        <span>관제 범위</span>
-        <p>프로젝트 · 서버 · API · 인증서</p>
-      </div>
     </>
   );
 }
@@ -214,11 +335,11 @@ function NavigationLink({
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const { isAdmin } = usePermissions();
+  const { project } = useProjectScope();
   const active = item.matches(pathname);
   return (
     <NavLink
-      to={item.label === '설정' && !isAdmin ? '/settings/instances' : item.to}
+      to={project ? `${item.to}?${new URLSearchParams({ project })}` : item.to}
       onClick={onNavigate}
       className={active ? 'nav-link active' : 'nav-link'}
       aria-label={item.label}
@@ -229,11 +350,6 @@ function NavigationLink({
         {item.icon}
       </span>
       <span className="nav-label">{item.label}</span>
-      {item.label === '설정' && (
-        <span className="nav-arrow" aria-hidden="true">
-          {lineIcon(<path d="m6 9 6 6 6-6" />)}
-        </span>
-      )}
     </NavLink>
   );
 }

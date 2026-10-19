@@ -24,8 +24,11 @@ final class DashboardQuery {
     }
 
     Map<String, Object> dashboard(String period) {
-        long seconds =
-                com.monitoring.agent.resource.ResourceQuery.duration(period).toSeconds();
+        return dashboard(period, "", "");
+    }
+
+    Map<String, Object> dashboard(String period, String selectedProject, String selectedInstance) {
+        long seconds = com.monitoring.agent.resource.ResourceQuery.duration(period).toSeconds();
         List<Map<String, Object>> projects =
                 db.queryForList(
                         """
@@ -33,8 +36,36 @@ final class DashboardQuery {
             from projects where enabled and __ACCESS__ order by project_id
             """
                                 .replace("__ACCESS__", ProjectAccess.sql("projects.project_id")));
-        List<Map<String, Object>> instances = instances();
-        List<Map<String, Object>> statusCauses = causes.find(instances);
+        projects =
+                projects.stream()
+                        .filter(
+                                project ->
+                                        selectedProject.isEmpty()
+                                                || selectedProject.equals(
+                                                        project.get("project_id")))
+                        .toList();
+        List<Map<String, Object>> instances =
+                instances().stream()
+                        .filter(
+                                instance ->
+                                        (selectedProject.isEmpty()
+                                                        || selectedProject.equals(
+                                                                instance.get("project_id")))
+                                                && (selectedInstance.isEmpty()
+                                                        || selectedInstance.equals(
+                                                                instance.get("instance_id"))))
+                        .toList();
+        List<Map<String, Object>> statusCauses =
+                causes.find(instances).stream()
+                        .filter(
+                                cause ->
+                                        (selectedProject.isEmpty()
+                                                        || selectedProject.equals(
+                                                                cause.get("project_id")))
+                                                && (selectedInstance.isEmpty()
+                                                        || selectedInstance.equals(
+                                                                cause.get("instance_id"))))
+                        .toList();
         for (Map<String, Object> instance : instances) {
             List<Map<String, Object>> activeStates = new java.util.ArrayList<>();
             activeStates.add(
@@ -74,9 +105,20 @@ final class DashboardQuery {
         result.put(
                 "expiring_certificate_count",
                 statusCauses.stream().filter(DashboardQuery::isCertificateExpiry).count());
-        result.put("history", history(seconds));
+        result.put("history", history(seconds, selectedProject, selectedInstance));
         result.put("status_causes", statusCauses);
-        result.put("service_balances", serviceBalances());
+        result.put(
+                "service_balances",
+                serviceBalances().stream()
+                        .filter(
+                                balance ->
+                                        (selectedProject.isEmpty()
+                                                        || selectedProject.equals(
+                                                                balance.get("project_id")))
+                                                && (selectedInstance.isEmpty()
+                                                        || selectedInstance.equals(
+                                                                balance.get("instance_id"))))
+                        .toList());
         return result;
     }
 
@@ -146,7 +188,7 @@ final class DashboardQuery {
                         .replace("__ACCESS__", ProjectAccess.sql("i.project_id")));
     }
 
-    private Map<String, Object> history(long seconds) {
+    private Map<String, Object> history(long seconds, String project, String instance) {
         String bucket = seconds <= 86400 ? "hour" : "day";
         Map<String, Object> history = new LinkedHashMap<>();
         history.put(
@@ -162,12 +204,14 @@ final class DashboardQuery {
                   then m.physical_memory_used_bytes::numeric/m.physical_memory_total_bytes end) physical_memory_ratio
               from instance_metric_samples m join instances i using(project_id,instance_id)
               where i.enabled and m.sampled_at >= now()-(? * interval '1 second')
+                and (? = '' or m.project_id = ?) and (? = '' or m.instance_id = ?)
               group by m.project_id,date_trunc('%s',m.sampled_at)
             ), disks as (
               select m.project_id,date_trunc('%s',m.sampled_at) sampled_at,
                 max(case when m.total_bytes>0 then m.used_bytes::numeric/m.total_bytes end) disk_ratio
               from disk_samples m join instances i using(project_id,instance_id)
               where i.enabled and m.sampled_at >= now()-(? * interval '1 second')
+                and (? = '' or m.project_id = ?) and (? = '' or m.instance_id = ?)
               group by m.project_id,date_trunc('%s',m.sampled_at)
             )
             select p.project_id,b.sampled_at,r.system_cpu_ratio,r.heap_ratio,r.physical_memory_ratio,d.disk_ratio
@@ -176,14 +220,24 @@ final class DashboardQuery {
               date_trunc('%s',now()),interval '1 %s') b(sampled_at)
             left join resources r on r.project_id=p.project_id and r.sampled_at=b.sampled_at
             left join disks d on d.project_id=p.project_id and d.sampled_at=b.sampled_at
-            where p.enabled and __ACCESS__
+            where p.enabled and __ACCESS__ and (? = '' or p.project_id = ?)
             order by p.project_id,b.sampled_at
             """
                                 .formatted(bucket, bucket, bucket, bucket, bucket, bucket, bucket)
                                 .replace("__ACCESS__", ProjectAccess.sql("p.project_id")),
                         seconds,
+                        project,
+                        project,
+                        instance,
+                        instance,
                         seconds,
-                        seconds));
+                        project,
+                        project,
+                        instance,
+                        instance,
+                        seconds,
+                        project,
+                        project));
         history.put(
                 "api",
                 db.queryForList(
@@ -193,11 +247,16 @@ final class DashboardQuery {
             join check_definitions d using(project_id,instance_id,check_id)
             where d.category='API' and d.enabled and d.monitoring_enabled and __ACCESS__
               and checked_at >= now()-(? * interval '1 second')
+              and (? = '' or r.project_id = ?) and (? = '' or r.instance_id = ?)
             group by date_trunc('%s',checked_at) order by sampled_at
             """
                                 .formatted(bucket, bucket)
                                 .replace("__ACCESS__", ProjectAccess.sql("r.project_id")),
-                        seconds));
+                        seconds,
+                        project,
+                        project,
+                        instance,
+                        instance));
         return history;
     }
 

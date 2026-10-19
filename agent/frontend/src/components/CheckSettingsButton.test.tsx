@@ -10,8 +10,8 @@ vi.mock('../api', () => ({ saveCheckSettings: vi.fn() }));
 const check: ApiCheck = {
   project_id: 'market',
   instance_id: 'dev',
-  check_id: 'batch-cleanup',
-  name: '판매특허 정리 배치 신선도',
+  check_id: 'batch-extinction',
+  name: '판매특허 소멸 배치 신선도',
   category: Check.category.INTERNAL,
   direction: null,
   status: Status.DOWN,
@@ -38,7 +38,7 @@ function view(value = check) {
       <CheckSettingsButton check={value} />
     </QueryClientProvider>,
   );
-  fireEvent.click(screen.getByRole('button', { name: '판매특허 정리 배치 점검 점검 설정' }));
+  fireEvent.click(screen.getByRole('button', { name: '판매특허 소멸 배치 점검 점검 설정' }));
 }
 test('internal check uses plain name and saves automatic interval in seconds', async () => {
   view();

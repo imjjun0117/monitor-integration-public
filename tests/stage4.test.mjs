@@ -21,20 +21,26 @@ test('단계 4 앱과 테스트가 존재한다', () => {
   }
 });
 
-test('최상위 메뉴는 정확히 다섯 개다', () => {
+test('최상위 메뉴는 관제와 관리를 포함한 여덟 개다', () => {
   const app = readFileSync(frontend + 'src/App.tsx', 'utf8');
-  for (const label of ['종합 현황', '프로젝트', 'API 모니터링', '인증서 관리', '설정']) {
+  for (const label of [
+    '종합 현황', '장애 관리', '프로젝트', 'API 모니터링',
+    'XLog', '실시간 로그', '인증서 관리', '설정',
+  ]) {
     assert.ok(app.includes(label), label);
   }
-  assert.equal((app.match(/label:\s*'[^']+',\s*to:\s*'[^']+'/g) || []).length, 5);
+  assert.equal((app.match(/label:\s*'[^']+',\s*to:\s*'[^']+'/g) || []).length, 8);
 });
 
-test('인스턴스 상세는 정확히 네 탭과 미지원 표기를 제공한다', () => {
+test('인스턴스 상세는 임계치와 XLog를 포함한 일곱 탭과 미지원 표기를 제공한다', () => {
   const detail = readFileSync(frontend + 'src/pages/InstanceDetailPage.tsx', 'utf8');
-  for (const label of ['JVM·서버 자원', 'DB Pool', '내부 점검', '실시간 로그', '미지원']) {
+  for (const label of [
+    'JVM·서버 자원', '임계치 관리', 'DB Pool', '내부 점검',
+    'XLog', '저장된 로그', '실시간 로그', '미지원',
+  ]) {
     assert.ok(detail.includes(label), label);
   }
-  assert.equal((detail.match(/<Tab /g) || []).length, 4);
+  assert.equal((detail.match(/<Tab /g) || []).length, 7);
 });
 
 test('실 API polling, 토큰 비재표시, lazy routes가 구현된다', () => {

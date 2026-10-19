@@ -21,6 +21,7 @@ import CheckSettingsButton from '../components/CheckSettingsButton';
 import { scheduleLabel } from '../utils/checkPresentation';
 import ServiceInfoCard from '../components/ServiceInfoCard';
 import ServiceSettingsButton from '../components/ServiceSettingsButton';
+import { useProjectScope } from '../components/ProjectScope';
 
 const initialFilters = {
   project: '',
@@ -32,10 +33,11 @@ const initialFilters = {
 };
 
 export default function ApiMonitoringPage() {
+  const { project: scopedProject, select: selectProject } = useProjectScope();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState(() => ({
     ...initialFilters,
-    project: searchParams.get('project') ?? '',
+    project: searchParams.get('project') ?? scopedProject,
     instance: searchParams.get('instance') ?? '',
     status: searchParams.get('status') ?? '',
     usage: searchParams.get('usage') ?? '',
@@ -65,7 +67,9 @@ export default function ApiMonitoringPage() {
       );
     if (target) {
       setSelected(target);
-      setSearchParams({}, { replace: true });
+      const next = new URLSearchParams(searchParams);
+      next.delete('check');
+      setSearchParams(next, { replace: true });
     }
   }, [query.data, searchParams, setSearchParams]);
   const currentSelected =
@@ -157,7 +161,10 @@ export default function ApiMonitoringPage() {
             id="api-project-filter"
             aria-label="프로젝트 필터"
             value={filters.project}
-            onChange={(_, project) => setFilters({ ...filters, project, instance: '' })}
+            onChange={(_, project) => {
+              setFilters({ ...filters, project, instance: '' });
+              selectProject(project);
+            }}
             isDisabled={projects.isPending || projects.isError}
           >
             <FormSelectOption

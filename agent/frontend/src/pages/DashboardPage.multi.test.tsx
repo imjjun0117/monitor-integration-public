@@ -5,7 +5,9 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import DashboardPage from './DashboardPage';
 import { getDashboard } from '../api';
 import { selectOption } from '../test-select';
+import { ProjectScopeProvider, ProjectSelector } from '../components/ProjectScope';
 import { ServiceMetric, Status } from '../generated';
+vi.mock('../components/XlogOverview', () => ({ default: () => null }));
 
 function metric(key: string, label: string, value: number | null, unit: string): ServiceMetric {
   return {
@@ -213,6 +215,12 @@ vi.mock('../api', () => ({
           }
         : dashboard,
   ),
+  getProjects: async () => ({ items: dashboard.projects }),
+  getInstances: async (project: string) => ({
+    items: state.empty
+      ? []
+      : (dashboard.projects.find((item) => item.project_id === project)?.instances ?? []),
+  }),
   getResources: (...args: unknown[]) => getResources(...(args as [string, string, string])),
 }));
 vi.mock('../components/MetricChart', () => ({
@@ -230,7 +238,9 @@ vi.mock('../components/MetricChart', () => ({
 }));
 
 beforeEach(() => {
+  sessionStorage.clear();
   getResources.mockClear();
+  vi.mocked(getDashboard).mockClear();
   state.failures.clear();
   state.stale = false;
   state.empty = false;
@@ -238,227 +248,136 @@ beforeEach(() => {
   state.balances = false;
 });
 afterEach(cleanup);
-function view() {
+function view(url = '/') {
   return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter>
-        <DashboardPage />
+      <MemoryRouter initialEntries={[url]}>
+        <ProjectScopeProvider>
+          <ProjectSelector />
+          <DashboardPage />
+        </ProjectScopeProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
-async function readyProject(name: string) {
-  if (!screen.queryByRole('region', { name })) {
-    fireEvent.click(await screen.findByRole('button', { name: name + ' 자원 보기' }));
-  }
-  const project = await screen.findByRole('region', { name });
-  await waitFor(() =>
-    expect(within(project).getByTestId('chart-시스템 CPU')).toHaveTextContent('"value":0'),
-  );
-  return project;
+async function ready(name = 'Alpha / Up') {
+  const panel = await screen.findByRole('region', { name });
+  await within(panel).findByTestId('chart-CPU');
+  return panel;
 }
 
-test('default overview compares all projects without auto-selecting a server or requesting instance history', async () => {
+test('initial dashboard selects one project and one instance without querying every server', async () => {
   state.many = true;
   view();
-  const overview = await screen.findByRole('region', { name: '전체 프로젝트 자원 추이' });
-  expect(screen.queryByRole('region', { name: 'Alpha' })).toBeNull();
-  expect(getResources).not.toHaveBeenCalled();
+  const panel = await ready();
+  expect(screen.getByLabelText('프로젝트 선택')).toHaveTextContent('Alpha');
+  expect(screen.getByLabelText('인스턴스 선택')).toHaveTextContent('Up');
+  expect(getResources).toHaveBeenCalledTimes(1);
+  expect(getResources).toHaveBeenCalledWith('alpha', 'up', '15m');
+  expect(
+    vi.mocked(getDashboard).mock.calls.every((args) => args[1] === 'alpha' && args[2] === 'up'),
+  ).toBe(true);
+  expect(screen.queryByRole('region', { name: '전체 프로젝트 자원 추이' })).toBeNull();
   for (const title of ['CPU', 'RAM', 'JVM Heap', '디스크']) {
-    expect(JSON.parse(within(overview).getByTestId('chart-' + title).textContent!)).toHaveLength(
-      100,
-    );
+    const series = JSON.parse(within(panel).getByTestId('chart-' + title).textContent!);
+    expect(series).toHaveLength(title === '디스크' ? 2 : 1);
   }
-  const alpha = await readyProject('Alpha');
-  expect(alpha).toBeInTheDocument();
-  expect(getResources).toHaveBeenCalledTimes(7);
-  fireEvent.click(screen.getByRole('button', { name: '전체 프로젝트 보기' }));
-  expect(screen.queryByRole('region', { name: 'Alpha' })).toBeNull();
-  expect(screen.getByRole('region', { name: '전체 프로젝트 자원 추이' })).toBeInTheDocument();
 });
 
-test('overview shows different vendors from multiple projects together before selecting a detail', async () => {
+test('dropdown search selects another project then its first instance and clears the previous target', async () => {
+  view();
+  await ready();
+  fireEvent.click(screen.getByLabelText('프로젝트 선택'));
+  fireEvent.change(await screen.findByRole('textbox', { name: '프로젝트 검색' }), {
+    target: { value: 'beta' },
+  });
+  expect(screen.queryByRole('option', { name: 'Alpha' })).toBeNull();
+  fireEvent.click(screen.getByRole('option', { name: 'Beta' }));
+  await ready('Beta / Warn');
+  expect(getResources).toHaveBeenCalledWith('beta', 'warn', '15m');
+  expect(screen.queryByRole('region', { name: 'Alpha / Up' })).toBeNull();
+});
+
+test('instance dropdown searches its ID and changes only the selected instance', async () => {
+  view();
+  await ready();
+  getResources.mockClear();
+  fireEvent.click(screen.getByLabelText('인스턴스 선택'));
+  fireEvent.change(await screen.findByRole('textbox', { name: '인스턴스 검색' }), {
+    target: { value: 'extra-4' },
+  });
+  expect(screen.queryByRole('option', { name: 'Up' })).toBeNull();
+  fireEvent.click(screen.getByRole('option', { name: 'Extra 4' }));
+  await ready('Alpha / Extra 4');
+  expect(getResources).toHaveBeenCalledTimes(1);
+  expect(getResources).toHaveBeenCalledWith('alpha', 'extra-4', '15m');
+});
+
+test('explicit instance and period survive initial entry and period changes stay scoped', async () => {
+  view('/?project=beta&instance=warn&period=30d');
+  await ready('Beta / Warn');
+  expect(getResources).toHaveBeenCalledWith('beta', 'warn', '30d');
+  getResources.mockClear();
+  await selectOption(screen.getByLabelText('관제 조회 기간'), '1년');
+  await waitFor(() => expect(getResources).toHaveBeenCalledWith('beta', 'warn', '365d'));
+  expect(getResources).toHaveBeenCalledTimes(1);
+});
+
+test('only selected instance service balance is shown with its exact API link', async () => {
   state.balances = true;
   view();
-  const table = await screen.findByRole('table', { name: '전체 프로젝트 외부 서비스 정보' });
-  expect(within(table).getByRole('link', { name: 'alpha 팝빌 상세' })).toHaveAttribute(
-    'href',
-    '/api-monitoring?project=alpha&instance=up&check=popbill',
-  );
-  expect(within(table).getByRole('link', { name: 'beta 다른 업체 상세' })).toHaveAttribute(
-    'href',
-    '/api-monitoring?project=beta&instance=warn&check=other-vendor',
-  );
-  expect(within(table).getByText('500 P')).toBeVisible();
-  expect(within(table).getByText('미수집')).toBeVisible();
-  expect(getResources).not.toHaveBeenCalled();
-});
-
-test('shows every project in overview but fetches history only for the selected project', async () => {
-  view();
-  const alpha = await readyProject('Alpha');
-  expect(screen.getByRole('button', { name: 'Beta 자원 보기' })).toBeInTheDocument();
-  expect(screen.queryByRole('region', { name: 'Beta' })).not.toBeInTheDocument();
-  expect(getResources).toHaveBeenCalledTimes(7);
-  expect(within(alpha).getByRole('list', { name: 'Alpha 인스턴스 현황' }).children).toHaveLength(7);
-  for (const title of ['시스템 CPU', 'RAM 사용률', 'JVM Heap 사용률', '디스크 사용률']) {
-    const series = JSON.parse(within(alpha).getByTestId(`chart-${title}`).textContent!);
-    expect(series).toHaveLength(title === '디스크 사용률' ? 14 : 7);
-    expect(series.some((item: { name: string }) => item.name.startsWith('Extra 4'))).toBe(true);
-  }
-  expect(getResources).not.toHaveBeenCalledWith('beta', 'warn', '24h');
-  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-  expect(screen.queryByText(/최대 6개/)).not.toBeInTheDocument();
-  expect(within(alpha).getByRole('link', { name: 'Down' })).toHaveAttribute(
-    'href',
-    '/projects/alpha/instances/down',
-  );
-});
-
-test('selected project shows balances immediately and links to the exact API details', async () => {
-  state.balances = true;
-  view();
-  await readyProject('Alpha');
+  await ready();
   const panel = screen.getByRole('region', { name: '선택 프로젝트 서비스 정보' });
   expect(within(panel).getByText('잔액').closest('div')).toHaveTextContent('500P');
-  expect(within(panel).getByText('최근 충전').closest('div')).toHaveTextContent('50,000P');
-  expect(within(panel).getByText('문자 잔여량').closest('div')).toHaveTextContent('25건');
   expect(within(panel).getByRole('link')).toHaveAttribute(
     'href',
     '/api-monitoring?project=alpha&instance=up&check=popbill',
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Beta 자원 보기' }));
-  await readyProject('Beta');
-  expect(within(panel).queryByText('잔액')).toBeNull();
-  expect(within(panel).getByText('잔여 건수').closest('div')).toHaveTextContent('미수집');
-  expect(within(panel).getByRole('link')).toHaveAttribute(
-    'href',
-    '/api-monitoring?project=beta&instance=warn&check=other-vendor',
-  );
-  expect(within(panel).queryByText('0')).toBeNull();
+  expect(screen.queryByText('다른 업체')).toBeNull();
 });
 
-test('selects another project and changes the period without polling hidden project history', async () => {
+test('zero usage, per-sample capacities and separate disk volumes remain accurate', async () => {
   view();
-  await readyProject('Alpha');
-  fireEvent.click(screen.getByRole('button', { name: 'Beta 자원 보기' }));
-  await readyProject('Beta');
-  expect(screen.queryByRole('region', { name: 'Alpha' })).not.toBeInTheDocument();
-  expect(screen.getByRole('region', { name: 'Beta' })).toBeInTheDocument();
-  getResources.mockClear();
-  await selectOption(screen.getByLabelText('관제 조회 기간'), '일주일');
-  await waitFor(() => expect(getResources).toHaveBeenCalledWith('beta', 'warn', '7d'));
-  expect(getResources).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole('button', { name: 'Alpha 자원 보기' }));
-  await readyProject('Alpha');
-  expect(getResources).toHaveBeenCalledWith('alpha', 'extra-4', '7d');
-});
-
-test('uses each sample capacity, preserves zero and unknown values, and separates disk volumes', async () => {
-  view();
-  const alpha = await readyProject('Alpha');
+  const panel = await ready();
   const read = (title: string) =>
-    JSON.parse(within(alpha).getByTestId(`chart-${title}`).textContent!);
-  expect(
-    read('시스템 CPU')[0].points.map((point: { value: number | null }) => point.value),
-  ).toEqual([0, 0.2]);
-  expect(
-    read('RAM 사용률')[0].points.map((point: { value: number | null }) => point.value),
-  ).toEqual([0.5, null]);
-  expect(
-    read('JVM Heap 사용률')[0].points.map((point: { value: number | null }) => point.value),
-  ).toEqual([0.25, null]);
-  const disks = read('디스크 사용률');
-  expect(disks[0].name).toContain('D:/data');
-  expect(disks[1].name).toContain('E:/logs');
-  expect(disks[0].styleIndex).not.toBe(disks[1].styleIndex);
-  expect(disks[0].points.map((point: { value: number | null }) => point.value)).toEqual([0.5]);
-  expect(disks[1].points.map((point: { value: number | null }) => point.value)).toEqual([
+    JSON.parse(within(panel).getByTestId('chart-' + title).textContent!);
+  expect(read('CPU')[0].points.map((point: { value: unknown }) => point.value)).toEqual([0, 0.2]);
+  expect(read('RAM')[0].points.map((point: { value: unknown }) => point.value)).toEqual([
     0.5,
     null,
   ]);
-  const up = within(alpha).getByRole('link', { name: 'Up' }).closest('li')!;
-  expect(up).toHaveTextContent('12 GB / 16 GB');
-  expect(up).toHaveTextContent('1 GB / 4 GB');
-  expect(up).toHaveTextContent('50 GB / 100 GB');
+  expect(read('JVM Heap')[0].points.map((point: { value: unknown }) => point.value)).toEqual([
+    0.25,
+    null,
+  ]);
+  expect(read('디스크')).toHaveLength(2);
 });
 
-test('one failed instance does not hide other instances and stale data is clearly marked', async () => {
-  state.failures.add('down');
-  state.stale = true;
+test('selected instance errors do not fetch a different server or plot false zero values', async () => {
+  state.failures.add('up');
   view();
-  const alpha = await readyProject('Alpha');
-  const down = within(alpha).getByRole('link', { name: 'Down' }).closest('li')!;
-  await waitFor(() => expect(down).toHaveTextContent('자원 조회 실패'));
-  expect(down.querySelector('meter')).toBeNull();
-  const up = within(alpha).getByRole('link', { name: 'Up' }).closest('li')!;
-  expect(up).toHaveTextContent('마지막 정상 데이터');
-  expect(up.querySelector('time')).toHaveAttribute('dateTime', '2026-09-09T01:00:00Z');
-  const series = JSON.parse(within(alpha).getByTestId('chart-시스템 CPU').textContent!);
-  expect(series).toHaveLength(7);
-  expect(series.find((item: { name: string }) => item.name === 'Down (down)').points).toEqual([]);
+  expect(await screen.findByText('인스턴스 자원을 불러오지 못했습니다.')).toBeVisible();
+  expect(getResources).toHaveBeenCalledTimes(1);
+  expect(screen.queryByTestId('chart-CPU')).toBeNull();
 });
 
-test('shows a useful resource error when every instance fails instead of plotting zeros', async () => {
-  for (const project of dashboard.projects) {
-    for (const instance of project.instances) {
-      state.failures.add(instance.instance_id);
-    }
-  }
-  view();
-  fireEvent.click(await screen.findByRole('button', { name: 'Alpha 자원 보기' }));
-  await waitFor(() =>
-    expect(screen.getAllByText('프로젝트 자원을 불러오지 못했습니다.')).toHaveLength(1),
-  );
-  expect(screen.queryByTestId('chart-시스템 CPU')).not.toBeInTheDocument();
-  expect(screen.queryByRole('meter')).not.toBeInTheDocument();
-});
-
-test('keeps a project with no instances visible without requesting invented targets', async () => {
+test('project without instances does not invent a target or request resource history', async () => {
   state.empty = true;
   view();
-  fireEvent.click(await screen.findByRole('button', { name: 'Alpha 자원 보기' }));
-  expect(await screen.findByText('등록된 인스턴스가 없습니다.')).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: 'Alpha' })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByLabelText('프로젝트 선택')).toHaveTextContent('Alpha'));
+  expect(await screen.findByText('프로젝트와 인스턴스를 선택하세요.')).toBeVisible();
   expect(getResources).not.toHaveBeenCalled();
+  expect(getDashboard).not.toHaveBeenCalled();
 });
 
-test('one hundred projects keep only one detail panel and do not trigger one hundred history requests', async () => {
-  state.many = true;
-  view();
-  await readyProject('Alpha');
-  expect(
-    screen
-      .getByRole('table', { name: '프로젝트 상태와 자원 사용률 비교' })
-      .querySelectorAll('tbody tr'),
-  ).toHaveLength(20);
-  expect(screen.getAllByTestId('chart-시스템 CPU')).toHaveLength(1);
-  expect(getResources).toHaveBeenCalledTimes(7);
-  fireEvent.change(screen.getByLabelText('프로젝트 검색'), { target: { value: 'project-97' } });
-  const target = await screen.findByRole('button', { name: 'Project 97 자원 보기' });
-  expect(getResources).toHaveBeenCalledTimes(7);
-  fireEvent.click(target);
-  await readyProject('Project 97');
-  expect(getResources).toHaveBeenCalledTimes(8);
-  expect(getResources).toHaveBeenLastCalledWith('project-97', 'server-97', '24h');
-  expect(screen.queryByRole('region', { name: 'Alpha' })).not.toBeInTheDocument();
-});
-
-test('main chart requests the selected month and year ranges', async () => {
-  render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
-      <MemoryRouter>
-        <DashboardPage />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-  await screen.findByLabelText('차트 조회 기간');
-  await selectOption(screen.getByLabelText('차트 조회 기간'), '한 달');
-  await waitFor(() => expect(getDashboard).toHaveBeenCalledWith('30d'));
-  await selectOption(await screen.findByLabelText('차트 조회 기간'), '1년');
-  await waitFor(() => expect(getDashboard).toHaveBeenCalledWith('365d'));
+test('short live ranges request only the selected server and can return to historical ranges', async () => {
+  view('/?project=beta&instance=warn&period=5m');
+  await ready('Beta / Warn');
+  expect(getResources).toHaveBeenCalledWith('beta', 'warn', '5m');
+  await selectOption(screen.getByLabelText('관제 조회 기간'), '최근 1시간');
+  await waitFor(() => expect(getResources).toHaveBeenCalledWith('beta', 'warn', '1h'));
+  await selectOption(screen.getByLabelText('관제 조회 기간'), '하루');
+  await waitFor(() => expect(getResources).toHaveBeenCalledWith('beta', 'warn', '24h'));
 });

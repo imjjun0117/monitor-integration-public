@@ -7,8 +7,10 @@ import java.nio.CharBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.CodingErrorAction;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -40,6 +42,11 @@ public final class LogReader {
     // 허용 경로와 커서를 검증하고 추가된 로그 구간 조회
     public Map<String, Object> read(String filePath, String encoding, String cursor)
             throws IOException {
+        return read(filePath, encoding, cursor, new java.util.Date());
+    }
+
+    Map<String, Object> read(String filePath, String encoding, String cursor, java.util.Date date)
+            throws IOException {
         if (roots.isEmpty()) {
             throw new IOException("LOG_ROOTS_NOT_CONFIGURED");
         }
@@ -58,6 +65,11 @@ public final class LogReader {
             throw new IOException("LOG_READER_BUSY");
         }
         try {
+            // 날짜별 Tomcat 로그는 대상 WAS의 현재 날짜 파일로 전환
+            filePath =
+                    filePath.replace(
+                            "{yyyy-MM-dd}",
+                            new java.text.SimpleDateFormat("yyyy-MM-dd").format(date));
             Path candidate = new File(filePath).toPath().normalize();
             boolean inConfiguredFolder = false;
             for (File root : roots) {
@@ -86,7 +98,12 @@ public final class LogReader {
                 throw new IOException("LOG_NOT_REGULAR_FILE");
             }
             String identity =
-                    digest(String.valueOf(attributes.fileKey()) + ":" + attributes.creationTime());
+                    digest(
+                            path.toString()
+                                    + ":"
+                                    + String.valueOf(attributes.fileKey())
+                                    + ":"
+                                    + attributes.creationTime());
             HashSet<java.nio.file.OpenOption> options = new HashSet<java.nio.file.OpenOption>();
             options.add(StandardOpenOption.READ);
             options.add(LinkOption.NOFOLLOW_LINKS);
@@ -148,6 +165,10 @@ public final class LogReader {
                 result.put("limited", Boolean.valueOf(limited));
                 return result;
             }
+        } catch (NoSuchFileException missing) {
+            throw new IOException("LOG_FILE_NOT_FOUND");
+        } catch (AccessDeniedException denied) {
+            throw new IOException("LOG_ACCESS_DENIED");
         } catch (SecurityException denied) {
             throw new IOException("LOG_ACCESS_DENIED");
         } finally {

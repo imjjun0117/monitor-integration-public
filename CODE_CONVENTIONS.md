@@ -14,8 +14,49 @@ Collector, Agent 서버, 프론트엔드의 직접 작성한 코드에 적용합
 - SQL·문자열·정규식 내용은 줄바꿈 정리 과정에서 변경하지 않음.
 - 프론트엔드는 `.prettierrc.json`의 2칸 들여쓰기·100열 기준 적용. JSX 속성 및 자식 요소는 길이에 따라 여러 줄로 배치.
 - Java는 4칸 들여쓰기의 AOSP 포맷 기준 사용. import 순서·문자열·Javadoc 자동 변경은 제외하고 처리 단계별 빈 줄은 코드 의미에 맞게 보완.
+- Java SQL 텍스트 블록은 아래 SQL 배치 규칙 적용. 자동 포맷 후에도 SQL 내부 정렬과 처리 단계 사이의 빈 줄 유지.
 - 메서드는 하나의 역할을 담당하고, 입력 검증과 조기 반환을 통해 불필요한 중첩 축소.
 - 기존 코드의 이름과 구조는 실제 수정이 필요한 경우에만 변경. 주석 정리를 위해 동작과 API 변경 금지.
+
+## SQL 배치와 처리 단계
+
+- 직접 작성하는 SQL은 키워드를 소문자로 작성하고 `select`, `from`, `where`, `order by`, `update`, `set`, `returning` 절을 구분하여 줄바꿈.
+- `select`와 `returning`의 컬럼은 한 줄에 하나씩 배치. 첫 컬럼을 제외한 컬럼은 쉼표를 이름 앞에 배치하고 같은 깊이로 정렬.
+- `where` 조건은 다음 줄에서 한 단계 들여쓰기. 추가 조건은 `and`·`or`를 줄 앞에 배치하고, 긴 괄호 조건은 내부를 한 단계 더 들여쓰기.
+- `=`, `<=`, `-`, `*` 등 연산자 양옆에 공백 배치. 함수명과 여는 괄호 사이에는 공백을 넣지 않음.
+- SQL 텍스트 블록의 최상위 절은 닫는 `"""`와 같은 깊이로 정렬. 하위 쿼리와 컬럼·조건은 4칸씩 들여쓰기.
+- 포맷 수정 시 컬럼 순서, 조건, 잠금, SQL 리터럴의 값과 공백 유지. 문자열의 모든 공백을 일괄 치환하지 않음.
+- Java 처리 단계는 조회·검증·작업 등록·오류 처리 사이에 빈 줄 하나 배치. 빈 줄에는 공백을 넣지 않으며 중괄호 직전·직후에 불필요한 빈 줄을 넣지 않음.
+- 아래 예제처럼 짧은 호출은 한 줄로 유지하고 긴 호출은 인자별 줄바꿈. 조회와 검증은 같은 단계로 묶음.
+
+```java
+// 수집 주기가 지난 인스턴스 조회
+List<Map<String, Object>> instances =
+        db.queryForList(
+                """
+                select
+                    project_id
+                    ,instance_id
+                from instances
+                where
+                    enabled
+                    and (
+                        last_polled_at is null
+                        or last_polled_at <= now() - (
+                            poll_interval_seconds * interval '1 second'
+                        )
+                    )
+                order by project_id, instance_id
+                """);
+
+// Collector 정보 조회 및 응답 검증
+byte[] infoBody = client.get(baseUrl, "info", token);
+validator.validateInfo(infoBody, projectId, instanceId);
+
+// Collector 자원 조회 및 응답 검증
+byte[] snapshotBody = client.get(baseUrl, "snapshot", token);
+validator.validateSnapshot(snapshotBody, projectId, instanceId);
+```
 
 ## 주석 문투
 

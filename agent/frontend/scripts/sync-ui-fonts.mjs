@@ -16,4 +16,5 @@ for (const name of ['outfit', 'noto-sans-kr']) {
 writeFileSync(resolve(output, 'fonts.css'), styles.join('\n'));
 copyFileSync(resolve('node_modules/@radix-ui/react-select/LICENSE'), resolve(output, '../radix-ui-LICENSE.txt'));
 copyFileSync(resolve('THIRD_PARTY_NOTICES.md'), resolve(output, '../THIRD_PARTY_NOTICES.txt'));
+copyFileSync(resolve('SHADCN_ADMIN_LICENSE.txt'), resolve(output, '../SHADCN_ADMIN_LICENSE.txt'));
 console.log('Self-hosted Outfit and Noto Sans KR fonts synchronized.');

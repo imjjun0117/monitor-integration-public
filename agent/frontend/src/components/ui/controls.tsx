@@ -1,5 +1,7 @@
 // 버튼·입력·상태 안내의 공통 구성
 import { usePermissions } from '../PermissionContext';
+import { Button as ShadcnButton } from '../shadcn/button';
+import { Input } from '../shadcn/input';
 // Adapted from TailAdmin's MIT React components. See THIRD_PARTY_NOTICES.md.
 import {
   createElement,
@@ -36,23 +38,25 @@ export function Button({
     return null;
   }
   const variants = {
-    primary: 'bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600',
-    secondary: 'bg-white text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50',
-    danger: 'bg-error-600 text-white shadow-theme-xs hover:bg-error-700',
-    link: 'text-brand-500 hover:bg-brand-50',
-    plain: 'text-gray-500 hover:bg-gray-100',
-  };
+    primary: 'default',
+    secondary: 'outline',
+    danger: 'destructive',
+    link: 'link',
+    plain: 'ghost',
+  } as const;
   return (
-    <button
+    <ShadcnButton
       {...props}
       type={type}
       disabled={disabled || isDisabled || isLoading}
       aria-busy={isLoading || undefined}
-      className={`ta-button ta-${variant} ta-button-${size} inline-flex shrink-0 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${size === 'sm' ? 'min-h-9 px-3 py-2' : 'min-h-11 px-4 py-2.5'} ${variants[variant]} ${className}`}
+      variant={variants[variant]}
+      size={size === 'sm' ? 'sm' : 'default'}
+      className={`ta-button ta-${variant} ta-button-${size} ${className}`}
     >
       {isLoading && <Spinner size="sm" aria-label="처리 중" />}
       {children}
-    </button>
+    </ShadcnButton>
   );
 }
 
@@ -70,7 +74,7 @@ export function TextInput({
   ...props
 }: InputProps) {
   return (
-    <input
+    <Input
       {...props}
       disabled={disabled || isDisabled}
       onChange={(event) => onChange?.(event, event.target.value)}

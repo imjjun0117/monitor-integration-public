@@ -5,8 +5,11 @@ import { Link } from 'react-router-dom';
 import { getSession, logout } from '../api';
 
 import { roleLabels } from './PermissionContext';
+import { Moon, Sun } from 'lucide-react';
+import { setTheme, useTheme } from '../theme';
 
 export default function UserMenu() {
+  const theme = useTheme();
   const session = useQuery({ queryKey: ['session'], queryFn: getSession, staleTime: 5 * 60_000 });
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -43,7 +46,7 @@ export default function UserMenu() {
   }
 
   const { username, role } = session.data;
-  const roleLabel = roleLabels[role] ?? role;
+  const roleLabel = session.data.role_name ?? roleLabels[role] ?? role;
 
   async function handleLogout() {
     setSigningOut(true);
@@ -74,71 +77,87 @@ export default function UserMenu() {
         </span>
         <ChevronIcon />
       </button>
-      {open && (
-        <div
-          className="user-panel"
-          role="menu"
-          aria-label="계정 메뉴"
-          onKeyDown={(event) => {
-            const items = [
-              ...event.currentTarget.querySelectorAll<HTMLElement>(
-                '[role="menuitem"]:not(:disabled)',
-              ),
-            ];
-            const index = items.indexOf(document.activeElement as HTMLElement);
-            const next =
-              event.key === 'ArrowDown'
-                ? (index + 1) % items.length
-                : event.key === 'ArrowUp'
-                  ? (index + items.length - 1) % items.length
-                  : event.key === 'Home'
-                    ? 0
-                    : event.key === 'End'
-                      ? items.length - 1
-                      : undefined;
-            if (next !== undefined) {
-              event.preventDefault();
-              items[next]?.focus();
-            }
-            if (event.key === 'Tab') {
-              setOpen(false);
-            }
+      <div
+        className="user-panel"
+        data-state={open ? 'open' : 'closed'}
+        aria-hidden={!open}
+        inert={!open}
+        role="menu"
+        aria-label="계정 메뉴"
+        onKeyDown={(event) => {
+          const items = [
+            ...event.currentTarget.querySelectorAll<HTMLElement>(
+              '[role="menuitem"]:not(:disabled)',
+            ),
+          ];
+          const index = items.indexOf(document.activeElement as HTMLElement);
+          const next =
+            event.key === 'ArrowDown'
+              ? (index + 1) % items.length
+              : event.key === 'ArrowUp'
+                ? (index + items.length - 1) % items.length
+                : event.key === 'Home'
+                  ? 0
+                  : event.key === 'End'
+                    ? items.length - 1
+                    : undefined;
+          if (next !== undefined) {
+            event.preventDefault();
+            items[next]?.focus();
+          }
+          if (event.key === 'Tab') {
+            setOpen(false);
+          }
+        }}
+      >
+        <div className="user-panel-identity">
+          <span className="user-avatar large" aria-hidden="true">
+            {username.slice(0, 1).toUpperCase()}
+          </span>
+          <span className="user-panel-text">
+            <span className="user-panel-name">
+              {username}
+              <span className="user-badge">{roleLabel}</span>
+            </span>
+            <span className="user-panel-meta">로그인됨</span>
+          </span>
+        </div>
+        <div className="user-panel-divider" />
+        <Link
+          role="menuitem"
+          className="user-panel-item"
+          to={role === 'ADMIN' ? '/settings/projects' : '/settings/instances'}
+          onClick={() => setOpen(false)}
+        >
+          <SettingsIcon />
+          {role === 'VIEWER' ? '설정 조회' : '설정 관리'}
+        </Link>
+        <button
+          type="button"
+          role="menuitem"
+          className="user-panel-item"
+          onClick={() => {
+            setTheme(theme === 'dark' ? 'light' : 'dark');
+            setOpen(false);
+            trigger.current?.focus();
           }}
         >
-          <div className="user-panel-identity">
-            <span className="user-avatar large" aria-hidden="true">
-              {username.slice(0, 1).toUpperCase()}
-            </span>
-            <span className="user-panel-text">
-              <span className="user-panel-name">
-                {username}
-                <span className="user-badge">{roleLabel}</span>
-              </span>
-              <span className="user-panel-meta">로그인됨</span>
-            </span>
-          </div>
-          <div className="user-panel-divider" />
-          <Link
-            role="menuitem"
-            className="user-panel-item"
-            to={role === 'ADMIN' ? '/settings/projects' : '/settings/instances'}
-            onClick={() => setOpen(false)}
-          >
-            <SettingsIcon />
-            {role === 'VIEWER' ? '설정 조회' : '설정 관리'}
-          </Link>
-          <button
-            type="button"
-            role="menuitem"
-            className="user-panel-item"
-            onClick={handleLogout}
-            disabled={signingOut}
-          >
-            <LogoutIcon />
-            {signingOut ? '로그아웃하는 중…' : '로그아웃'}
-          </button>
-        </div>
-      )}
+          <span className="user-item-icon">
+            {theme === 'dark' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+          </span>
+          {theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          className="user-panel-item"
+          onClick={handleLogout}
+          disabled={signingOut}
+        >
+          <LogoutIcon />
+          {signingOut ? '로그아웃하는 중…' : '로그아웃'}
+        </button>
+      </div>
     </div>
   );
 }

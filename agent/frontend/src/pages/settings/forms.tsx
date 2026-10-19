@@ -234,6 +234,10 @@ const MUTATION_MESSAGES: Record<string, string> = {
   INVALID_LOG_CONFIG: '로그 이름, 절대 파일 경로, 인코딩과 조회 주기(5~1,800초)를 확인하세요.',
   FORBIDDEN: '이 작업을 실행할 권한이 없습니다.',
   WRITE_FAILED: '변경 내용을 저장하지 못했습니다. 서버 상태를 확인하고 다시 시도하세요.',
+  ROLE_INVALID: '역할 ID, 이름과 기준 권한을 확인하세요.',
+  ROLE_PROTECTED: '기본 역할과 등록된 기준 권한은 변경할 수 없습니다.',
+  ROLE_DISABLED: '미사용 역할에는 사용자를 배정할 수 없습니다.',
+  ADMIN_ASSIGNMENT_PROTECTED: '관리자 역할 회수는 사용자 관리에서 진행하세요.',
   USER_INVALID: '계정 정보와 담당 프로젝트를 확인하세요.',
   PASSWORD_INVALID: '비밀번호는 12자 이상, UTF-8 기준 72바이트 이하로 입력하세요.',
   SELF_ADMIN_REQUIRED: '현재 로그인한 관리자의 역할과 사용 상태는 유지해야 합니다.',
@@ -316,6 +320,8 @@ export function SettingsDialog({
   return (
     <Modal
       variant={ModalVariant.medium}
+      className={`settings-dialog${id.startsWith('role-') ? ' settings-dialog-compact' : ''}`}
+      closeOnOutside={false}
       aria-labelledby={id}
       isOpen
       onClose={() => {
@@ -343,7 +349,12 @@ export function SettingsDialog({
         <MutationError failed={failed} error={error} />
       </ModalBody>
       <ModalFooter>
+        <Button variant="secondary" size="sm" isDisabled={isPending} onClick={onClose}>
+          취소
+        </Button>
         <Button
+          size="sm"
+          variant={submitLabel === '삭제' ? 'danger' : 'primary'}
           permission="write"
           type="submit"
           form={`${id}-form`}
@@ -352,9 +363,6 @@ export function SettingsDialog({
           isDisabled={isPending || submitDisabled}
         >
           {submitLabel}
-        </Button>
-        <Button variant="link" isDisabled={isPending} onClick={onClose}>
-          취소
         </Button>
       </ModalFooter>
     </Modal>

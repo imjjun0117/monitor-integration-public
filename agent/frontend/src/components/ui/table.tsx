@@ -1,5 +1,6 @@
 // 목록·페이지 이동·선택 동작의 공통 구성
 // Adapted from TailAdmin's MIT table components. See THIRD_PARTY_NOTICES.md.
+import { Table as ShadcnTable, TableHeader, TableBody } from '../shadcn/table';
 import {
   useId,
   useLayoutEffect,
@@ -52,7 +53,7 @@ export function Table({
   });
   return (
     <div className="ta-table-scroll max-w-full overflow-x-auto rounded-xl border border-gray-200 bg-white">
-      <table
+      <ShadcnTable
         ref={ref}
         {...props}
         className={`ta-table w-full border-collapse text-left text-sm ${className}`}
@@ -61,10 +62,10 @@ export function Table({
   );
 }
 export function Thead(props: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead {...props} className={`bg-gray-50 ${props.className ?? ''}`} />;
+  return <TableHeader {...props} className={`bg-gray-50 ${props.className ?? ''}`} />;
 }
 export function Tbody(props: HTMLAttributes<HTMLTableSectionElement>) {
-  return <tbody {...props} className={`divide-y divide-gray-200 ${props.className ?? ''}`} />;
+  return <TableBody {...props} className={`divide-y divide-gray-200 ${props.className ?? ''}`} />;
 }
 export function Tr(props: HTMLAttributes<HTMLTableRowElement>) {
   return (

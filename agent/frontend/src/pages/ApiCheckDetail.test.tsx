@@ -170,7 +170,7 @@ test('unused API keeps its last result and blocks manual execution', () => {
 test('Seesaw HTTPS success does not claim working SMS authentication or a zero balance', () => {
   show({
     ...base,
-    project_id: 'sample-campus',
+    project_id: 'sample-b',
     check_id: 'sms-seesaw',
     name: '시소톡 SMS 서버 HTTPS 연결',
     http: {
@@ -188,7 +188,7 @@ test('Seesaw HTTPS success does not claim working SMS authentication or a zero b
 test('SNS keeps provider authentication errors and masked request values visible', () => {
   show({
     ...base,
-    project_id: 'sample-campus',
+    project_id: 'sample-b',
     check_id: 'sns-instagram',
     name: 'Instagram 미디어 API 조회',
     status: Status.DOWN,

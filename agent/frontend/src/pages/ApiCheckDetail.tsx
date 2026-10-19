@@ -19,8 +19,7 @@ const descriptions: Record<string, string> = {
     'SMART V는 특허 가치 평가 보고서 서비스입니다. 이미 발급된 평가번호로 보고서 상태와 상세 응답을 조회합니다.',
   popbill:
     '연동회원·파트너 잔액과 알림톡·SMS·LMS의 실제 과금 대상을 조회합니다. 예상 발송 건수는 유형별 과금 잔액으로 계산하며, 충전 이력은 연동회원 내역만 제공합니다. 실제 메시지는 발송하지 않습니다.',
-  'catalog-api':
-    '목록 API에 오늘 날짜로 조회하고, 응답에 transferCount가 포함돼 있는지 확인합니다.',
+  kipris: 'KIPRIS Plus에 오늘 날짜로 조회하고, 응답에 transferCount가 포함돼 있는지 확인합니다.',
   odcloud: '공공데이터포털 사업자 상태 API를 호출하고, 응답의 status_code가 OK인지 확인합니다.',
   'document-viewer': '문서 뷰어 서버가 응답하는지 확인합니다. 문서 변환 작업은 실행하지 않습니다.',
   'sms-seesaw':

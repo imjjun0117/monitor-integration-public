@@ -60,6 +60,23 @@ public final class ThresholdResolver {
         return new Resolved(values);
     }
 
+    // 인증서에 연결한 인스턴스 기준 적용. 연결이 없으면 프로젝트 기준 유지
+    public Limits resolveCertificate(String projectId, long certificateTargetId) {
+        List<String> instances = db.queryForList(
+                """
+                select instance_id
+                from instance_certificate_thresholds
+                where
+                    project_id = ?
+                    and certificate_target_id = ?
+                """,
+                String.class,
+                projectId,
+                certificateTargetId);
+        return resolve(projectId, instances.isEmpty() ? null : instances.getFirst())
+                .get("CERTIFICATE_DAYS");
+    }
+
     // 한 번의 임계값 조회로 여러 프로젝트 및 인스턴스의 적용값 반환
     public Map<Scope, Resolved> resolveBatch(Collection<Scope> scopes) {
         List<Map<String, Object>> rows =

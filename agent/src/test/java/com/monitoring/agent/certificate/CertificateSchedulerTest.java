@@ -37,5 +37,7 @@ class CertificateSchedulerTest {
             assertTrue(sql.getValue().contains(column), column);
         }
         assertTrue(sql.getValue().contains("l.checked_at is null"));
+        assertTrue(sql.getValue().contains("join projects p using(project_id)"));
+        assertTrue(sql.getValue().contains("and p.enabled"));
     }
 }

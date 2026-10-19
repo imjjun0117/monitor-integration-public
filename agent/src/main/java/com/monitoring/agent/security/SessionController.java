@@ -12,17 +12,33 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/session")
 public final class SessionController {
     private final JdbcTemplate db;
+    private final MenuAccess menus;
 
-    SessionController(JdbcTemplate db) {
+    SessionController(JdbcTemplate db, MenuAccess menus) {
         this.db = db;
+        this.menus = menus;
     }
 
     @GetMapping("/me")
     Map<String, Object> me(Authentication principal) {
+        String role =
+                db.queryForObject(
+                        "select role from app_users where username=?",
+                        String.class,
+                        principal.getName());
+        String roleName =
+                db.queryForObject("select name from app_roles where role_id=?", String.class, role);
         return Map.of(
+                "role_id",
+                role,
+                "role_name",
+                roleName,
+                "menus",
+                menus.menus(role),
                 "project_ids",
                 db.queryForList(
-                        "select project_id from user_project_access where username=? order by project_id",
+                        "select project_id from user_project_access where username=? order by"
+                                + " project_id",
                         String.class,
                         principal.getName()),
                 "username",
@@ -31,9 +47,9 @@ public final class SessionController {
                 principal.getAuthorities().stream()
                         .map(a -> a.getAuthority().replace("ROLE_", ""))
                         .filter(
-                                role ->
+                                authorityRole ->
                                         java.util.List.of("ADMIN", "OPERATOR", "VIEWER")
-                                                .contains(role))
+                                                .contains(authorityRole))
                         .findFirst()
                         .orElse("VIEWER"));
     }

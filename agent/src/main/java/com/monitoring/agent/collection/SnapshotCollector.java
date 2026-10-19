@@ -87,22 +87,48 @@ public final class SnapshotCollector implements DisposableBean {
         List<Map<String, Object>> instances =
                 db.queryForList(
                         """
-            with due as (
-              select project_id,instance_id from instances
-              where enabled and (last_polled_at is null
-                or last_polled_at <= now()-(poll_interval_seconds * interval '1 second'))
-              order by project_id,instance_id
-              for update skip locked
-            )
-            update instances i set last_polled_at=now()
-            from due
-            where i.project_id=due.project_id and i.instance_id=due.instance_id
-            returning i.project_id,i.instance_id,i.agent_base_url,i.token_ciphertext,i.token_iv
-            """);
+                        with due as (
+                            select
+                                project_id
+                                ,instance_id
+                            from instances
+                            where
+                                enabled
+                                and transport_mode = 'HTTP'
+                                and exists(
+                                    select 1
+                                    from projects p
+                                    where p.project_id = instances.project_id
+                                        and p.enabled
+                                )
+                                and (
+                                    last_polled_at is null
+                                    or last_polled_at <= now() - (
+                                        poll_interval_seconds * interval '1 second'
+                                    )
+                                )
+                            order by project_id, instance_id
+                            for update skip locked
+                        )
+                        update instances i
+                        set last_polled_at = now()
+                        from due
+                        where i.project_id = due.project_id
+                            and i.instance_id = due.instance_id
+                        returning
+                            i.project_id
+                            ,i.instance_id
+                            ,i.agent_base_url
+                            ,i.token_ciphertext
+                            ,i.token_iv
+                        """);
+
         for (Map<String, Object> instance : instances) {
             String key = instance.get("project_id") + "/" + instance.get("instance_id");
+
             BoundedInstanceExecutor.Submission submission =
                     executor.submit(key, () -> collectOne(instance));
+
             if (submission == BoundedInstanceExecutor.Submission.QUEUE_FULL) {
                 failures.record(
                         (String) instance.get("project_id"),
@@ -116,16 +142,42 @@ public final class SnapshotCollector implements DisposableBean {
     private void collectOne(Map<String, Object> instance) {
         String projectId = (String) instance.get("project_id");
         String instanceId = (String) instance.get("instance_id");
+
         try {
+            // 대기 중 프로젝트나 인스턴스를 미사용으로 변경하면 수집 차단
+            Boolean enabled =
+                    db.queryForObject(
+                            """
+                            select exists(
+                                select 1
+                                from instances i
+                                join projects p using(project_id)
+                                where i.project_id = ?
+                                    and i.instance_id = ?
+                                    and i.enabled
+                                    and p.enabled
+                                    and i.transport_mode = 'HTTP'
+                            )
+                            """,
+                            Boolean.class,
+                            projectId,
+                            instanceId);
+            if (!Boolean.TRUE.equals(enabled)) {
+                return;
+            }
+
             String token =
                     cipher.decrypt(
                             (byte[]) instance.get("token_ciphertext"),
                             (byte[]) instance.get("token_iv"));
             String baseUrl = (String) instance.get("agent_base_url");
+
             byte[] infoBody = client.get(baseUrl, "info", token);
             validator.validateInfo(infoBody, projectId, instanceId);
+
             byte[] snapshotBody = client.get(baseUrl, "snapshot", token);
             validator.validateSnapshot(snapshotBody, projectId, instanceId);
+
             JsonNode info = json.readTree(infoBody);
             JsonNode snapshot = json.readTree(snapshotBody);
             persistence.save(projectId, instanceId, info, snapshot, Instant.now());

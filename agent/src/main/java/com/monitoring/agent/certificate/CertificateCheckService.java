@@ -58,9 +58,20 @@ final class CertificateCheckService implements AutoCloseable {
         Map<String, Object> row =
                 db.queryForMap(
                         """
-            select certificate_target_id,project_id,hostname,port,sni_hostname,target_version
-            from certificate_targets where certificate_target_id=? and enabled
-            """,
+                        select
+                            t.certificate_target_id
+                            ,t.project_id
+                            ,t.hostname
+                            ,t.port
+                            ,t.sni_hostname
+                            ,t.target_version
+                        from certificate_targets t
+                        join projects p using(project_id)
+                        where
+                            t.certificate_target_id = ?
+                            and t.enabled
+                            and p.enabled
+                        """,
                         id);
         return submit(Target.from(row));
     }
@@ -80,8 +91,31 @@ final class CertificateCheckService implements AutoCloseable {
 
     private void run(Target target) {
         try {
+            // 대기 중 대상이나 프로젝트를 미사용으로 변경하면 TLS 검사 차단
+            Boolean enabled =
+                    db.queryForObject(
+                            """
+                            select exists(
+                                select 1
+                                from certificate_targets t
+                                join projects p using(project_id)
+                                where t.certificate_target_id = ?
+                                    and t.target_version = ?
+                                    and t.project_id = ?
+                                    and t.enabled
+                                    and p.enabled
+                            )
+                            """,
+                            Boolean.class,
+                            target.id(),
+                            target.version(),
+                            target.projectId());
+            if (!Boolean.TRUE.equals(enabled)) {
+                return;
+            }
+
             ThresholdResolver.Limits limits =
-                    thresholds.resolve(target.projectId(), null).get("CERTIFICATE_DAYS");
+                    thresholds.resolveCertificate(target.projectId(), target.id());
             CertificateChecker.Result result =
                     checker.check(target.hostname(), target.port(), target.sniHostname(), limits);
             results.success(target, result);

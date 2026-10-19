@@ -1,5 +1,5 @@
 // 인스턴스 자원·점검·로그 조회 화면
-import { chartPeriods, type ChartPeriod } from '../utils/chartPeriod';
+import { chartPeriods, liveWindowMs, type ChartPeriod } from '../utils/chartPeriod';
 import {
   Button,
   Label,
@@ -36,7 +36,19 @@ import { useManualRerunPolling } from '../hooks/useManualRerunPolling';
 import LogPanel from '../components/LogPanel';
 import { usePermissions } from '../components/PermissionContext';
 
-type TabKey = 'resources' | 'db-pools' | 'internal-checks' | 'logs';
+import TransportPanel from '../components/TransportPanel';
+import InstanceThresholdSettings from './settings/InstanceThresholdSettings';
+import CollectorEvents from '../components/CollectorEvents';
+import XlogOverview from '../components/XlogOverview';
+
+type TabKey =
+  | 'resources'
+  | 'db-pools'
+  | 'internal-checks'
+  | 'logs'
+  | 'xlog'
+  | 'log-history'
+  | 'thresholds';
 
 export default function InstanceDetailPage() {
   const { projectId = '', instanceId = '' } = useParams();
@@ -46,9 +58,19 @@ export default function InstanceDetailPage() {
   return (
     <>
       <PageBackLink to={`/projects/${projectId}`}>{`${projectId} 인스턴스 목록으로`}</PageBackLink>
+      <TransportPanel projectId={projectId} instanceId={instanceId} />
       <Tabs activeKey={current} onSelect={(_, key) => setSearch({ tab: String(key) })}>
         <Tab eventKey="resources" title={<TabTitleText>JVM·서버 자원</TabTitleText>}>
           {current === 'resources' && <Resources projectId={projectId} instanceId={instanceId} />}
+        </Tab>
+        <Tab eventKey="thresholds" title={<TabTitleText>임계치 관리</TabTitleText>}>
+          {current === 'thresholds' && (
+            <InstanceThresholdSettings
+              key={`${projectId}/${instanceId}`}
+              projectId={projectId}
+              instanceId={instanceId}
+            />
+          )}
         </Tab>
         <Tab eventKey="db-pools" title={<TabTitleText>DB Pool</TabTitleText>}>
           {current === 'db-pools' && <Pools projectId={projectId} instanceId={instanceId} />}
@@ -58,6 +80,18 @@ export default function InstanceDetailPage() {
             <Checks projectId={projectId} instanceId={instanceId} />
           )}
         </Tab>
+        <Tab eventKey="xlog" title={<TabTitleText>XLog</TabTitleText>}>
+          {current === 'xlog' && (
+            <XlogOverview project={projectId} instance={instanceId} detailed />
+          )}
+        </Tab>
+        {canWrite && (
+          <Tab eventKey="log-history" title={<TabTitleText>저장된 로그</TabTitleText>}>
+            {current === 'log-history' && (
+              <CollectorEvents projectId={projectId} instanceId={instanceId} kind="LOG" />
+            )}
+          </Tab>
+        )}
         {canWrite && (
           <Tab eventKey="logs" title={<TabTitleText>실시간 로그</TabTitleText>}>
             {current === 'logs' && <LogPanel projectId={projectId} instanceId={instanceId} />}
@@ -69,11 +103,11 @@ export default function InstanceDetailPage() {
 }
 
 function Resources({ projectId, instanceId }: { projectId: string; instanceId: string }) {
-  const [period, setPeriod] = useState<ChartPeriod>('24h');
+  const [period, setPeriod] = useState<ChartPeriod>('15m');
   const query = useQuery({
     queryKey: ['resources', projectId, instanceId, period],
     queryFn: () => getResources(projectId, instanceId, period),
-    refetchInterval: 15_000,
+    refetchInterval: liveWindowMs(period) ? 5_000 : 15_000,
     retry: false,
   });
   const diskSeries = useMemo(() => {
@@ -113,6 +147,8 @@ function Resources({ projectId, instanceId }: { projectId: string; instanceId: s
       </div>
       <div className="chart-grid">
         <MetricChart
+          key={`cpu/${period}`}
+          liveWindow={liveWindowMs(period)}
           title="시스템 CPU"
           points={data.history}
           xKey="sampled_at"
@@ -128,6 +164,8 @@ function Resources({ projectId, instanceId }: { projectId: string; instanceId: s
           }
         />
         <MetricChart
+          key={`ram/${period}`}
+          liveWindow={liveWindowMs(period)}
           title="물리 메모리 사용량"
           points={data.history}
           xKey="sampled_at"
@@ -144,6 +182,8 @@ function Resources({ projectId, instanceId }: { projectId: string; instanceId: s
           }
         />
         <MetricChart
+          key={`heap/${period}`}
+          liveWindow={liveWindowMs(period)}
           title="JVM Heap 사용량"
           points={data.history}
           xKey="sampled_at"
@@ -161,7 +201,8 @@ function Resources({ projectId, instanceId }: { projectId: string; instanceId: s
         />
         {data.disks.map((disk) => (
           <MetricChart
-            key={disk.path_id}
+            key={`${disk.path_id}/${period}`}
+            liveWindow={liveWindowMs(period)}
             title={
               disk.path_id === 'application'
                 ? '웹앱 디스크'
@@ -243,11 +284,11 @@ function Resources({ projectId, instanceId }: { projectId: string; instanceId: s
 }
 
 function Pools({ projectId, instanceId }: { projectId: string; instanceId: string }) {
-  const [period, setPeriod] = useState<ChartPeriod>('24h');
+  const [period, setPeriod] = useState<ChartPeriod>('15m');
   const query = useQuery({
     queryKey: ['pools', projectId, instanceId, period],
     queryFn: () => getDbPools(projectId, instanceId, period),
-    refetchInterval: 15_000,
+    refetchInterval: liveWindowMs(period) ? 5_000 : 15_000,
     retry: false,
   });
   if (query.isPending) {
@@ -313,9 +354,30 @@ function Pools({ projectId, instanceId }: { projectId: string; instanceId: strin
         </Table>
       </div>
       <div className="chart-grid">
-        <MetricChart title="DB Pool Active" points={data.history} xKey="sampled_at" yKey="active" />
-        <MetricChart title="DB Pool Idle" points={data.history} xKey="sampled_at" yKey="idle" />
-        <MetricChart title="DB Pool Max" points={data.history} xKey="sampled_at" yKey="max_size" />
+        <MetricChart
+          key={`pool-active/${period}`}
+          liveWindow={liveWindowMs(period)}
+          title="DB Pool Active"
+          points={data.history}
+          xKey="sampled_at"
+          yKey="active"
+        />
+        <MetricChart
+          key={`pool-idle/${period}`}
+          liveWindow={liveWindowMs(period)}
+          title="DB Pool Idle"
+          points={data.history}
+          xKey="sampled_at"
+          yKey="idle"
+        />
+        <MetricChart
+          key={`pool-max/${period}`}
+          liveWindow={liveWindowMs(period)}
+          title="DB Pool Max"
+          points={data.history}
+          xKey="sampled_at"
+          yKey="max_size"
+        />
       </div>
     </div>
   );

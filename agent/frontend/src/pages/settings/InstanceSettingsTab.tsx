@@ -13,7 +13,7 @@ import {
   TextInput,
 } from '../../components/ui';
 import { Table, Tbody, Td, Th, Thead, Tr } from '../../components/ui';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { Instance, InstanceUpdate, InstanceWrite } from '../../generated';
 import {
@@ -41,9 +41,13 @@ import {
   identifier,
   validateInstance,
 } from './validation';
+import TransportPanel from '../../components/TransportPanel';
+import { DefaultService, TransportMode } from '../../generated';
+import { useProjectScope } from '../../components/ProjectScope';
 
 export default function InstanceSettingsTab() {
-  const [projectId, setProjectId] = useState('');
+  const { project: scopedProject } = useProjectScope();
+  const [projectId, setProjectId] = useState(scopedProject);
   const [value, setValue] = useState<InstanceWrite>(emptyInstance());
   const [validation, setValidation] = useState<string>();
   const projects = useQuery({ queryKey: ['projects'], queryFn: getProjects });
@@ -55,7 +59,7 @@ export default function InstanceSettingsTab() {
     [projects.data?.items],
   );
   useEffect(() => {
-    if (!enabledProjects.some((project) => project.project_id === projectId)) {
+    if (projects.data && !enabledProjects.some((project) => project.project_id === projectId)) {
       setProjectId(enabledProjects[0]?.project_id ?? '');
     }
   }, [enabledProjects, projectId]);
@@ -260,20 +264,68 @@ function currentDraft(instance: Instance): InstanceUpdate {
 function InstanceRow({ projectId, instance }: { projectId: string; instance: Instance }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
+  const client = useQueryClient();
+  const [collectionMode, setCollectionMode] = useState<TransportMode.mode>();
+  const [xlogEnabled, setXlogEnabled] = useState<boolean>();
+  const connection = useQuery({
+    queryKey: ['connection', projectId, instance.instance_id],
+    queryFn: () => DefaultService.getConnection({ projectId, instanceId: instance.instance_id }),
+    enabled: editing,
+    retry: false,
+  });
+  const xlog = useQuery({
+    queryKey: ['xlog-settings', projectId],
+    queryFn: () => DefaultService.getXlogSettings({ projectId }),
+    enabled: editing,
+    retry: false,
+  });
   const [draft, setDraft] = useState<InstanceUpdate>(() => currentDraft(instance));
   const [validation, setValidation] = useState<string>();
-  const save = useInvalidateMutation(
-    () => updateInstance(projectId, instance.instance_id, { ...draft, token: draft.token || null }),
-    ['instances', projectId],
-    () => {
+  const connectionChanging =
+    useIsMutating({
+      mutationKey: ['connection-change', projectId, instance.instance_id],
+    }) > 0;
+  const collectionChanged =
+    JSON.stringify(draft) !== JSON.stringify(currentDraft(instance)) ||
+    (collectionMode !== undefined && collectionMode !== connection.data?.mode) ||
+    (xlogEnabled !== undefined && xlogEnabled !== xlog.data?.enabled);
+  const selectedMode = collectionMode ?? connection.data?.mode;
+  const save = useMutation({
+    mutationKey: ['connection-change', projectId, instance.instance_id],
+    mutationFn: async () => {
+      await updateInstance(projectId, instance.instance_id, {
+        ...draft,
+        token: draft.token || null,
+      });
+
+      if (collectionMode !== undefined && collectionMode !== connection.data?.mode) {
+        await DefaultService.saveConnectionMode({
+          projectId,
+          instanceId: instance.instance_id,
+          requestBody: { mode: collectionMode },
+        });
+      }
+      if (xlogEnabled !== undefined && xlogEnabled !== xlog.data?.enabled) {
+        await DefaultService.saveXlogSettings({ projectId, requestBody: { enabled: xlogEnabled } });
+      }
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['instances', projectId] }),
+        client.invalidateQueries({ queryKey: ['connection', projectId] }),
+        client.invalidateQueries({ queryKey: ['xlog-settings', projectId] }),
+      ]);
       setDraft((current) => ({ ...current, token: '' }));
       setEditing(false);
     },
-  );
+  });
 
   function openEdit() {
     setDraft(currentDraft(instance));
+    setCollectionMode(undefined);
+    setXlogEnabled(undefined);
     setValidation(undefined);
+    save.reset();
     setEditing(true);
   }
   const connectionTest = useMutation({
@@ -291,7 +343,7 @@ function InstanceRow({ projectId, instance }: { projectId: string; instance: Ins
     const error = validateInstance(draft, false);
     setValidation(error);
     if (!error) {
-      save.mutate(undefined);
+      save.mutate();
     }
   }
 
@@ -329,7 +381,7 @@ function InstanceRow({ projectId, instance }: { projectId: string; instance: Ins
               isDisabled={connectionTest.isPending}
               onClick={() => connectionTest.mutate()}
             >
-              연결 테스트
+              연결
             </Button>
             <Button
               variant="secondary"
@@ -341,28 +393,37 @@ function InstanceRow({ projectId, instance }: { projectId: string; instance: Ins
             <Button
               permission="admin"
               variant="danger"
-              aria-label={`인스턴스 ${instance.instance_id} 영구 삭제`}
+              aria-label={`인스턴스 ${instance.instance_id} 삭제`}
               onClick={() => setConfirmDelete(true)}
             >
-              영구 삭제
+              삭제
             </Button>
           </div>
           <SettingsDialog
             id={`edit-instance-${instance.instance_id}`}
-            title={`인스턴스 ${instance.instance_id} 수정`}
+            title="인스턴스 수정"
             submitLabel="저장"
             submitAriaLabel={`인스턴스 ${instance.instance_id} 저장`}
             isOpen={editing}
-            isPending={save.isPending}
+            isPending={save.isPending || connectionChanging}
+            submitDisabled={!connection.data || !xlog.data}
             onClose={() => setEditing(false)}
             onSubmit={saveCurrent}
             validation={validation}
             failed={save.isError}
             error={save.error}
           >
+            <LabeledField id={`instance-${instance.instance_id}-id`} label="인스턴스 ID">
+              <TextInput
+                id={`instance-${instance.instance_id}-id`}
+                aria-label="인스턴스 ID"
+                value={instance.instance_id}
+                readOnly
+              />
+            </LabeledField>
             <LabeledField
               id={`instance-${instance.instance_id}-display-name`}
-              label={`표시명 (${instance.instance_id})`}
+              label="표시명"
               help="앞뒤 공백 없이 1~120자"
             >
               <TextInput
@@ -386,7 +447,7 @@ function InstanceRow({ projectId, instance }: { projectId: string; instance: Ins
             </LabeledField>
             <LabeledField
               id={`instance-${instance.instance_id}-agent-url`}
-              label={`Collector Base URL (${instance.instance_id})`}
+              label="Collector Base URL"
               help="최대 500자"
             >
               <TextInput
@@ -400,10 +461,65 @@ function InstanceRow({ projectId, instance }: { projectId: string; instance: Ins
               id={`instance-${instance.instance_id}-token`}
               value={draft.token ?? ''}
               onChange={(token) => setDraft({ ...draft, token })}
-              label={`인스턴스 ${instance.instance_id} 새 토큰`}
+              label="새 토큰"
               help="비워 두면 기존 토큰 유지, 변경 시 32 UTF-8 bytes 이상"
               required={false}
             />
+            <LabeledField
+              id={`instance-${instance.instance_id}-collection-mode`}
+              label="수집 방식"
+              help="웹소켓 연결은 설정 저장 후 별도로 시작합니다."
+            >
+              <FormSelect
+                id={`instance-${instance.instance_id}-collection-mode`}
+                aria-label="수집 방식"
+                value={collectionMode ?? connection.data?.mode ?? 'HTTP'}
+                isDisabled={!connection.data || save.isPending || connectionChanging}
+                onChange={(_, mode) => setCollectionMode(mode as TransportMode.mode)}
+              >
+                <FormSelectOption value="HTTP" label="HTTP 조회" />
+                <FormSelectOption value="WSS" label="웹소켓 연결" />
+              </FormSelect>
+            </LabeledField>
+            {editing && selectedMode === 'WSS' && (
+              <div className="field">
+                <span className="field-label">웹소켓 연결</span>
+                {connection.data?.mode === 'WSS' ? (
+                  <TransportPanel
+                    projectId={projectId}
+                    instanceId={instance.instance_id}
+                    compact
+                    isDisabled={save.isPending || collectionChanged}
+                  />
+                ) : (
+                  <span role="status">연결 대기</span>
+                )}
+                <span className="field-help">
+                  {collectionChanged
+                    ? '변경 내용을 저장한 뒤 수정 창을 다시 열어 연결을 시작하세요.'
+                    : '연결 시작·종료는 즉시 적용됩니다.'}
+                </span>
+              </div>
+            )}
+            <LabeledField
+              id={`instance-${instance.instance_id}-xlog`}
+              label="XLog 수집"
+              help="프로젝트 공통 설정으로, 같은 프로젝트의 연결된 웹소켓 인스턴스 전체에 적용됩니다."
+            >
+              <FormSelect
+                id={`instance-${instance.instance_id}-xlog`}
+                aria-label="XLog 수집"
+                value={(xlogEnabled ?? xlog.data?.enabled) ? 'on' : 'off'}
+                isDisabled={!xlog.data || save.isPending}
+                onChange={(_, value) => setXlogEnabled(value === 'on')}
+              >
+                <FormSelectOption value="off" label="사용 안 함" />
+                <FormSelectOption value="on" label="사용" />
+              </FormSelect>
+            </LabeledField>
+            {(connection.isError || xlog.isError) && (
+              <p role="alert">수집 설정을 불러오지 못했습니다. 창을 다시 열어 시도하세요.</p>
+            )}
             <NumberInput
               id={`instance-${instance.instance_id}-poll-interval`}
               label="폴링 간격(초)"
@@ -435,6 +551,11 @@ function InstanceRow({ projectId, instance }: { projectId: string; instance: Ins
               help="중지하면 폴링을 멈추지만 기존 수집 데이터는 유지합니다."
               onChange={(enabled) => setDraft({ ...draft, enabled })}
             />
+            {save.isError && (
+              <p role="alert">
+                일부 항목은 이미 저장됐을 수 있습니다. 값을 확인한 뒤 다시 저장하세요.
+              </p>
+            )}
           </SettingsDialog>
           <Modal
             variant={ModalVariant.small}
@@ -463,7 +584,7 @@ function InstanceRow({ projectId, instance }: { projectId: string; instance: Ins
                 isDisabled={permanentDelete.isPending}
                 onClick={() => permanentDelete.mutate(undefined)}
               >
-                영구 삭제
+                삭제
               </Button>
               <Button
                 variant="link"

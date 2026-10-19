@@ -1,6 +1,6 @@
 ---
 version: alpha
-name: Hermes Monitoring
+name: Monitoring
 description: 중립 표면과 절제된 보라색 포인트를 사용하는 데이터 밀도 높은 모니터링 콘솔.
 colors:
   primary: "#5B21B6"
@@ -126,7 +126,7 @@ components:
 
 ## Overview
 
-Hermes Monitoring은 장식보다 이상 징후, 최근성, 원인 탐색과 안전한 조작을 우선한다. 공개 Codeit Design System에서 확인한 semantic token, 4·8 간격, neutral 기반 표면, 절제된 보라 포인트와 명확한 상태 원칙을 현재 제품 화면에 적용한다.
+Monitoring은 장식보다 이상 징후, 최근성, 원인 탐색과 안전한 조작을 우선한다. 공개 Codeit Design System에서 확인한 semantic token, 4·8 간격, neutral 기반 표면, 절제된 보라 포인트와 명확한 상태 원칙을 현재 제품 화면에 적용한다.
 
 ## Colors
 
