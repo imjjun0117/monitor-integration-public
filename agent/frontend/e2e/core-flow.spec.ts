@@ -52,6 +52,8 @@ async function chooseOption(page: Page, label: string, option: string) {
   // 선택 반영 전에 문서를 이동하여 프로젝트 범위 저장이 중단되지 않도록 검증
   await expect(control.locator('..')).toHaveAttribute('title', option);
   await expect(control).toHaveAttribute('aria-expanded', 'false');
+  // 닫힘 상태 변경 뒤 남는 애니메이션까지 완료된 후 다음 화면 검증
+  await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0);
 }
 
 test('custom login and responsive dashboard meet visual behavior gates', async ({ page }) => {
