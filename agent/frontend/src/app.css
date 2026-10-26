@@ -76,6 +76,13 @@ body {
   min-width: 0;
   overflow-x: auto;
 }
+/* 권한 차단은 유지하고 fieldset의 기본 최소 너비가 표 내부 스크롤을 막지 않도록 정리 */
+.settings-content {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
 .field-help,
 .api-detail-note,
 .service-balance-note,

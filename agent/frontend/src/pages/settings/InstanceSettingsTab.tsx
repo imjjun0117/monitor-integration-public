@@ -1,6 +1,19 @@
 // 인스턴스 연결 정보와 수집 주기 관리 화면
 import { ProTable, type ProColumns } from '@ant-design/pro-components';
-import { Alert, Button, Input, Modal, Select, Space, Tag } from 'antd';
+import {
+  Alert,
+  Button,
+  Descriptions,
+  Flex,
+  Form,
+  Grid,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Tag,
+  theme,
+} from 'antd';
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { Instance, InstanceUpdate, InstanceWrite } from '../../generated';
@@ -33,7 +46,34 @@ import TransportPanel from '../../components/TransportPanel';
 import { DefaultService, TransportMode } from '../../generated';
 import { useProjectScope } from '../../components/ProjectScope';
 
+const INSTANCE_FIELDS = [
+  { title: '표시명', render: (item: Instance) => item.display_name },
+  { title: '환경', render: (item: Instance) => item.environment || '—' },
+  {
+    title: 'Collector Base URL',
+    span: 2,
+    render: (item: Instance) => item.agent_base_url || '—',
+  },
+  { title: '폴링 간격(초)', render: (item: Instance) => item.poll_interval_seconds ?? '—' },
+  {
+    title: 'API 자동 점검',
+    render: (item: Instance) => (
+      <Tag color={item.api_checks_enabled ? 'green' : 'default'}>
+        {item.api_checks_enabled ? '사용' : '사용 안 함'}
+      </Tag>
+    ),
+  },
+  {
+    title: '수집 상태',
+    render: (item: Instance) => (
+      <Tag color={item.enabled ? 'green' : 'default'}>{item.enabled ? '사용' : '중지'}</Tag>
+    ),
+  },
+];
+
 export default function InstanceSettingsTab() {
+  const { token } = theme.useToken();
+  const compact = Grid.useBreakpoint().md === false;
   const { project: scopedProject } = useProjectScope();
   const { canWrite, isAdmin } = usePermissions();
   const [projectId, setProjectId] = useState(scopedProject);
@@ -83,11 +123,24 @@ export default function InstanceSettingsTab() {
 
   return (
     <>
-      <Space wrap role="group" aria-label="인스턴스 등록 작업">
-        <LabeledField id="instance-project-id" label="소속 프로젝트">
+      <Flex
+        wrap
+        gap="middle"
+        align="end"
+        role="group"
+        aria-label="인스턴스 등록 작업"
+        style={{ marginBottom: token.marginLG }}
+      >
+        <Form.Item
+          label="소속 프로젝트"
+          htmlFor="instance-project-id"
+          layout="vertical"
+          style={{ minWidth: 0, flex: '1 1 240px', marginBottom: 0 }}
+        >
           <Select
             id="instance-project-id"
             aria-label="소속 프로젝트"
+            style={{ width: '100%' }}
             value={projectId || undefined}
             onChange={setProjectId}
             disabled={projects.isPending || projects.isError}
@@ -105,11 +158,11 @@ export default function InstanceSettingsTab() {
               label: `${project.display_name} (${project.project_id})`,
             }))}
           />
-        </LabeledField>
+        </Form.Item>
         <Button type="primary" onClick={openCreate} disabled={!projectId || !canWrite}>
           등록
         </Button>
-      </Space>
+      </Flex>
       <SettingsDialog
         id="create-instance"
         title="인스턴스 등록"
@@ -206,47 +259,65 @@ export default function InstanceSettingsTab() {
           rowKey="instance_id"
           dataSource={query.data?.items ?? []}
           columns={
-            [
-              { title: '인스턴스', dataIndex: 'instance_id' },
-              { title: '표시명', dataIndex: 'display_name' },
-              { title: '환경', render: (_, item) => item.environment || '—' },
-              { title: 'Collector Base URL', render: (_, item) => item.agent_base_url || '—' },
-              { title: '폴링 간격(초)', render: (_, item) => item.poll_interval_seconds ?? '—' },
-              {
-                title: 'API 자동 점검',
-                render: (_, item) => (
-                  <Tag color={item.api_checks_enabled ? 'green' : 'default'}>
-                    {item.api_checks_enabled ? '사용' : '사용 안 함'}
-                  </Tag>
-                ),
-              },
-              {
-                title: '수집 상태',
-                render: (_, item) => (
-                  <Tag color={item.enabled ? 'green' : 'default'}>
-                    {item.enabled ? '사용' : '중지'}
-                  </Tag>
-                ),
-              },
-              {
-                title: '작업',
-                valueType: 'option',
-                render: (_, item) => (
-                  <InstanceRow
-                    key={item.instance_id}
-                    projectId={projectId}
-                    instance={item}
-                    canWrite={canWrite}
-                    isAdmin={isAdmin}
-                  />
-                ),
-              },
-            ] as ProColumns<Instance>[]
+            compact
+              ? [
+                  {
+                    title: '인스턴스',
+                    render: (_, item) => (
+                      <div style={{ overflowWrap: 'anywhere' }}>
+                        <strong>{item.instance_id}</strong>
+                        <Descriptions
+                          size="small"
+                          layout="vertical"
+                          column={2}
+                          style={{ marginBlock: token.marginSM }}
+                          styles={{ content: { overflowWrap: 'anywhere' } }}
+                          items={INSTANCE_FIELDS.map((field) => ({
+                            key: field.title,
+                            label: field.title,
+                            span: 'span' in field ? field.span : 1,
+                            children: field.render(item),
+                          }))}
+                        />
+                        <InstanceRow
+                          key={item.instance_id}
+                          projectId={projectId}
+                          instance={item}
+                          canWrite={canWrite}
+                          isAdmin={isAdmin}
+                        />
+                      </div>
+                    ),
+                  },
+                ]
+              : ([
+                  { title: '인스턴스', dataIndex: 'instance_id' },
+                  ...INSTANCE_FIELDS.map(
+                    (field): ProColumns<Instance> => ({
+                      title: field.title,
+                      render: (_, item) => field.render(item),
+                    }),
+                  ),
+                  {
+                    title: '작업',
+                    valueType: 'option',
+                    render: (_, item) => (
+                      <InstanceRow
+                        key={item.instance_id}
+                        projectId={projectId}
+                        instance={item}
+                        canWrite={canWrite}
+                        isAdmin={isAdmin}
+                      />
+                    ),
+                  },
+                ] as ProColumns<Instance>[])
           }
           search={false}
           options={false}
           pagination={false}
-          scroll={{ x: 'max-content' }}
+          tableLayout={compact ? 'fixed' : undefined}
+          scroll={compact ? undefined : { x: 'max-content' }}
         />
       </QueryContent>
     </>

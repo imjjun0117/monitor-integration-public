@@ -679,3 +679,83 @@ test('API list filters real external and internal sample checks', async ({ page 
     await expect(removal).toBeHidden();
   }
 });
+
+
+for (const width of [320, 390]) {
+  for (const appearance of ['light', 'dark'] as const) {
+    test(`mobile settings stay inside ${width}px in ${appearance} mode`, async ({ page }) => {
+      const errors: string[] = [];
+      observe(page, errors);
+      await page.setViewportSize({ width, height: 844 });
+      await page.addInitScript(
+        (value) => localStorage.setItem('monitoring.theme', value),
+        appearance,
+      );
+      await login(page);
+      for (const section of [
+        'instances',
+        'projects',
+        'thresholds',
+        'certificates',
+        'users',
+        'roles',
+        'menus',
+        'audit',
+      ]) {
+        await waitForRequests(page);
+        await page.goto(`/settings/${section}?project=sample-a`);
+        const content = page.locator('fieldset.settings-content');
+        await expect(content).toBeVisible();
+        await expect(page.getByRole('combobox', { name: '프로젝트 선택' })).toBeEnabled();
+        await waitForRequests(page);
+        const layout = await content.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return {
+            documentWidth: document.documentElement.scrollWidth,
+            left: box.left,
+            right: box.right,
+            border: getComputedStyle(element).borderTopWidth,
+          };
+        });
+        expect.soft(layout.documentWidth, section).toBeLessThanOrEqual(width);
+        expect.soft(layout.left, section).toBeGreaterThanOrEqual(0);
+        expect.soft(layout.right, section).toBeLessThanOrEqual(width);
+        expect.soft(layout.border, section).toBe('0px');
+        if (section !== 'audit') {
+          await expect(content).toHaveAttribute('disabled', '');
+        }
+        if (section === 'instances') {
+          const table = page.getByRole('table', { name: '인스턴스 설정', exact: true });
+          await expect(table.getByRole('columnheader')).toHaveCount(1);
+          await expect(table.getByText('샘플 A 1', { exact: true })).toBeVisible();
+          await expect(
+            table.getByText('Collector Base URL', { exact: true }).first(),
+          ).toBeVisible();
+          await expect(page.getByRole('button', { name: '등록', exact: true })).toBeDisabled();
+          await page.screenshot({
+            path: resolve(screenshotDirectory, `settings-instances-${width}-${appearance}.png`),
+            fullPage: true,
+          });
+          expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+        }
+        // 넓은 설정 표는 화면 전체가 아닌 표 안에서 끝 열까지 이동 가능
+        for (const scroller of await content.locator('.ant-table-content').all()) {
+          const scroll = await scroller.evaluate((element) => {
+            element.scrollLeft = element.scrollWidth;
+            return {
+              client: element.clientWidth,
+              scroll: element.scrollWidth,
+              left: element.scrollLeft,
+            };
+          });
+          expect(scroll.client).toBeLessThanOrEqual(width);
+          if (scroll.scroll > scroll.client) {
+            expect(scroll.left).toBeGreaterThan(0);
+          }
+        }
+      }
+      await waitForRequests(page);
+      expect(errors).toEqual([]);
+    });
+  }
+}

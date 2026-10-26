@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { createInstance, updateInstance } from '../../api';
 import { CancelablePromise, ConnectionState, DefaultService } from '../../generated';
 import { selectOption } from '../../test-select';
+import { Grid } from 'antd';
 import InstanceSettingsTab from './InstanceSettingsTab';
 
 vi.mock('../../api', () => ({
@@ -190,3 +191,35 @@ test('saved WSS settings can be connected separately and retried without saving 
   expect(DefaultService.startConnection).toHaveBeenCalledTimes(2);
   expect(updateInstance).toHaveBeenCalledTimes(1);
 }, 40_000);
+
+test('mobile instance summary retains every configuration field in one column', async () => {
+  const breakpoint = vi.spyOn(Grid, 'useBreakpoint').mockReturnValue({ md: false });
+  try {
+    render(
+      <MemoryRouter>
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <InstanceSettingsTab />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByText('https://example.com');
+    expect(screen.getAllByRole('columnheader')).toHaveLength(1);
+    for (const value of ['dev', 'Dev', 'development', '30', '사용 안 함', '사용']) {
+      expect(screen.getByText(value, { exact: true })).toBeVisible();
+    }
+    for (const label of [
+      '표시명',
+      '환경',
+      'Collector Base URL',
+      '폴링 간격(초)',
+      'API 자동 점검',
+      '수집 상태',
+    ]) {
+      expect(screen.getByText(label, { exact: true })).toBeVisible();
+    }
+  } finally {
+    breakpoint.mockRestore();
+  }
+});

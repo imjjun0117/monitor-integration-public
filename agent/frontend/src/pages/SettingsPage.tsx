@@ -1,6 +1,6 @@
 // 설정 메뉴와 관리 화면 구성
 import { usePermissions } from '../components/PermissionContext';
-import { Alert } from 'antd';
+import { Alert, theme } from 'antd';
 import UserSettingsTab from './settings/UserSettingsTab';
 import AuditSettingsTab from './settings/AuditSettingsTab';
 import MenuSettingsTab from './settings/MenuSettingsTab';
@@ -13,6 +13,7 @@ import ProjectSettingsTab from './settings/ProjectSettingsTab';
 import ThresholdSettingsTab from './settings/ThresholdSettingsTab';
 
 export default function SettingsPage() {
+  const { token } = theme.useToken();
   const section = useLocation().pathname.split('/').at(-1) ?? 'projects';
   const mobileReadonly = useMobileReadonly();
   const { isAdmin, canWrite } = usePermissions();
@@ -24,9 +25,16 @@ export default function SettingsPage() {
   }
   return (
     <>
-      <p id="mobile-settings-note" className="mobile-readonly-notice" role="note">
-        모바일에서는 조회만 지원합니다. 설정 변경은 태블릿 또는 데스크톱에서 진행해 주세요.
-      </p>
+      {mobileReadonly && (
+        <Alert
+          id="mobile-settings-note"
+          role="note"
+          type="info"
+          showIcon
+          title="모바일에서는 조회만 지원합니다. 설정 변경은 태블릿 또는 데스크톱에서 진행해 주세요."
+          style={{ marginBottom: token.marginLG }}
+        />
+      )}
       {!canWrite && <Alert type="info" title="조회 전용 계정입니다. 설정을 변경할 수 없습니다." />}
       <fieldset
         className="settings-content"
