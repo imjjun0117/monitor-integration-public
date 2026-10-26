@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -205,7 +205,9 @@ test('mobile instance summary retains every configuration field in one column', 
       </MemoryRouter>,
     );
     await screen.findByText('https://example.com');
-    expect(screen.getAllByRole('columnheader')).toHaveLength(1);
+    const table = screen.getByRole('table', { name: '인스턴스 설정' });
+    // 내부 Descriptions 레이블과 구분하여 목록 자체의 열 헤더 검증
+    expect(within(table.querySelector('thead')!).getAllByRole('columnheader')).toHaveLength(1);
     for (const value of ['dev', 'Dev', 'development', '30', '사용 안 함', '사용']) {
       expect(screen.getByText(value, { exact: true })).toBeVisible();
     }
