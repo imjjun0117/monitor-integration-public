@@ -18,6 +18,13 @@ import static org.junit.Assert.*;
 public class CollectorConnectionTest {
     private static final String TOKEN = "01234567890123456789012345678901";
     private static final String TICKET = TOKEN + TOKEN;
+    private static final int XLOG_RECORD_COUNT = 2000;
+    private static final int XLOG_QUEUE_LIMIT = 500;
+    private static final int XLOG_BATCH_LIMIT = 50;
+    private static final long MESSAGE_TIMEOUT_MS = 5000;
+    // 최대 대기열을 초당 50개씩 모두 전송하는 시간과 기존 메시지 대기 여유 합산
+    private static final long XLOG_DRAIN_TIMEOUT_MS =
+            TimeUnit.SECONDS.toMillis(XLOG_QUEUE_LIMIT / XLOG_BATCH_LIMIT) + MESSAGE_TIMEOUT_MS;
 
     @Test
     public void explicitStartConnectsOnceAndDisconnectStopsXlogWithoutRetry() throws Exception {
@@ -51,14 +58,28 @@ public class CollectorConnectionTest {
             }
             assertTrue(configured.getAsJsonObject("body").get("xlog_enabled").getAsBoolean());
             long generation = collector.xlogGeneration();
-            for (int i = 0; i < 2000; i++) {
+            // 폐기 없는 첫 전송을 먼저 수신해 생산·전송 스레드의 실행 순서 차이 재현
+            collector.record(
+                    generation, Collections.<String, Object>singletonMap("path", "/sample"));
+            assertTrue(server.firstXlog.await(MESSAGE_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+            for (int i = 1; i < XLOG_RECORD_COUNT; i++) {
                 collector.record(
                         generation, Collections.<String, Object>singletonMap("path", "/sample"));
             }
-            assertTrue(((Number) collector.status().get("queue_size")).intValue() <= 500);
-            JsonObject xlog = server.message("xlog");
-            assertTrue(xlog.getAsJsonArray("items").size() <= 50);
-            assertTrue(xlog.get("dropped").getAsLong() > 0);
+            assertTrue(
+                    ((Number) collector.status().get("queue_size")).intValue() <= XLOG_QUEUE_LIMIT);
+            long received = 0;
+            long dropped = 0;
+            long deliveryDeadline = System.currentTimeMillis() + XLOG_DRAIN_TIMEOUT_MS;
+            while (received + dropped < XLOG_RECORD_COUNT) {
+                JsonObject xlog = server.message("xlog", deliveryDeadline);
+                int batchSize = xlog.getAsJsonArray("items").size();
+                assertTrue(batchSize <= XLOG_BATCH_LIMIT);
+                received += batchSize;
+                dropped += xlog.get("dropped").getAsLong();
+            }
+            assertEquals(XLOG_RECORD_COUNT, received + dropped);
+            assertTrue(dropped > 0);
             server.connection.close();
             long deadline = System.currentTimeMillis() + 5000;
             while (collector.isXlogEnabled() && System.currentTimeMillis() < deadline) {
@@ -164,6 +185,8 @@ public class CollectorConnectionTest {
                 new java.util.concurrent.CountDownLatch(1);
         final java.util.concurrent.CountDownLatch opened =
                 new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch firstXlog =
+                new java.util.concurrent.CountDownLatch(1);
         final AtomicInteger opens = new AtomicInteger();
         final LinkedBlockingQueue<JsonObject> messages = new LinkedBlockingQueue<JsonObject>();
         volatile WebSocket connection;
@@ -183,7 +206,11 @@ public class CollectorConnectionTest {
         }
 
         public void onMessage(WebSocket socket, String value) {
-            messages.offer(new JsonParser().parse(value).getAsJsonObject());
+            JsonObject message = new JsonParser().parse(value).getAsJsonObject();
+            messages.offer(message);
+            if ("xlog".equals(message.get("type").getAsString())) {
+                firstXlog.countDown();
+            }
         }
 
         public void onClose(WebSocket socket, int code, String reason, boolean remote) {}
@@ -195,7 +222,10 @@ public class CollectorConnectionTest {
         }
 
         JsonObject message(String type) throws Exception {
-            long deadline = System.currentTimeMillis() + 5000;
+            return message(type, System.currentTimeMillis() + MESSAGE_TIMEOUT_MS);
+        }
+
+        JsonObject message(String type, long deadline) throws Exception {
             while (System.currentTimeMillis() < deadline) {
                 JsonObject value = messages.poll(100, TimeUnit.MILLISECONDS);
                 if (value != null && type.equals(value.get("type").getAsString())) {
