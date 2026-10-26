@@ -223,6 +223,8 @@ test('mobile page headings and navigation stay compact', async ({ page }) => {
   observe(page, errors);
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
+  // 최초 인스턴스 자동 선택과 데이터 조회가 끝난 뒤 다음 문서로 이동
+  await expect(page.getByRole('link', { name: /샘플 A \/ 샘플 A 1/ })).toBeVisible();
   for (const route of ['/logs', '/incidents', '/xlog']) {
     await waitForRequests(page);
     await page.goto(`${route}?project=sample-a`);
@@ -251,8 +253,15 @@ test('mobile page headings and navigation stay compact', async ({ page }) => {
     }
     if (route === '/incidents') {
       await page.getByRole('combobox', { name: '장애 상태 필터' }).click();
+      const historyResponse = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return url.pathname === '/api/v1/incidents' && url.searchParams.get('state') === '';
+      });
       await page.locator('.ant-select-dropdown:visible').getByText('전체 이력', { exact: true }).click();
       await expect(page).toHaveURL(/state=&?/);
+      const response = await historyResponse;
+      expect(response.ok()).toBe(true);
+      expect(await response.finished()).toBeNull();
       await waitForRequests(page);
       const rows = page.locator('.incident-row-summary');
       for (const row of await rows.all()) {
