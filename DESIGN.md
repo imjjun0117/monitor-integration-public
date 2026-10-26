@@ -1,5 +1,5 @@
 ---
-version: alpha
+version: legacy-reference
 name: Monitoring
 description: 중립 표면과 절제된 보라색 포인트를 사용하는 데이터 밀도 높은 모니터링 콘솔.
 colors:
@@ -123,6 +123,9 @@ components:
     rounded: "{rounded.circle}"
     padding: 8px
 ---
+
+> 현재 UI는 공식 Ant Design·ProComponents의 레이아웃·폼·테이블·모달과 기본 토큰을 사용합니다. 아래 색상·폰트·Radix/TailAdmin 규칙은 이전 UI의 참고 기록이며 현재 구현의 규범이 아닙니다.
+
 
 ## Overview
 

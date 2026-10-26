@@ -1,6 +1,7 @@
 // 프로젝트별 API 점검 및 서비스 지표 조회 화면
-import { Alert, Button, Label, FormSelect, FormSelectOption, TextInput } from '../components/ui';
-import { Table, Tbody, Td, Th, Thead, Tr } from '../components/ui';
+import { ProTable, type ProColumns } from '@ant-design/pro-components';
+import { Alert, Button, Form, Input, Select, Space, Tag } from 'antd';
+import { usePermissions } from '../components/PermissionContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -16,7 +17,6 @@ import ApiCheckDetail, { checkName, checkOutcome } from './ApiCheckDetail';
 import { Empty, Failure, Loading, RefreshFailure } from '../components/QueryState';
 import StatusLabel, { statusLabels } from '../components/StatusLabel';
 import { useManualRerunPolling } from '../hooks/useManualRerunPolling';
-import { LabeledField } from './settings/forms';
 import CheckSettingsButton from '../components/CheckSettingsButton';
 import { scheduleLabel } from '../utils/checkPresentation';
 import ServiceInfoCard from '../components/ServiceInfoCard';
@@ -132,8 +132,7 @@ export default function ApiMonitoringPage() {
       {Object.values(filters).some(Boolean) && (
         <div className="filter-actions">
           <Button
-            variant="link"
-            size="sm"
+            type="link"
             onClick={() => {
               setFilters(initialFilters);
               setSearchParams({}, { replace: true });
@@ -143,123 +142,134 @@ export default function ApiMonitoringPage() {
           </Button>
         </div>
       )}
-      <div className="filters api-filters">
-        <LabeledField id="api-usage-filter" label="사용 여부">
-          <FormSelect
-            id="api-usage-filter"
-            aria-label="사용 여부 필터"
-            value={filters.usage}
-            onChange={(_, usage) => setFilters({ ...filters, usage })}
-          >
-            <FormSelectOption value="" label="전체 API" />
-            <FormSelectOption value="used" label="사용 API" />
-            <FormSelectOption value="unused" label="미사용 API" />
-          </FormSelect>
-        </LabeledField>
-        <LabeledField id="api-project-filter" label="프로젝트">
-          <FormSelect
-            id="api-project-filter"
-            aria-label="프로젝트 필터"
-            value={filters.project}
-            onChange={(_, project) => {
-              setFilters({ ...filters, project, instance: '' });
-              selectProject(project);
-            }}
-            isDisabled={projects.isPending || projects.isError}
-          >
-            <FormSelectOption
-              value=""
-              label={
-                projects.isPending
-                  ? '프로젝트 불러오는 중…'
-                  : projects.isError
-                    ? '프로젝트를 불러오지 못했습니다'
-                    : projects.data?.items.length === 0
-                      ? '등록된 프로젝트가 없습니다'
-                      : '전체 프로젝트'
-              }
+      <Form layout="vertical">
+        <div className="query-filters">
+          <Form.Item label="사용 여부" htmlFor="api-usage-filter">
+            <Select
+              id="api-usage-filter"
+              aria-label="사용 여부 필터"
+              value={filters.usage}
+              onChange={(usage) => setFilters({ ...filters, usage })}
+              options={[
+                { value: '', label: '전체 API' },
+                { value: 'used', label: '사용 API' },
+                { value: 'unused', label: '미사용 API' },
+              ]}
+              style={{ minWidth: 150 }}
             />
-            {projects.data?.items.map((project) => (
-              <FormSelectOption
-                key={project.project_id}
-                value={project.project_id}
-                label={`${project.display_name} (${project.project_id})`}
-              />
-            ))}
-          </FormSelect>
-        </LabeledField>
-        <LabeledField id="api-instance-filter" label="인스턴스">
-          <FormSelect
-            id="api-instance-filter"
-            aria-label="인스턴스 필터"
-            value={filters.instance}
-            onChange={(_, instance) => setFilters({ ...filters, instance })}
-            isDisabled={!filters.project || instances.isPending || instances.isError}
-          >
-            <FormSelectOption
-              value=""
-              label={
-                !filters.project
-                  ? '프로젝트를 먼저 선택하세요'
-                  : instances.isPending
-                    ? '인스턴스 불러오는 중…'
-                    : instances.isError
-                      ? '인스턴스를 불러오지 못했습니다'
-                      : instances.data?.items.length === 0
-                        ? '등록된 인스턴스가 없습니다'
-                        : '전체 인스턴스'
-              }
+          </Form.Item>
+          <Form.Item label="프로젝트" htmlFor="api-project-filter">
+            <Select
+              id="api-project-filter"
+              aria-label="프로젝트 필터"
+              showSearch
+              optionFilterProp="label"
+              value={filters.project}
+              onChange={(project) => {
+                setFilters({ ...filters, project, instance: '' });
+                selectProject(project);
+              }}
+              disabled={projects.isPending || projects.isError}
+              options={[
+                {
+                  value: '',
+                  label: projects.isPending
+                    ? '프로젝트 불러오는 중…'
+                    : projects.isError
+                      ? '프로젝트를 불러오지 못했습니다'
+                      : projects.data?.items.length === 0
+                        ? '등록된 프로젝트가 없습니다'
+                        : '전체 프로젝트',
+                },
+                ...(projects.data?.items.map((project) => ({
+                  value: project.project_id,
+                  label: `${project.display_name} (${project.project_id})`,
+                })) ?? []),
+              ]}
+              style={{ minWidth: 200 }}
             />
-            {instances.data?.items.map((instance) => (
-              <FormSelectOption
-                key={instance.instance_id}
-                value={instance.instance_id}
-                label={`${instance.display_name} (${instance.instance_id})`}
-              />
-            ))}
-          </FormSelect>
-        </LabeledField>
-        <LabeledField id="api-direction-filter" label="구분">
-          <FormSelect
-            id="api-direction-filter"
-            aria-label="내외부 필터"
-            value={filters.direction}
-            onChange={(_, value) => setFilters({ ...filters, direction: value })}
+          </Form.Item>
+          <Form.Item label="인스턴스" htmlFor="api-instance-filter">
+            <Select
+              id="api-instance-filter"
+              aria-label="인스턴스 필터"
+              showSearch
+              optionFilterProp="label"
+              value={filters.instance}
+              onChange={(instance) => setFilters({ ...filters, instance })}
+              disabled={!filters.project || instances.isPending || instances.isError}
+              options={[
+                {
+                  value: '',
+                  label: !filters.project
+                    ? '프로젝트를 먼저 선택하세요'
+                    : instances.isPending
+                      ? '인스턴스 불러오는 중…'
+                      : instances.isError
+                        ? '인스턴스를 불러오지 못했습니다'
+                        : instances.data?.items.length === 0
+                          ? '등록된 인스턴스가 없습니다'
+                          : '전체 인스턴스',
+                },
+                ...(instances.data?.items.map((instance) => ({
+                  value: instance.instance_id,
+                  label: `${instance.display_name} (${instance.instance_id})`,
+                })) ?? []),
+              ]}
+              style={{ minWidth: 200 }}
+            />
+          </Form.Item>
+          <Form.Item label="구분" htmlFor="api-direction-filter">
+            <Select
+              id="api-direction-filter"
+              aria-label="내외부 필터"
+              value={filters.direction}
+              onChange={(direction) => setFilters({ ...filters, direction })}
+              options={[
+                { value: '', label: '전체' },
+                { value: 'INTERNAL', label: '내부 API' },
+                { value: 'EXTERNAL', label: '외부 API' },
+              ]}
+              style={{ minWidth: 130 }}
+            />
+          </Form.Item>
+          <Form.Item label="상태" htmlFor="api-status-filter">
+            <Select
+              id="api-status-filter"
+              aria-label="상태 필터"
+              value={filters.status}
+              onChange={(status) => setFilters({ ...filters, status })}
+              options={[
+                { value: '', label: '전체' },
+                ...(['UP', 'WARN', 'DOWN', 'UNKNOWN'] as const).map((value) => ({
+                  value,
+                  label: statusLabels[value],
+                })),
+              ]}
+              style={{ minWidth: 130 }}
+            />
+          </Form.Item>
+          <Form.Item
+            label="API 이름"
+            htmlFor="api-name-filter"
+            extra="입력 즉시 결과에 적용됩니다."
           >
-            <FormSelectOption value="" label="전체" />
-            <FormSelectOption value="INTERNAL" label="내부 API" />
-            <FormSelectOption value="EXTERNAL" label="외부 API" />
-          </FormSelect>
-        </LabeledField>
-        <LabeledField id="api-status-filter" label="상태">
-          <FormSelect
-            id="api-status-filter"
-            aria-label="상태 필터"
-            value={filters.status}
-            onChange={(_, value) => setFilters({ ...filters, status: value })}
-          >
-            <FormSelectOption value="" label="전체" />
-            {(['UP', 'WARN', 'DOWN', 'UNKNOWN'] as const).map((value) => (
-              <FormSelectOption key={value} value={value} label={statusLabels[value]} />
-            ))}
-          </FormSelect>
-        </LabeledField>
-        <LabeledField id="api-name-filter" label="API 이름" help="입력 즉시 결과에 적용됩니다.">
-          <TextInput
-            id="api-name-filter"
-            aria-label="API 이름"
-            value={filters.name}
-            onChange={(_, value) => setFilters({ ...filters, name: value })}
-          />
-        </LabeledField>
-      </div>
-      {rerun.isError && <Alert variant="danger" title="재점검 요청에 실패했습니다." />}
+            <Input
+              id="api-name-filter"
+              aria-label="API 이름"
+              value={filters.name}
+              onChange={(event) => setFilters({ ...filters, name: event.target.value })}
+            />
+          </Form.Item>
+        </div>
+      </Form>
+      {rerun.isError && <Alert type="error" title="재점검 요청에 실패했습니다." />}
       {usage.isError && (
-        <Alert variant="danger" title="사용 여부를 저장하지 못했습니다. 기존 설정을 유지합니다." />
+        <Alert type="error" title="사용 여부를 저장하지 못했습니다. 기존 설정을 유지합니다." />
       )}
       {usage.isSuccess && (
         <Alert
-          variant="success"
+          type="success"
           title={
             usage.variables.monitoring_enabled === false
               ? '사용으로 전환했습니다. 다음 자동 점검 대상에 포함됩니다.'
@@ -275,11 +285,7 @@ export default function ApiMonitoringPage() {
               <ServiceInfoCard
                 key={`${check.project_id}/${check.instance_id}/${check.check_id}`}
                 check={check}
-                action={
-                  <Button variant="secondary" size="sm" onClick={() => setSelected(check)}>
-                    상세 · 다시 조회
-                  </Button>
-                }
+                action={<Button onClick={() => setSelected(check)}>상세 · 다시 조회</Button>}
               />
             ))}
         </div>
@@ -328,6 +334,7 @@ function CheckTable({
   toggleUsage: (check: ApiCheck) => void;
   saving: boolean;
 }) {
+  const { canWrite } = usePermissions();
   if (query.isPending) {
     return <Loading />;
   }
@@ -341,7 +348,7 @@ function CheckTable({
         {filtered ? (
           <>
             조건에 맞는 API가 없습니다.{' '}
-            <Button variant="link" onClick={reset}>
+            <Button type="link" onClick={reset}>
               필터 초기화
             </Button>
           </>
@@ -351,86 +358,93 @@ function CheckTable({
       </Empty>
     );
   }
+  const columns: ProColumns<ApiCheck>[] = [
+    {
+      title: '프로젝트 / 실행 서버',
+      render: (_, check) => (
+        <>
+          <strong>{check.project_name ?? check.project_id}</strong>
+          <br />
+          {check.instance_name ?? check.instance_id}
+        </>
+      ),
+    },
+    {
+      title: 'API',
+      render: (_, check) => (
+        <>
+          {check.direction === 'INTERNAL'
+            ? '내부 API'
+            : check.direction === 'EXTERNAL'
+              ? '외부 API'
+              : '미지원'}
+          <br />
+          <Button type="link" onClick={() => select(check)}>
+            {checkName(check)}
+          </Button>
+        </>
+      ),
+    },
+    {
+      title: '현재 상태',
+      render: (_, check) => (
+        <>
+          {check.monitoring_enabled === false ? (
+            <Tag>미사용</Tag>
+          ) : (
+            <StatusLabel status={check.status} />
+          )}
+          <br />
+          {scheduleLabel(check)}
+        </>
+      ),
+    },
+    {
+      title: '응답시간',
+      render: (_, check) =>
+        check.duration_ms == null ? '미수집' : `${check.duration_ms.toLocaleString('ko-KR')} ms`,
+    },
+    {
+      title: '최근 점검',
+      render: (_, check) =>
+        check.checked_at ? new Date(check.checked_at).toLocaleString('ko-KR') : '미수집',
+    },
+    {
+      title: '실패 요약',
+      render: (_, check) =>
+        check.monitoring_enabled !== false && (check.status === 'DOWN' || check.status === 'WARN')
+          ? checkOutcome(check)
+          : '',
+    },
+    {
+      title: '관리',
+      render: (_, check) => (
+        <>
+          <CheckSettingsButton check={check} />
+          <ServiceSettingsButton check={check} />
+          {canWrite && (
+            <Button
+              disabled={saving}
+              onClick={() => toggleUsage(check)}
+              aria-label={`${checkName(check)} ${check.monitoring_enabled === false ? '사용으로 전환' : '미사용으로 전환'}`}
+            >
+              {check.monitoring_enabled === false ? '사용 재개' : '사용 중지'}
+            </Button>
+          )}
+        </>
+      ),
+    },
+  ];
   return (
-    <Table variant="compact" className="api-check-table" aria-label="API 점검 목록">
-      <Thead>
-        <Tr>
-          <Th>프로젝트 / 실행 서버</Th>
-          <Th>API</Th>
-          <Th>현재 상태</Th>
-          <Th>응답시간</Th>
-          <Th>최근 점검</Th>
-          <Th>실패 요약</Th>
-          <Th>관리</Th>
-        </Tr>
-      </Thead>
-      <Tbody>
-        {checks.map((check) => (
-          <Tr key={`${check.project_id}/${check.instance_id}/${check.check_id}`}>
-            <Td>
-              <strong>{check.project_name ?? check.project_id}</strong>
-              <small>{check.instance_name ?? check.instance_id}</small>
-            </Td>
-            <Td>
-              <small>
-                {check.direction === 'INTERNAL'
-                  ? '내부 API'
-                  : check.direction === 'EXTERNAL'
-                    ? '외부 API'
-                    : '미지원'}
-              </small>
-              <Button variant="link" onClick={() => select(check)}>
-                {checkName(check)}
-              </Button>
-            </Td>
-            <Td>
-              {check.monitoring_enabled === false ? (
-                <Label color="grey">미사용</Label>
-              ) : (
-                <StatusLabel status={check.status} />
-              )}
-              <small>{scheduleLabel(check)}</small>
-            </Td>
-            <Td>
-              {check.duration_ms == null
-                ? '미수집'
-                : `${check.duration_ms.toLocaleString('ko-KR')} ms`}
-            </Td>
-            <Td>
-              {check.checked_at ? (
-                <>
-                  {new Date(check.checked_at).toLocaleDateString('ko-KR')}
-                  <small>{new Date(check.checked_at).toLocaleTimeString('ko-KR')}</small>
-                </>
-              ) : (
-                '미수집'
-              )}
-            </Td>
-            <Td>
-              {check.monitoring_enabled !== false &&
-              (check.status === 'DOWN' || check.status === 'WARN')
-                ? checkOutcome(check)
-                : ''}
-            </Td>
-            <Td>
-              <div className="check-row-actions">
-                <CheckSettingsButton check={check} />
-                <ServiceSettingsButton check={check} />
-                <Button
-                  permission="write"
-                  variant="secondary"
-                  size="sm"
-                  isDisabled={saving}
-                  onClick={() => toggleUsage(check)}
-                  aria-label={`${checkName(check)} ${check.monitoring_enabled === false ? '사용으로 전환' : '미사용으로 전환'}`}
-                >
-                  {check.monitoring_enabled === false ? '사용 재개' : '사용 중지'}
-                </Button>
-              </div>
-            </Td>
-          </Tr>
-        ))}
-      </Tbody>
-    </Table>
+    <ProTable<ApiCheck>
+      aria-label="API 점검 목록"
+      rowKey={(check) => `${check.project_id}/${check.instance_id}/${check.check_id}`}
+      columns={columns}
+      dataSource={checks}
+      search={false}
+      options={false}
+      pagination={false}
+      scroll={{ x: 'max-content' }}
+    />
   );
 }

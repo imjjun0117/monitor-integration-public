@@ -2,7 +2,7 @@
 import { chartPeriods, liveWindowMs, type ChartPeriod } from '../utils/chartPeriod';
 import type { DashboardProject, DashboardResourceSample } from '../generated';
 import { useProjectScope } from './ProjectScope';
-import { FormSelect, FormSelectOption } from './ui';
+import { Select, Space } from 'antd';
 import MetricChart from './MetricChart';
 
 const metrics = [
@@ -32,33 +32,30 @@ export default function ProjectComparison({
   }
   return (
     <section className="project-comparison" aria-label="전체 프로젝트 자원 추이">
-      <div className="chart-project-filter">
-        <FormSelect
+      <Space wrap>
+        <Select
           aria-label="차트 프로젝트"
           value={projectId}
-          onChange={(_, next) => setProjectId(next)}
-        >
-          <FormSelectOption value="" label="전체 프로젝트" />
-          {projects.map((project) => (
-            <FormSelectOption
-              key={project.project_id}
-              value={project.project_id}
-              label={`${project.display_name} (${project.project_id})`}
-            />
-          ))}
-        </FormSelect>
+          onChange={setProjectId}
+          showSearch
+          optionFilterProp="label"
+          options={[
+            { value: '', label: '전체 프로젝트' },
+            ...projects.map((project) => ({
+              value: project.project_id,
+              label: `${project.display_name} (${project.project_id})`,
+            })),
+          ]}
+        />
         {onPeriodChange && (
-          <FormSelect
+          <Select
             aria-label="차트 조회 기간"
             value={period}
-            onChange={(_, value) => onPeriodChange(value as ChartPeriod)}
-          >
-            {Object.entries(chartPeriods).map(([value, label]) => (
-              <FormSelectOption key={value} value={value} label={label} />
-            ))}
-          </FormSelect>
+            onChange={(value) => onPeriodChange(value as ChartPeriod)}
+            options={Object.entries(chartPeriods).map(([value, label]) => ({ value, label }))}
+          />
         )}
-      </div>
+      </Space>
       <div className="chart-grid">
         {metrics.map((metric) => (
           <MetricChart

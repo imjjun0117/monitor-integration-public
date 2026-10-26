@@ -30,12 +30,14 @@ public class LoginPageController {
             csrf = (CsrfToken) request.getAttribute("_csrf");
         }
         String token = csrf == null ? "" : HtmlUtils.htmlEscape(csrf.getToken());
-        String error =
-                request.getParameter("error") == null
-                        ? ""
-                        : """
-            <p class="login-error" role="alert">아이디 또는 비밀번호를 확인해 주세요.</p>
-            """;
-        return template.replace("{{CSRF_TOKEN}}", token).replace("{{ERROR}}", error);
+        // 오류 값은 반영하지 않고 존재 여부만 고정된 표시 신호로 전달
+        String error = request.getParameter("error") == null ? "false" : "true";
+        String errorNotice =
+                "true".equals(error)
+                        ? "<p class=\"login-error\" role=\"alert\">아이디 또는 비밀번호를 확인해 주세요.</p>"
+                        : "";
+        return template.replace("{{CSRF_TOKEN}}", token)
+                .replace("{{LOGIN_ERROR}}", error)
+                .replace("{{ERROR}}", errorNotice);
     }
 }

@@ -1,8 +1,8 @@
 // 사용자 계정과 프로젝트별 권한 관리 화면
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Button, FormSelect, FormSelectOption, TextInput } from '../../components/ui';
-import { Table, Tbody, Td, Th, Thead, Tr } from '../../components/ui';
+import { ProTable, type ProColumns } from '@ant-design/pro-components';
+import { Button, Checkbox, Input, Select, Space, Typography } from 'antd';
 import { createUser, getProjects, getUsers, updateUser } from '../../api';
 import { DefaultService, type UserWrite, type ManagedUser } from '../../generated';
 import { roleLabels, usePermissions } from '../../components/PermissionContext';
@@ -72,11 +72,60 @@ export default function UserSettingsTab() {
     setValidation(undefined);
     save.mutate(draft);
   }
+  const columns: ProColumns<ManagedUser>[] = [
+    {
+      title: '계정',
+      dataIndex: 'username',
+      render: (_, user) => (
+        <Space>
+          {user.username}
+          {user.username === username && (
+            <Typography.Text type="secondary">내 계정</Typography.Text>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: '역할',
+      dataIndex: 'role',
+      render: (_, user) => user.role_name ?? roleLabels[user.role] ?? user.role,
+    },
+    {
+      title: '담당 프로젝트',
+      render: (_, user) =>
+        user.role === 'ADMIN'
+          ? '전체 프로젝트'
+          : user.project_ids.length
+            ? user.project_ids
+                .map(
+                  (id) =>
+                    projects.data?.items.find((project) => project.project_id === id)
+                      ?.display_name ?? id,
+                )
+                .join(', ')
+            : '미지정 · 접근 불가',
+    },
+    { title: '상태', dataIndex: 'enabled', renderText: (enabled) => (enabled ? '사용' : '중지') },
+    {
+      title: '최근 변경',
+      dataIndex: 'updated_at',
+      render: (_, user) => new Date(user.updated_at).toLocaleString('ko-KR'),
+    },
+    {
+      title: '관리',
+      valueType: 'option',
+      render: (_, user) => (
+        <Button aria-label={`${user.username} 계정 수정`} onClick={() => edit(user)}>
+          수정
+        </Button>
+      ),
+    },
+  ];
   return (
     <>
-      <div className="settings-toolbar">
+      <Space>
         <Button
-          permission="admin"
+          type="primary"
           onClick={() => {
             setEditing(false);
             setDraft(emptyUser());
@@ -86,11 +135,11 @@ export default function UserSettingsTab() {
         >
           사용자 등록
         </Button>
-      </div>
-      <p className="settings-help">
+      </Space>
+      <Typography.Paragraph>
         관리자는 전체 프로젝트를 관리합니다. 운영자는 담당 프로젝트를 관리하고, 조회자는 확인만 할
         수 있습니다.
-      </p>
+      </Typography.Paragraph>
       <RefreshFailure
         visible={users.isError && Boolean(users.data)}
         updatedAt={users.dataUpdatedAt}
@@ -104,77 +153,29 @@ export default function UserSettingsTab() {
         <Empty>등록된 사용자가 없습니다.</Empty>
       ) : (
         <>
-          <Table aria-label="사용자 목록">
-            <Thead>
-              <Tr>
-                <Th>계정</Th>
-                <Th>역할</Th>
-                <Th>담당 프로젝트</Th>
-                <Th>상태</Th>
-                <Th>최근 변경</Th>
-                <Th>관리</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {users.data.items.map((user) => (
-                <Tr key={user.username}>
-                  <Td>
-                    {user.username}
-                    {user.username === username && (
-                      <small className="user-account-note">내 계정</small>
-                    )}
-                  </Td>
-                  <Td>{user.role_name ?? roleLabels[user.role] ?? user.role}</Td>
-                  <Td>
-                    {user.role === 'ADMIN'
-                      ? '전체 프로젝트'
-                      : user.project_ids.length
-                        ? user.project_ids
-                            .map(
-                              (id) =>
-                                projects.data?.items.find((p) => p.project_id === id)
-                                  ?.display_name ?? id,
-                            )
-                            .join(', ')
-                        : '미지정 · 접근 불가'}
-                  </Td>
-                  <Td>{user.enabled ? '사용' : '중지'}</Td>
-                  <Td>{new Date(user.updated_at).toLocaleString('ko-KR')}</Td>
-                  <Td>
-                    <Button
-                      permission="admin"
-                      variant="secondary"
-                      size="sm"
-                      aria-label={`${user.username} 계정 수정`}
-                      onClick={() => edit(user)}
-                    >
-                      수정
-                    </Button>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-          <div className="project-overview-pagination">
+          <ProTable<ManagedUser>
+            aria-label="사용자 목록"
+            rowKey="username"
+            dataSource={users.data.items}
+            columns={columns}
+            search={false}
+            options={false}
+            pagination={false}
+            scroll={{ x: 'max-content' }}
+          />
+          <Space wrap>
             <span>전체 {users.data.total}명</span>
-            <Button
-              variant="secondary"
-              size="sm"
-              isDisabled={page === 0}
-              onClick={() => setPage(page - 1)}
-            >
+            <Button disabled={page === 0} onClick={() => setPage(page - 1)}>
               이전
             </Button>
             <span>{page + 1}</span>
             <Button
-              variant="secondary"
-              size="sm"
-              isDisabled={(page + 1) * 50 >= users.data.total}
+              disabled={(page + 1) * 50 >= users.data.total}
               onClick={() => setPage(page + 1)}
             >
               다음
             </Button>
-          </div>
+          </Space>
         </>
       )}
       {draft && (
@@ -195,13 +196,13 @@ export default function UserSettingsTab() {
           error={save.error}
         >
           <LabeledField id="user-id" label="계정 ID">
-            <TextInput
+            <Input
               id="user-id"
               value={draft.username}
-              isDisabled={editing}
+              disabled={editing}
               autoComplete="off"
               maxLength={80}
-              onChange={(_, value) => setDraft({ ...draft, username: value })}
+              onChange={(event) => setDraft({ ...draft, username: event.target.value })}
             />
           </LabeledField>
           <SecretInput
@@ -217,24 +218,22 @@ export default function UserSettingsTab() {
             onChange={(password) => setDraft({ ...draft, password })}
           />
           <LabeledField id="user-role" label="역할">
-            <FormSelect
+            <Select
               id="user-role"
+              aria-label="역할"
               value={draft.role}
-              isDisabled={editing && draft.username === username}
-              onChange={(_, role) =>
+              disabled={editing && draft.username === username}
+              onChange={(role) =>
                 setDraft({
                   ...draft,
-                  role: role,
+                  role,
                   projectIds: role === 'ADMIN' ? [] : draft.projectIds,
                 })
               }
-            >
-              {(roles.data ?? [])
+              options={(roles.data ?? [])
                 .filter((role) => role.enabled || role.roleId === draft.role)
-                .map(({ roleId: value, name: label }) => (
-                  <FormSelectOption key={value} value={value} label={label} />
-                ))}
-            </FormSelect>
+                .map(({ roleId: value, name: label }) => ({ value, label }))}
+            />
           </LabeledField>
           {editing && draft.username === username ? (
             <p className="field-help">내 계정의 관리자 역할과 사용 상태는 유지됩니다.</p>
@@ -249,34 +248,25 @@ export default function UserSettingsTab() {
             />
           )}
           {draft.role !== 'ADMIN' && (
-            <fieldset className="user-project-picker">
+            <fieldset>
               <legend>담당 프로젝트</legend>
               {projects.isPending ? (
                 <Loading />
               ) : projects.isError ? (
                 <Failure message="프로젝트를 불러오지 못했습니다." />
               ) : (
-                projects.data?.items.map((project) => (
-                  <label key={project.project_id}>
-                    <input
-                      type="checkbox"
-                      checked={draft.projectIds.includes(project.project_id)}
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          projectIds: event.target.checked
-                            ? [...draft.projectIds, project.project_id]
-                            : draft.projectIds.filter((id) => id !== project.project_id),
-                        })
-                      }
-                    />
-                    {project.display_name} <small>({project.project_id})</small>
-                  </label>
-                ))
+                <Checkbox.Group
+                  value={draft.projectIds}
+                  onChange={(projectIds) => setDraft({ ...draft, projectIds })}
+                  options={(projects.data?.items ?? []).map((project) => ({
+                    value: project.project_id,
+                    label: `${project.display_name} (${project.project_id})`,
+                  }))}
+                />
               )}
-              <p className="field-help">
+              <Typography.Paragraph type="secondary">
                 프로젝트를 선택하지 않으면 관제 데이터에 접근할 수 없습니다.
-              </p>
+              </Typography.Paragraph>
             </fieldset>
           )}
         </SettingsDialog>

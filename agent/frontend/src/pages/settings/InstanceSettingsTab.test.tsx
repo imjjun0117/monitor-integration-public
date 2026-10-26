@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { updateInstance } from '../../api';
+import { createInstance, updateInstance } from '../../api';
 import { CancelablePromise, ConnectionState, DefaultService } from '../../generated';
 import { selectOption } from '../../test-select';
 import InstanceSettingsTab from './InstanceSettingsTab';
@@ -89,6 +89,71 @@ async function edit() {
   );
   await selectOption(screen.getByRole('combobox', { name: '수집 방식' }), '웹소켓 연결');
 }
+test('registration is an AntD dialog and Escape cancels without creating', async () => {
+  render(
+    <MemoryRouter>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <InstanceSettingsTab />
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+  const register = await screen.findByRole('button', { name: '등록' });
+  await waitFor(() => expect(register).toBeEnabled());
+  fireEvent.click(register);
+  expect(screen.getByRole('dialog', { name: '인스턴스 등록' })).toHaveClass('ant-modal');
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(createInstance).not.toHaveBeenCalled();
+});
+
+test('failed registration keeps the draft, but cancel and reopen starts clean', async () => {
+  vi.mocked(createInstance).mockRejectedValueOnce(new Error('network failed'));
+  render(
+    <MemoryRouter>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <InstanceSettingsTab />
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+  const register = await screen.findByRole('button', { name: '등록' });
+  await waitFor(() => expect(register).toBeEnabled());
+  fireEvent.click(register);
+  fireEvent.change(screen.getByRole('textbox', { name: '인스턴스 ID' }), {
+    target: { value: 'new-instance' },
+  });
+  fireEvent.change(screen.getByRole('textbox', { name: '인스턴스 표시명' }), {
+    target: { value: 'New' },
+  });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Collector Base URL' }), {
+    target: { value: 'https://collector.example.com' },
+  });
+  fireEvent.change(screen.getByLabelText('Collector 토큰'), {
+    target: { value: 'test-token-with-thirty-two-bytes-long' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '인스턴스 등록 확인' }));
+  await waitFor(() =>
+    expect(createInstance).toHaveBeenCalledWith(
+      'alpha',
+      expect.objectContaining({ instanceId: 'new-instance' }),
+    ),
+  );
+  expect(
+    await screen.findByText('요청을 처리하지 못했습니다. 입력값과 서버 상태를 확인하세요.'),
+  ).toBeVisible();
+  expect(screen.getByRole('textbox', { name: '인스턴스 ID' })).toHaveValue('new-instance');
+  fireEvent.click(screen.getByRole('button', { name: '취소' }));
+  fireEvent.click(register);
+  expect(
+    screen.queryByText('요청을 처리하지 못했습니다. 입력값과 서버 상태를 확인하세요.'),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: '인스턴스 ID' })).toHaveValue('');
+  expect(screen.getByLabelText('Collector 토큰')).toHaveValue('');
+});
+
 test('saves changed settings and closes without starting WSS', async () => {
   await edit();
   expect(screen.getByText('연결 대기')).toBeVisible();
@@ -110,6 +175,7 @@ test('a failed save keeps the dialog open and never starts WSS', async () => {
   expect(screen.getByRole('dialog')).toBeVisible();
   expect(DefaultService.startConnection).not.toHaveBeenCalled();
 });
+// AntD 폼을 두 번 열고 실패·재시도까지 검증하므로 병렬 전체 실행 시 렌더링 여유를 둔다.
 test('saved WSS settings can be connected separately and retried without saving again', async () => {
   await edit();
   fireEvent.click(screen.getByRole('button', { name: '인스턴스 dev 저장' }));
@@ -123,4 +189,4 @@ test('saved WSS settings can be connected separately and retried without saving 
   expect(await screen.findByText('연결 시도 중')).toBeVisible();
   expect(DefaultService.startConnection).toHaveBeenCalledTimes(2);
   expect(updateInstance).toHaveBeenCalledTimes(1);
-});
+}, 40_000);

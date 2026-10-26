@@ -44,6 +44,9 @@ test('normal collection list includes a server with API failure and excludes a c
     '/projects/alpha/instances/api-failed',
   );
   expect(screen.queryByRole('link', { name: '수집 중단 서버' })).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('table', { name: '서버 수집 현황' }).closest('.ant-pro-table'),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '전체 서버 보기' }));
   expect(await screen.findByRole('link', { name: '수집 중단 서버' })).toBeVisible();
 });

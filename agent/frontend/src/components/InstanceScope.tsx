@@ -2,18 +2,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { getInstances } from '../api';
-import { FormSelect, FormSelectOption } from './ui';
+import { Form, Select } from 'antd';
 
 export default function InstanceScope({
   project,
   instance,
   onChange,
   defaultFirst = false,
+  allowAll = true,
 }: {
   project: string;
   instance: string;
   onChange: (value: string) => void;
   defaultFirst?: boolean;
+  allowAll?: boolean;
 }) {
   const query = useQuery({
     queryKey: ['instances', project],
@@ -27,38 +29,46 @@ export default function InstanceScope({
     }
   }, [defaultFirst, query.data, instance, project]);
   return (
-    <div className="instance-scope">
-      <FormSelect
+    <Form.Item
+      className="instance-scope"
+      layout="vertical"
+      label="인스턴스"
+      htmlFor="instance-scope-select"
+      style={{ marginBottom: 0 }}
+    >
+      <Select
+        id="instance-scope-select"
         aria-label="인스턴스 선택"
-        searchLabel="인스턴스 검색"
+        showSearch
+        filterOption={(input, option) =>
+          `${option?.label ?? ''} ${option?.value ?? ''} ${option && 'searchText' in option ? option.searchText : ''}`
+            .toLowerCase()
+            .includes(input.toLowerCase())
+        }
         value={instance}
-        isDisabled={!project || query.isPending || query.isError}
-        onChange={(_, value) => onChange(value)}
-      >
-        <FormSelectOption
-          value=""
-          label={
-            !project
+        disabled={!project || query.isPending || query.isError}
+        onChange={onChange}
+        options={[
+          {
+            value: '',
+            label: !project
               ? '프로젝트를 먼저 선택하세요'
               : query.isError
                 ? '인스턴스를 불러오지 못했습니다'
                 : query.isPending
                   ? '불러오는 중…'
-                  : defaultFirst
+                  : defaultFirst || !allowAll
                     ? '인스턴스 선택'
-                    : '전체 인스턴스'
-          }
-          isDisabled={defaultFirst}
-        />
-        {items.map((item) => (
-          <FormSelectOption
-            key={item.instance_id}
-            value={item.instance_id}
-            label={item.display_name}
-            searchText={`${item.instance_id} ${item.environment ?? ''} ${item.host_name ?? ''}`}
-          />
-        ))}
-      </FormSelect>
-    </div>
+                    : '전체 인스턴스',
+            disabled: defaultFirst,
+          },
+          ...items.map((item) => ({
+            value: item.instance_id,
+            label: item.display_name,
+            searchText: `${item.environment ?? ''} ${item.host_name ?? ''}`,
+          })),
+        ]}
+      />
+    </Form.Item>
   );
 }

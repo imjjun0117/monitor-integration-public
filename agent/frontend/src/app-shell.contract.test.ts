@@ -4,16 +4,17 @@ const { readFileSync } = await vi.importActual<{
   readFileSync(path: string, encoding: string): string;
 }>('node:fs');
 const cwd = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
-const styles = readFileSync(`${cwd}/src/app.css`, 'utf8');
+const source = (file: string) => readFileSync(`${cwd}/src/${file.replace(/^\.\//, '')}`, 'utf8');
 
-test('the canvas background and viewport height contract covers every full-page shell layer', () => {
-  for (const selector of ['html', 'body', '#root', '.app-shell', '.workspace', 'main']) {
-    const rule = styles.split('\n').find((line) => line.startsWith(`${selector} {`)) ?? '';
-    expect(rule, `${selector} must cover the document canvas`).toMatch(
-      /min-height:\s*(?:100%|100vh)/,
-    );
-    expect(rule, `${selector} must paint the document canvas`).toContain(
-      'background: var(--hm-canvas)',
-    );
-  }
+test('responsive layout uses Ant Design shell rather than repainting the document canvas', () => {
+  const appStyles = source('./app.css');
+  const layoutStyles = source('./pro-layout.css');
+  const app = source('./App.tsx');
+
+  expect(app).toContain('<ProLayout');
+  expect(appStyles).not.toMatch(/(?:html|body|#root|\.workspace)\s*\{[^}]*background:/);
+  expect(layoutStyles).toMatch(
+    /\.monitor-pro-layout \.ant-pro-layout-content\s*\{[^}]*min-width:\s*0/,
+  );
+  expect(layoutStyles).toMatch(/@media \(max-width: 600px\)/);
 });

@@ -1,9 +1,9 @@
 // 상태 코드에 맞는 이름과 색상 표시
-import { Label } from './ui';
+import { Tag } from 'antd';
 import type { Status } from '../generated';
 
 export const statusLabels = { UP: '정상', WARN: '경고', DOWN: '장애', UNKNOWN: '미수집' } as const;
-const colors = { UP: 'green', WARN: 'orange', DOWN: 'red', UNKNOWN: 'grey' } as const;
+const colors = { UP: 'green', WARN: 'orange', DOWN: 'red', UNKNOWN: 'default' } as const;
 
 export default function StatusLabel({
   status,
@@ -21,5 +21,5 @@ export default function StatusLabel({
         : context === 'check'
           ? { UP: '정상', WARN: '점검 경고', DOWN: '점검 실패', UNKNOWN: '결과 미확인' }
           : statusLabels;
-  return <Label color={colors[value]}>{text[value]}</Label>;
+  return <Tag color={value === 'UP' ? 'default' : colors[value]}>{text[value]}</Tag>;
 }

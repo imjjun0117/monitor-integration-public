@@ -6,11 +6,15 @@ if (!token || Buffer.byteLength(token, 'utf8') < 32) {
   throw new Error('HERMES_E2E_AGENT_TOKEN must be at least 32 UTF-8 bytes');
 }
 
+const basePort = Number(process.env.HERMES_E2E_AGENT_BASE_PORT ?? 18181);
+if (!Number.isInteger(basePort) || basePort < 1 || basePort > 65532) {
+  throw new Error('HERMES_E2E_AGENT_BASE_PORT must allow four TCP ports');
+}
 const agents = [
-  { port: 18081, projectId: 'sample-a', instanceId: 'local-01' },
-  { port: 18082, projectId: 'sample-a', instanceId: 'local-02' },
-  { port: 18083, projectId: 'sample-b', instanceId: 'local-01' },
-  { port: 18084, projectId: 'sample-b', instanceId: 'local-02' },
+  { port: basePort, projectId: 'sample-a', instanceId: 'local-01' },
+  { port: basePort + 1, projectId: 'sample-a', instanceId: 'local-02' },
+  { port: basePort + 2, projectId: 'sample-b', instanceId: 'local-01' },
+  { port: basePort + 3, projectId: 'sample-b', instanceId: 'local-02' },
 ];
 const servers = [];
 

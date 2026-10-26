@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getLogs, readLog, saveLog, type LogSource, type LogWrite } from '../api';
 import { usePermissions } from './PermissionContext';
-import { Alert, Button, FormSelect, FormSelectOption, TextInput } from './ui';
+import { ProDescriptions, ProForm, ProTable, type ProColumns } from '@ant-design/pro-components';
+import { Alert, Button, Checkbox, Form, Input, Modal, Select, Space } from 'antd';
 import { Empty, Failure, Loading } from './QueryState';
-import { BooleanSelect, LabeledField, NumberInput, SettingsDialog } from '../pages/settings/forms';
 
 const messages: Record<string, string> = {
   LOG_DISABLED: '미사용으로 설정된 로그입니다.',
@@ -62,8 +62,38 @@ export default function LogPanel({
   const [selected, setSelected] = useState<number>();
   const [editing, setEditing] = useState<LogSource | 'new'>();
   const source = query.data?.find((log) => log.log_id === selected);
+  const columns: ProColumns<LogSource>[] = [
+    {
+      title: '로그 이름',
+      dataIndex: 'name',
+      render: (_, log) => (
+        <Button
+          type={selected === log.log_id ? 'primary' : 'default'}
+          disabled={!log.enabled}
+          onClick={() => setSelected(log.log_id)}
+        >
+          {log.name}
+        </Button>
+      ),
+    },
+    { title: '파일 경로', dataIndex: 'path', render: (_, log) => <code>{log.path}</code> },
+    {
+      title: '대상 상태',
+      dataIndex: 'enabled',
+      renderText: (enabled) => (enabled ? '사용' : '미사용'),
+    },
+    {
+      title: '작업',
+      valueType: 'option',
+      render: (_, log) => (
+        <Button type="link" onClick={() => setEditing(log)}>
+          설정
+        </Button>
+      ),
+    },
+  ];
   if (!permissions.canWrite) {
-    return <Alert variant="info" title="로그 조회는 관리자와 담당 운영자에게만 허용됩니다." />;
+    return <Alert type="info" title="로그 조회는 관리자와 담당 운영자에게만 허용됩니다." />;
   }
   if (query.isPending) {
     return <Loading />;
@@ -75,33 +105,23 @@ export default function LogPanel({
     <div className="log-panel">
       <div className="log-source-heading">
         <h2>서버 로그</h2>
-        <Button permission="write" onClick={() => setEditing('new')}>
+        <Button type="primary" onClick={() => setEditing('new')}>
           로그 등록
         </Button>
       </div>
       {!query.data?.length ? (
         <Empty />
       ) : (
-        <div className="log-source-list">
-          {query.data.map((log) => (
-            <div className="log-source" key={log.log_id}>
-              <Button
-                variant={selected === log.log_id ? 'primary' : 'secondary'}
-                isDisabled={!log.enabled}
-                onClick={() => setSelected(log.log_id)}
-              >
-                {log.name}
-              </Button>
-              <span className="log-file-path" title={log.path}>
-                {log.path}
-              </span>
-              <span>{log.enabled ? '사용' : '미사용'}</span>
-              <Button permission="write" variant="link" onClick={() => setEditing(log)}>
-                설정
-              </Button>
-            </div>
-          ))}
-        </div>
+        <ProTable<LogSource>
+          aria-label="로그 소스 목록"
+          rowKey="log_id"
+          columns={columns}
+          dataSource={query.data}
+          search={false}
+          options={false}
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+        />
       )}
       {source && (
         <LogViewer
@@ -264,21 +284,26 @@ function LogViewer({
   }, [text, autoScroll]);
   return (
     <section className="log-viewer" aria-label={`${source.name} 로그`}>
+      <ProDescriptions
+        column={1}
+        bordered
+        dataSource={{
+          path: source.path,
+          encoding: source.encoding,
+          interval: `${source.poll_interval_seconds}초`,
+        }}
+        columns={[
+          { title: '서버 로그 경로', dataIndex: 'path' },
+          { title: '인코딩', dataIndex: 'encoding' },
+          { title: '조회 주기', dataIndex: 'interval' },
+        ]}
+      />
       <div className="log-toolbar">
         <h3>{source.name}</h3>
-        <label>
-          <input
-            type="checkbox"
-            checked={autoScroll}
-            onChange={(event) => setAutoScroll(event.target.checked)}
-          />{' '}
+        <Checkbox checked={autoScroll} onChange={(event) => setAutoScroll(event.target.checked)}>
           자동 스크롤
-        </label>
-        <Button
-          variant="secondary"
-          isDisabled={!source.enabled}
-          onClick={() => setPlaying((value) => !value)}
-        >
+        </Checkbox>
+        <Button disabled={!source.enabled} onClick={() => setPlaying((value) => !value)}>
           {playing ? '일시정지' : '조회 시작'}
         </Button>
         <span aria-live="polite">
@@ -304,8 +329,8 @@ function LogViewer({
           '조회 시작을 누르면 새로 추가되는 내용을 가져옵니다.'
         )}
       </div>
-      {error && <Alert variant="danger" title={error} />}
-      {notice && <Alert variant="info" title={notice} />}
+      {error && <Alert type="error" title={error} />}
+      {notice && <Alert type="info" title={notice} />}
       <pre ref={output} className="log-output" tabIndex={0} aria-label="로그 원문">
         {text || (busy ? '로그를 읽고 있습니다.' : '표시할 로그가 없습니다.')}
       </pre>
@@ -344,74 +369,101 @@ function LogSettings({
     value.pollIntervalSeconds >= 5 &&
     value.pollIntervalSeconds <= 1800;
   return (
-    <SettingsDialog
-      id="log-settings"
+    <Modal
+      open
       title={source ? '로그 설정' : '로그 등록'}
-      isOpen
-      isPending={mutation.isPending}
-      submitLabel="저장"
-      onClose={onClose}
-      onSubmit={() => mutation.mutate()}
-      failed={mutation.isError}
-      error={mutation.error}
-      submitDisabled={!valid}
+      onCancel={onClose}
+      closable={false}
+      mask={{ closable: false }}
+      footer={null}
     >
-      <LabeledField id="log-name" label="로그 이름">
-        <TextInput
-          id="log-name"
-          value={value.name}
-          maxLength={120}
-          required
-          onChange={(_, name) => setValue((current) => ({ ...current, name }))}
-        />
-      </LabeledField>
-      <LabeledField
-        id="log-path"
-        label="파일 경로"
-        help="대상 서버의 절대 경로를 입력하세요. 날짜별 로그는 catalina.{yyyy-MM-dd}.log 형식으로 등록하면 날짜가 바뀔 때 새 파일을 읽습니다. Collector에서 허용한 폴더만 읽습니다."
+      <ProForm
+        id="log-settings-form"
+        layout="vertical"
+        submitter={false}
+        onFinish={async () => {
+          if (valid) mutation.mutate();
+          return false;
+        }}
       >
-        <TextInput
-          id="log-path"
-          value={value.path}
-          maxLength={1000}
-          required
-          placeholder="/usr/local/tomcat/logs/catalina.out"
-          onChange={(_, path) => setValue((current) => ({ ...current, path }))}
-        />
-      </LabeledField>
-      <LabeledField id="log-encoding" label="파일 인코딩">
-        <FormSelect
-          id="log-encoding"
-          value={value.encoding}
-          onChange={(_, encoding) =>
-            setValue((current) => ({ ...current, encoding: encoding as LogWrite['encoding'] }))
-          }
+        <Form.Item label="로그 이름" htmlFor="log-name">
+          <Input
+            id="log-name"
+            value={value.name}
+            maxLength={120}
+            required
+            onChange={(event) => setValue((current) => ({ ...current, name: event.target.value }))}
+          />
+        </Form.Item>
+        <Form.Item
+          label="파일 경로"
+          htmlFor="log-path"
+          extra="대상 서버의 절대 경로를 입력하세요. 날짜별 로그는 catalina.{yyyy-MM-dd}.log 형식으로 등록하면 날짜가 바뀔 때 새 파일을 읽습니다. Collector에서 허용한 폴더만 읽습니다."
         >
-          {['UTF-8', 'MS949', 'EUC-KR'].map((encoding) => (
-            <FormSelectOption key={encoding} value={encoding} label={encoding} />
-          ))}
-        </FormSelect>
-      </LabeledField>
-      <BooleanSelect
-        id="log-enabled"
-        label="로그 조회"
-        trueLabel="사용"
-        falseLabel="미사용"
-        value={value.enabled}
-        help="미사용이면 수동·자동 조회 모두 중지합니다. 사용해도 로그 화면을 열었을 때만 요청합니다."
-        onChange={(enabled) => setValue((current) => ({ ...current, enabled }))}
-      />
-      <NumberInput
-        id="log-interval"
-        label="조회 주기(초)"
-        min={5}
-        max={1800}
-        value={value.pollIntervalSeconds}
-        help="5~1,800초. 파일 전체 대신 새로 추가된 내용만 가져옵니다."
-        onChange={(pollIntervalSeconds) =>
-          setValue((current) => ({ ...current, pollIntervalSeconds }))
-        }
-      />
-    </SettingsDialog>
+          <Input
+            id="log-path"
+            value={value.path}
+            maxLength={1000}
+            required
+            placeholder="/usr/local/tomcat/logs/catalina.out"
+            onChange={(event) => setValue((current) => ({ ...current, path: event.target.value }))}
+          />
+        </Form.Item>
+        <Form.Item label="파일 인코딩" htmlFor="log-encoding">
+          <Select
+            id="log-encoding"
+            value={value.encoding}
+            onChange={(encoding) =>
+              setValue((current) => ({ ...current, encoding: encoding as LogWrite['encoding'] }))
+            }
+            options={['UTF-8', 'MS949', 'EUC-KR'].map((encoding) => ({
+              value: encoding,
+              label: encoding,
+            }))}
+          />
+        </Form.Item>
+        <Form.Item
+          label="로그 조회"
+          htmlFor="log-enabled"
+          extra="미사용이면 수동·자동 조회 모두 중지합니다. 사용해도 로그 화면을 열었을 때만 요청합니다."
+        >
+          <Select
+            id="log-enabled"
+            value={value.enabled}
+            onChange={(enabled) => setValue((current) => ({ ...current, enabled }))}
+            options={[
+              { value: true, label: '사용' },
+              { value: false, label: '미사용' },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item
+          label="조회 주기(초)"
+          htmlFor="log-interval"
+          extra="5~1,800초. 파일 전체 대신 새로 추가된 내용만 가져옵니다."
+        >
+          <Input
+            id="log-interval"
+            type="number"
+            min={5}
+            max={1800}
+            value={value.pollIntervalSeconds}
+            onChange={(event) =>
+              setValue((current) => ({
+                ...current,
+                pollIntervalSeconds: Number(event.target.value),
+              }))
+            }
+          />
+        </Form.Item>
+        {mutation.isError && <Alert type="error" title="로그 설정을 저장하지 못했습니다." />}
+        <Space>
+          <Button onClick={onClose}>취소</Button>
+          <Button type="primary" htmlType="submit" loading={mutation.isPending} disabled={!valid}>
+            저장
+          </Button>
+        </Space>
+      </ProForm>
+    </Modal>
   );
 }

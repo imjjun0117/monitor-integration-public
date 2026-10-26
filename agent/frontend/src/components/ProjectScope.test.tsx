@@ -55,3 +55,19 @@ test('project change clears previous instance and survives navigation and remoun
   mount('/logs');
   expect(screen.getByLabelText('현재 범위')).toHaveTextContent('beta|');
 });
+
+test('project picker is a searchable Ant Design Select while preserving its accessible name', async () => {
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={['/logs?project=alpha']}>
+        <ProjectScopeProvider>
+          <Probe />
+        </ProjectScopeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  const picker = await screen.findByRole('combobox', { name: '프로젝트 선택' });
+  expect(screen.getByText('프로젝트', { selector: 'label' })).toBeVisible();
+  expect(picker.closest('.ant-select')).toBeInTheDocument();
+  expect(picker).toHaveAttribute('aria-expanded', 'false');
+});

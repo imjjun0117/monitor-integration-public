@@ -1,3 +1,4 @@
+import { Grid } from 'antd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -70,7 +71,10 @@ beforeEach(() => {
   vi.mocked(getIncident).mockResolvedValue(detail);
   vi.mocked(getIncidentEvidence).mockResolvedValue(evidence);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 function show(write = true, path = '/incidents/1') {
   const client = new QueryClient({
@@ -191,17 +195,39 @@ test('later automatic recovery is detected even after saving an earlier action',
   expect(screen.getByRole('button', { name: '복구 전후' })).toBeVisible();
 });
 
+test('the incident investigation uses accessible AntD tabs and a details card', async () => {
+  show();
+  await screen.findByRole('heading', { name: /배치 지연/ });
+  expect(
+    (await screen.findByRole('tab', { name: '점검 결과' })).closest('.ant-tabs'),
+  ).toBeInTheDocument();
+  expect(screen.getByText('최초 감지').closest('.ant-descriptions')).toBeInTheDocument();
+});
+
 test('list passes the state filter and links each record to its project', async () => {
+  vi.spyOn(Grid, 'useBreakpoint').mockReturnValue({ md: true });
   vi.mocked(getIncidents).mockResolvedValue({ items: [incident], total: 1, page: 0, size: 50 });
   show(false, '/incidents?state=RECOVERED');
+  expect(
+    (await screen.findByRole('table', { name: '장애 관리대장' })).closest('.ant-pro-table'),
+  ).toBeInTheDocument();
   expect(await screen.findByRole('link', { name: /배치 지연/ })).toHaveAttribute(
     'href',
     '/incidents/1?project=p',
   );
   expect(getIncidents).toHaveBeenCalledWith('', 'RECOVERED', 0);
-  expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+  expect(document.querySelector('.ant-pagination-next')).toHaveClass('ant-pagination-disabled');
   fireEvent.click(screen.getByRole('button', { name: '미확인' }));
   await waitFor(() => expect(getIncidents).toHaveBeenLastCalledWith('', 'OPEN', 0));
+});
+
+test('incident pagination keeps server page indexes and displays the current server slice', async () => {
+  vi.mocked(getIncidents).mockResolvedValue({ items: [incident], total: 101, page: 1, size: 50 });
+  show(false, '/incidents?state=ACTIVE&page=1');
+  expect(await screen.findByRole('link', { name: /배치 지연/ })).toBeInTheDocument();
+  expect(getIncidents).toHaveBeenCalledWith('', 'ACTIVE', 1);
+  fireEvent.click(screen.getByTitle('Next Page'));
+  await waitFor(() => expect(getIncidents).toHaveBeenLastCalledWith('', 'ACTIVE', 2));
 });
 
 test('metric incidents focus the affected resource and show other evidence only on selection', async () => {
@@ -243,6 +269,20 @@ test('metric incidents focus the affected resource and show other evidence only 
   fireEvent.click(screen.getByRole('button', { name: '시스템 CPU' }));
   expect(screen.getByRole('img', { name: '시스템 CPU 추이' })).toBeVisible();
   fireEvent.click(screen.getByRole('tab', { name: '보관 로그' }));
-  expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: '시스템 CPU 추이' })).not.toBeInTheDocument();
   expect(screen.getByText('원문 로그 조회 권한이 없습니다.')).toBeVisible();
+});
+
+// 작은 화면에서도 상태·시각·담당자를 생략하지 않고 필터 조건을 서버로 전달
+test('mobile incident list retains metadata and filters through the compact selector', async () => {
+  vi.spyOn(Grid, 'useBreakpoint').mockReturnValue({ md: false });
+  vi.mocked(getIncidents).mockResolvedValue({ items: [incident], total: 1, page: 0, size: 50 });
+  show(false, '/incidents');
+  expect(await screen.findByRole('link', { name: /배치 지연/ })).toBeInTheDocument();
+  expect(screen.getByText('담당자', { exact: false })).toHaveTextContent('미지정');
+  expect(document.querySelector('time')).toHaveAttribute('datetime', incident.opened_at);
+  expect(screen.getAllByRole('columnheader')).toHaveLength(1);
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '장애 상태 필터' }));
+  fireEvent.click(await screen.findByText('확인 완료', { exact: true }));
+  await waitFor(() => expect(getIncidents).toHaveBeenLastCalledWith('', 'ACKNOWLEDGED', 0));
 });

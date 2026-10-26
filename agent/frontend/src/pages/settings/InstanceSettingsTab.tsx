@@ -1,18 +1,6 @@
 // 인스턴스 연결 정보와 수집 주기 관리 화면
-import {
-  Alert,
-  Button,
-  FormSelect,
-  FormSelectOption,
-  Label,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalVariant,
-  TextInput,
-} from '../../components/ui';
-import { Table, Tbody, Td, Th, Thead, Tr } from '../../components/ui';
+import { ProTable, type ProColumns } from '@ant-design/pro-components';
+import { Alert, Button, Input, Modal, Select, Space, Tag } from 'antd';
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { Instance, InstanceUpdate, InstanceWrite } from '../../generated';
@@ -30,7 +18,6 @@ import {
   MutationError,
   NumberInput,
   QueryContent,
-  ReadonlyValue,
   SecretInput,
   SettingsDialog,
 } from './forms';
@@ -41,12 +28,14 @@ import {
   identifier,
   validateInstance,
 } from './validation';
+import { usePermissions } from '../../components/PermissionContext';
 import TransportPanel from '../../components/TransportPanel';
 import { DefaultService, TransportMode } from '../../generated';
 import { useProjectScope } from '../../components/ProjectScope';
 
 export default function InstanceSettingsTab() {
   const { project: scopedProject } = useProjectScope();
+  const { canWrite, isAdmin } = usePermissions();
   const [projectId, setProjectId] = useState(scopedProject);
   const [value, setValue] = useState<InstanceWrite>(emptyInstance());
   const [validation, setValidation] = useState<string>();
@@ -76,6 +65,7 @@ export default function InstanceSettingsTab() {
   );
 
   function openCreate() {
+    create.reset();
     setValue(emptyInstance());
     setValidation(undefined);
     setCreating(true);
@@ -93,40 +83,33 @@ export default function InstanceSettingsTab() {
 
   return (
     <>
-      <div className="settings-toolbar">
+      <Space wrap role="group" aria-label="인스턴스 등록 작업">
         <LabeledField id="instance-project-id" label="소속 프로젝트">
-          <FormSelect
+          <Select
             id="instance-project-id"
             aria-label="소속 프로젝트"
-            value={projectId}
-            onChange={(_, next) => setProjectId(next)}
-            isDisabled={projects.isPending || projects.isError}
-          >
-            <FormSelectOption
-              value=""
-              label={
-                projects.isPending
-                  ? '프로젝트 불러오는 중…'
-                  : projects.isError
-                    ? '프로젝트를 불러오지 못했습니다'
-                    : enabledProjects.length === 0
-                      ? '사용 가능한 프로젝트가 없습니다'
-                      : '프로젝트 선택'
-              }
-            />
-            {enabledProjects.map((project) => (
-              <FormSelectOption
-                key={project.project_id}
-                value={project.project_id}
-                label={`${project.display_name} (${project.project_id})`}
-              />
-            ))}
-          </FormSelect>
+            value={projectId || undefined}
+            onChange={setProjectId}
+            disabled={projects.isPending || projects.isError}
+            placeholder={
+              projects.isPending
+                ? '프로젝트 불러오는 중…'
+                : projects.isError
+                  ? '프로젝트를 불러오지 못했습니다'
+                  : enabledProjects.length === 0
+                    ? '사용 가능한 프로젝트가 없습니다'
+                    : '프로젝트 선택'
+            }
+            options={enabledProjects.map((project) => ({
+              value: project.project_id,
+              label: `${project.display_name} (${project.project_id})`,
+            }))}
+          />
         </LabeledField>
-        <Button onClick={openCreate} isDisabled={!projectId}>
+        <Button type="primary" onClick={openCreate} disabled={!projectId || !canWrite}>
           등록
         </Button>
-      </div>
+      </Space>
       <SettingsDialog
         id="create-instance"
         title="인스턴스 등록"
@@ -141,31 +124,31 @@ export default function InstanceSettingsTab() {
         error={create.error}
       >
         <LabeledField id="instance-id" label="인스턴스 ID" help="예: live-01">
-          <TextInput
+          <Input
             id="instance-id"
             aria-label="인스턴스 ID"
             value={value.instanceId}
-            onChange={(_, instanceId) => setValue({ ...value, instanceId })}
+            onChange={(event) => setValue({ ...value, instanceId: event.target.value })}
             minLength={2}
             maxLength={64}
             required
           />
         </LabeledField>
         <LabeledField id="instance-display-name" label="표시명" help="앞뒤 공백 없이 1~120자">
-          <TextInput
+          <Input
             id="instance-display-name"
             aria-label="인스턴스 표시명"
             value={value.displayName}
-            onChange={(_, displayName) => setValue({ ...value, displayName })}
+            onChange={(event) => setValue({ ...value, displayName: event.target.value })}
             required
           />
         </LabeledField>
         <LabeledField id="instance-environment" label="환경" help="예: production, 최대 40자">
-          <TextInput
+          <Input
             id="instance-environment"
             aria-label="인스턴스 환경"
             value={value.environment ?? ''}
-            onChange={(_, environment) => setValue({ ...value, environment })}
+            onChange={(event) => setValue({ ...value, environment: event.target.value })}
           />
         </LabeledField>
         <LabeledField
@@ -173,11 +156,11 @@ export default function InstanceSettingsTab() {
           label="Collector Base URL"
           help="예: https://agent.example.com, 최대 500자"
         >
-          <TextInput
+          <Input
             id="instance-agent-url"
             aria-label="Collector Base URL"
             value={value.agentBaseUrl}
-            onChange={(_, agentBaseUrl) => setValue({ ...value, agentBaseUrl })}
+            onChange={(event) => setValue({ ...value, agentBaseUrl: event.target.value })}
             required
           />
         </LabeledField>
@@ -218,31 +201,53 @@ export default function InstanceSettingsTab() {
         />
       </SettingsDialog>
       <QueryContent query={query} empty={(query.data?.items.length ?? 0) === 0}>
-        <div className="settings-table-scroll">
-          <Table
-            className="settings-table settings-instance-table"
-            variant="compact"
-            aria-label="인스턴스 설정"
-          >
-            <Thead>
-              <Tr>
-                <Th>인스턴스</Th>
-                <Th>표시명</Th>
-                <Th>환경</Th>
-                <Th>Collector Base URL</Th>
-                <Th>폴링 간격(초)</Th>
-                <Th>API 자동 점검</Th>
-                <Th>수집 상태</Th>
-                <Th>작업</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {query.data?.items.map((instance) => (
-                <InstanceRow key={instance.instance_id} projectId={projectId} instance={instance} />
-              ))}
-            </Tbody>
-          </Table>
-        </div>
+        <ProTable<Instance>
+          aria-label="인스턴스 설정"
+          rowKey="instance_id"
+          dataSource={query.data?.items ?? []}
+          columns={
+            [
+              { title: '인스턴스', dataIndex: 'instance_id' },
+              { title: '표시명', dataIndex: 'display_name' },
+              { title: '환경', render: (_, item) => item.environment || '—' },
+              { title: 'Collector Base URL', render: (_, item) => item.agent_base_url || '—' },
+              { title: '폴링 간격(초)', render: (_, item) => item.poll_interval_seconds ?? '—' },
+              {
+                title: 'API 자동 점검',
+                render: (_, item) => (
+                  <Tag color={item.api_checks_enabled ? 'green' : 'default'}>
+                    {item.api_checks_enabled ? '사용' : '사용 안 함'}
+                  </Tag>
+                ),
+              },
+              {
+                title: '수집 상태',
+                render: (_, item) => (
+                  <Tag color={item.enabled ? 'green' : 'default'}>
+                    {item.enabled ? '사용' : '중지'}
+                  </Tag>
+                ),
+              },
+              {
+                title: '작업',
+                valueType: 'option',
+                render: (_, item) => (
+                  <InstanceRow
+                    key={item.instance_id}
+                    projectId={projectId}
+                    instance={item}
+                    canWrite={canWrite}
+                    isAdmin={isAdmin}
+                  />
+                ),
+              },
+            ] as ProColumns<Instance>[]
+          }
+          search={false}
+          options={false}
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+        />
       </QueryContent>
     </>
   );
@@ -261,7 +266,17 @@ function currentDraft(instance: Instance): InstanceUpdate {
   };
 }
 
-function InstanceRow({ projectId, instance }: { projectId: string; instance: Instance }) {
+function InstanceRow({
+  projectId,
+  instance,
+  canWrite,
+  isAdmin,
+}: {
+  projectId: string;
+  instance: Instance;
+  canWrite: boolean;
+  isAdmin: boolean;
+}) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const client = useQueryClient();
@@ -349,267 +364,239 @@ function InstanceRow({ projectId, instance }: { projectId: string; instance: Ins
 
   return (
     <>
-      <Tr>
-        <Td>{instance.instance_id}</Td>
-        <Td>
-          <ReadonlyValue>{instance.display_name}</ReadonlyValue>
-        </Td>
-        <Td>
-          <ReadonlyValue>{instance.environment}</ReadonlyValue>
-        </Td>
-        <Td>
-          <ReadonlyValue>{instance.agent_base_url}</ReadonlyValue>
-        </Td>
-        <Td>
-          <ReadonlyValue>{instance.poll_interval_seconds}</ReadonlyValue>
-        </Td>
-        <Td>
-          <Label color={instance.api_checks_enabled ? 'green' : 'grey'} isCompact>
-            {instance.api_checks_enabled ? '사용' : '사용 안 함'}
-          </Label>
-        </Td>
-        <Td>
-          <Label color={instance.enabled ? 'green' : 'grey'} isCompact>
-            {instance.enabled ? '사용' : '중지'}
-          </Label>
-        </Td>
-        <Td className="settings-instance-actions">
-          <div className="settings-row-actions">
-            <Button
-              variant="secondary"
-              isLoading={connectionTest.isPending}
-              isDisabled={connectionTest.isPending}
-              onClick={() => connectionTest.mutate()}
-            >
-              연결
-            </Button>
-            <Button
-              variant="secondary"
-              aria-label={`인스턴스 ${instance.instance_id} 수정`}
-              onClick={openEdit}
-            >
-              수정
-            </Button>
-            <Button
-              permission="admin"
-              variant="danger"
-              aria-label={`인스턴스 ${instance.instance_id} 삭제`}
-              onClick={() => setConfirmDelete(true)}
-            >
-              삭제
-            </Button>
-          </div>
-          <SettingsDialog
-            id={`edit-instance-${instance.instance_id}`}
-            title="인스턴스 수정"
-            submitLabel="저장"
-            submitAriaLabel={`인스턴스 ${instance.instance_id} 저장`}
-            isOpen={editing}
-            isPending={save.isPending || connectionChanging}
-            submitDisabled={!connection.data || !xlog.data}
-            onClose={() => setEditing(false)}
-            onSubmit={saveCurrent}
-            validation={validation}
-            failed={save.isError}
-            error={save.error}
+      <Space wrap>
+        {canWrite && (
+          <Button
+            loading={connectionTest.isPending}
+            disabled={connectionTest.isPending}
+            onClick={() => connectionTest.mutate()}
           >
-            <LabeledField id={`instance-${instance.instance_id}-id`} label="인스턴스 ID">
-              <TextInput
-                id={`instance-${instance.instance_id}-id`}
-                aria-label="인스턴스 ID"
-                value={instance.instance_id}
-                readOnly
-              />
-            </LabeledField>
-            <LabeledField
+            연결
+          </Button>
+        )}
+        {canWrite && (
+          <Button aria-label={`인스턴스 ${instance.instance_id} 수정`} onClick={openEdit}>
+            수정
+          </Button>
+        )}
+        {isAdmin && (
+          <Button
+            danger
+            aria-label={`인스턴스 ${instance.instance_id} 삭제`}
+            onClick={() => setConfirmDelete(true)}
+          >
+            삭제
+          </Button>
+        )}
+        <SettingsDialog
+          id={`edit-instance-${instance.instance_id}`}
+          title="인스턴스 수정"
+          submitLabel="저장"
+          submitAriaLabel={`인스턴스 ${instance.instance_id} 저장`}
+          isOpen={editing}
+          isPending={save.isPending || connectionChanging}
+          submitDisabled={!connection.data || !xlog.data}
+          onClose={() => setEditing(false)}
+          onSubmit={saveCurrent}
+          validation={validation}
+          failed={save.isError}
+          error={save.error}
+        >
+          <LabeledField id={`instance-${instance.instance_id}-id`} label="인스턴스 ID">
+            <Input
+              id={`instance-${instance.instance_id}-id`}
+              aria-label="인스턴스 ID"
+              value={instance.instance_id}
+              readOnly
+            />
+          </LabeledField>
+          <LabeledField
+            id={`instance-${instance.instance_id}-display-name`}
+            label="표시명"
+            help="앞뒤 공백 없이 1~120자"
+          >
+            <Input
               id={`instance-${instance.instance_id}-display-name`}
-              label="표시명"
-              help="앞뒤 공백 없이 1~120자"
-            >
-              <TextInput
-                id={`instance-${instance.instance_id}-display-name`}
-                aria-label={`인스턴스 ${instance.instance_id} 표시명`}
-                value={draft.displayName}
-                onChange={(_, displayName) => setDraft({ ...draft, displayName })}
-              />
-            </LabeledField>
-            <LabeledField
-              id={`instance-${instance.instance_id}-environment`}
-              label="환경"
-              help="최대 40자"
-            >
-              <TextInput
-                id={`instance-${instance.instance_id}-environment`}
-                aria-label={`인스턴스 ${instance.instance_id} 환경`}
-                value={draft.environment ?? ''}
-                onChange={(_, environment) => setDraft({ ...draft, environment })}
-              />
-            </LabeledField>
-            <LabeledField
-              id={`instance-${instance.instance_id}-agent-url`}
-              label="Collector Base URL"
-              help="최대 500자"
-            >
-              <TextInput
-                id={`instance-${instance.instance_id}-agent-url`}
-                aria-label={`인스턴스 ${instance.instance_id} Base URL`}
-                value={draft.agentBaseUrl}
-                onChange={(_, agentBaseUrl) => setDraft({ ...draft, agentBaseUrl })}
-              />
-            </LabeledField>
-            <SecretInput
-              id={`instance-${instance.instance_id}-token`}
-              value={draft.token ?? ''}
-              onChange={(token) => setDraft({ ...draft, token })}
-              label="새 토큰"
-              help="비워 두면 기존 토큰 유지, 변경 시 32 UTF-8 bytes 이상"
-              required={false}
+              aria-label={`인스턴스 ${instance.instance_id} 표시명`}
+              value={draft.displayName}
+              onChange={(event) => setDraft({ ...draft, displayName: event.target.value })}
             />
-            <LabeledField
-              id={`instance-${instance.instance_id}-collection-mode`}
-              label="수집 방식"
-              help="웹소켓 연결은 설정 저장 후 별도로 시작합니다."
-            >
-              <FormSelect
-                id={`instance-${instance.instance_id}-collection-mode`}
-                aria-label="수집 방식"
-                value={collectionMode ?? connection.data?.mode ?? 'HTTP'}
-                isDisabled={!connection.data || save.isPending || connectionChanging}
-                onChange={(_, mode) => setCollectionMode(mode as TransportMode.mode)}
-              >
-                <FormSelectOption value="HTTP" label="HTTP 조회" />
-                <FormSelectOption value="WSS" label="웹소켓 연결" />
-              </FormSelect>
-            </LabeledField>
-            {editing && selectedMode === 'WSS' && (
-              <div className="field">
-                <span className="field-label">웹소켓 연결</span>
-                {connection.data?.mode === 'WSS' ? (
-                  <TransportPanel
-                    projectId={projectId}
-                    instanceId={instance.instance_id}
-                    compact
-                    isDisabled={save.isPending || collectionChanged}
-                  />
-                ) : (
-                  <span role="status">연결 대기</span>
-                )}
-                <span className="field-help">
-                  {collectionChanged
-                    ? '변경 내용을 저장한 뒤 수정 창을 다시 열어 연결을 시작하세요.'
-                    : '연결 시작·종료는 즉시 적용됩니다.'}
-                </span>
-              </div>
-            )}
-            <LabeledField
-              id={`instance-${instance.instance_id}-xlog`}
-              label="XLog 수집"
-              help="프로젝트 공통 설정으로, 같은 프로젝트의 연결된 웹소켓 인스턴스 전체에 적용됩니다."
-            >
-              <FormSelect
-                id={`instance-${instance.instance_id}-xlog`}
-                aria-label="XLog 수집"
-                value={(xlogEnabled ?? xlog.data?.enabled) ? 'on' : 'off'}
-                isDisabled={!xlog.data || save.isPending}
-                onChange={(_, value) => setXlogEnabled(value === 'on')}
-              >
-                <FormSelectOption value="off" label="사용 안 함" />
-                <FormSelectOption value="on" label="사용" />
-              </FormSelect>
-            </LabeledField>
-            {(connection.isError || xlog.isError) && (
-              <p role="alert">수집 설정을 불러오지 못했습니다. 창을 다시 열어 시도하세요.</p>
-            )}
-            <NumberInput
-              id={`instance-${instance.instance_id}-poll-interval`}
-              label="폴링 간격(초)"
-              ariaLabel={`인스턴스 ${instance.instance_id} 폴링 간격`}
-              help="15초 이상"
-              min={15}
-              max={MAX_POLL_INTERVAL_SECONDS}
-              value={draft.pollIntervalSeconds}
-              onChange={(pollIntervalSeconds) => setDraft({ ...draft, pollIntervalSeconds })}
-            />
-            <BooleanSelect
-              id={`instance-${instance.instance_id}-api-checks`}
-              label="API 자동 점검"
-              ariaLabel={`인스턴스 ${instance.instance_id} API 자동 점검`}
-              value={draft.apiChecksEnabled}
-              falseLabel="사용 안 함"
-              trueLabel="사용"
-              falseFirst
-              help="이 인스턴스의 API 자동 실행을 허용합니다. 각 API의 사용 여부와 주기는 API 모니터링에서 설정합니다."
-              onChange={(apiChecksEnabled) => setDraft({ ...draft, apiChecksEnabled })}
-            />
-            <BooleanSelect
-              id={`instance-${instance.instance_id}-enabled`}
-              label="수집 상태"
-              ariaLabel={`인스턴스 ${instance.instance_id} 수집 상태`}
-              value={draft.enabled}
-              trueLabel="사용"
-              falseLabel="중지"
-              help="중지하면 폴링을 멈추지만 기존 수집 데이터는 유지합니다."
-              onChange={(enabled) => setDraft({ ...draft, enabled })}
-            />
-            {save.isError && (
-              <p role="alert">
-                일부 항목은 이미 저장됐을 수 있습니다. 값을 확인한 뒤 다시 저장하세요.
-              </p>
-            )}
-          </SettingsDialog>
-          <Modal
-            variant={ModalVariant.small}
-            aria-labelledby={`delete-instance-${instance.instance_id}`}
-            isOpen={confirmDelete}
-            onClose={() => {
-              if (!permanentDelete.isPending) {
-                setConfirmDelete(false);
-              }
-            }}
+          </LabeledField>
+          <LabeledField
+            id={`instance-${instance.instance_id}-environment`}
+            label="환경"
+            help="최대 40자"
           >
-            <ModalHeader
-              title={`인스턴스 ${instance.instance_id} 영구 삭제`}
-              labelId={`delete-instance-${instance.instance_id}`}
+            <Input
+              id={`instance-${instance.instance_id}-environment`}
+              aria-label={`인스턴스 ${instance.instance_id} 환경`}
+              value={draft.environment ?? ''}
+              onChange={(event) => setDraft({ ...draft, environment: event.target.value })}
             />
-            <ModalBody>
-              이 인스턴스의 모든 기록과 설정이 삭제되며 복구할 수 없습니다.
-              <MutationError failed={permanentDelete.isError} error={permanentDelete.error} />
-            </ModalBody>
-            <ModalFooter>
-              <Button
-                permission="admin"
-                variant="danger"
-                aria-label={`인스턴스 ${instance.instance_id} 영구 삭제 확인`}
-                isLoading={permanentDelete.isPending}
-                isDisabled={permanentDelete.isPending}
-                onClick={() => permanentDelete.mutate(undefined)}
-              >
-                삭제
-              </Button>
-              <Button
-                variant="link"
-                isDisabled={permanentDelete.isPending}
-                onClick={() => setConfirmDelete(false)}
-              >
+          </LabeledField>
+          <LabeledField
+            id={`instance-${instance.instance_id}-agent-url`}
+            label="Collector Base URL"
+            help="최대 500자"
+          >
+            <Input
+              id={`instance-${instance.instance_id}-agent-url`}
+              aria-label={`인스턴스 ${instance.instance_id} Base URL`}
+              value={draft.agentBaseUrl}
+              onChange={(event) => setDraft({ ...draft, agentBaseUrl: event.target.value })}
+            />
+          </LabeledField>
+          <SecretInput
+            id={`instance-${instance.instance_id}-token`}
+            value={draft.token ?? ''}
+            onChange={(token) => setDraft({ ...draft, token })}
+            label="새 토큰"
+            help="비워 두면 기존 토큰 유지, 변경 시 32 UTF-8 bytes 이상"
+            required={false}
+          />
+          <LabeledField
+            id={`instance-${instance.instance_id}-collection-mode`}
+            label="수집 방식"
+            help="웹소켓 연결은 설정 저장 후 별도로 시작합니다."
+          >
+            <Select
+              id={`instance-${instance.instance_id}-collection-mode`}
+              aria-label="수집 방식"
+              value={collectionMode ?? connection.data?.mode ?? 'HTTP'}
+              disabled={!connection.data || save.isPending || connectionChanging}
+              onChange={(mode) => setCollectionMode(mode as TransportMode.mode)}
+              options={[
+                { value: 'HTTP', label: 'HTTP 조회' },
+                { value: 'WSS', label: '웹소켓 연결' },
+              ]}
+            />
+          </LabeledField>
+          {editing && selectedMode === 'WSS' && (
+            <div>
+              <span>웹소켓 연결</span>
+              {connection.data?.mode === 'WSS' ? (
+                <TransportPanel
+                  projectId={projectId}
+                  instanceId={instance.instance_id}
+                  compact
+                  isDisabled={save.isPending || collectionChanged}
+                />
+              ) : (
+                <span role="status">연결 대기</span>
+              )}
+              <span className="field-help">
+                {collectionChanged
+                  ? '변경 내용을 저장한 뒤 수정 창을 다시 열어 연결을 시작하세요.'
+                  : '연결 시작·종료는 즉시 적용됩니다.'}
+              </span>
+            </div>
+          )}
+          <LabeledField
+            id={`instance-${instance.instance_id}-xlog`}
+            label="XLog 수집"
+            help="프로젝트 공통 설정으로, 같은 프로젝트의 연결된 웹소켓 인스턴스 전체에 적용됩니다."
+          >
+            <Select
+              id={`instance-${instance.instance_id}-xlog`}
+              aria-label="XLog 수집"
+              value={(xlogEnabled ?? xlog.data?.enabled) ? 'on' : 'off'}
+              disabled={!xlog.data || save.isPending}
+              onChange={(value) => setXlogEnabled(value === 'on')}
+              options={[
+                { value: 'off', label: '사용 안 함' },
+                { value: 'on', label: '사용' },
+              ]}
+            />
+          </LabeledField>
+          {(connection.isError || xlog.isError) && (
+            <p role="alert">수집 설정을 불러오지 못했습니다. 창을 다시 열어 시도하세요.</p>
+          )}
+          <NumberInput
+            id={`instance-${instance.instance_id}-poll-interval`}
+            label="폴링 간격(초)"
+            ariaLabel={`인스턴스 ${instance.instance_id} 폴링 간격`}
+            help="15초 이상"
+            min={15}
+            max={MAX_POLL_INTERVAL_SECONDS}
+            value={draft.pollIntervalSeconds}
+            onChange={(pollIntervalSeconds) => setDraft({ ...draft, pollIntervalSeconds })}
+          />
+          <BooleanSelect
+            id={`instance-${instance.instance_id}-api-checks`}
+            label="API 자동 점검"
+            ariaLabel={`인스턴스 ${instance.instance_id} API 자동 점검`}
+            value={draft.apiChecksEnabled}
+            falseLabel="사용 안 함"
+            trueLabel="사용"
+            falseFirst
+            help="이 인스턴스의 API 자동 실행을 허용합니다. 각 API의 사용 여부와 주기는 API 모니터링에서 설정합니다."
+            onChange={(apiChecksEnabled) => setDraft({ ...draft, apiChecksEnabled })}
+          />
+          <BooleanSelect
+            id={`instance-${instance.instance_id}-enabled`}
+            label="수집 상태"
+            ariaLabel={`인스턴스 ${instance.instance_id} 수집 상태`}
+            value={draft.enabled}
+            trueLabel="사용"
+            falseLabel="중지"
+            help="중지하면 폴링을 멈추지만 기존 수집 데이터는 유지합니다."
+            onChange={(enabled) => setDraft({ ...draft, enabled })}
+          />
+          {save.isError && (
+            <p role="alert">
+              일부 항목은 이미 저장됐을 수 있습니다. 값을 확인한 뒤 다시 저장하세요.
+            </p>
+          )}
+        </SettingsDialog>
+        <Modal
+          title={`인스턴스 ${instance.instance_id} 영구 삭제`}
+          open={confirmDelete}
+          destroyOnHidden
+          transitionName=""
+          maskTransitionName=""
+          mask={{ closable: false }}
+          closable={false}
+          keyboard={!permanentDelete.isPending}
+          onCancel={() => {
+            if (!permanentDelete.isPending) {
+              setConfirmDelete(false);
+            }
+          }}
+          footer={
+            <Space>
+              <Button disabled={permanentDelete.isPending} onClick={() => setConfirmDelete(false)}>
                 취소
               </Button>
-            </ModalFooter>
-          </Modal>
-        </Td>
-      </Tr>
-      {!connectionTest.isPending && (connectionTest.data || connectionTest.error) && (
-        <Tr className="settings-connection-row">
-          <Td colSpan={8}>
-            {connectionError ? (
-              <Alert isInline variant="danger" title={`${instance.instance_id} · 연결 테스트 실패`}>
-                <p>{connectionError}</p>
-              </Alert>
-            ) : (
-              <Alert isInline variant="success" title="연결 테스트에 성공했습니다." />
-            )}
-          </Td>
-        </Tr>
-      )}
+              {isAdmin && (
+                <Button
+                  danger
+                  type="primary"
+                  aria-label={`인스턴스 ${instance.instance_id} 영구 삭제 확인`}
+                  loading={permanentDelete.isPending}
+                  disabled={permanentDelete.isPending}
+                  onClick={() => permanentDelete.mutate(undefined)}
+                >
+                  영구 삭제
+                </Button>
+              )}
+            </Space>
+          }
+        >
+          <p>이 인스턴스의 모든 기록과 설정이 삭제되며 복구할 수 없습니다.</p>
+          <MutationError failed={permanentDelete.isError} error={permanentDelete.error} />
+        </Modal>
+      </Space>
+      {!connectionTest.isPending &&
+        (connectionTest.data || connectionTest.error) &&
+        (connectionError ? (
+          <Alert
+            type="error"
+            title={`${instance.instance_id} · 연결 테스트 실패`}
+            description={connectionError}
+          />
+        ) : (
+          <Alert type="success" title="연결 테스트에 성공했습니다." />
+        ))}
     </>
   );
 }

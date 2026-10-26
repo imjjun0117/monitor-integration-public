@@ -1,17 +1,6 @@
 // 설정 화면의 입력·오류·등록 창 공통 구성
 import { usePermissions } from '../../components/PermissionContext';
-import {
-  Alert,
-  Button,
-  FormSelect,
-  FormSelectOption,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalVariant,
-  TextInput,
-} from '../../components/ui';
+import { Alert, Button, Form, Input, InputNumber, Modal, Select, Space } from 'antd';
 import { cloneElement, isValidElement, useEffect, useState } from 'react';
 import type { FormEvent, ReactElement, ReactNode } from 'react';
 import { Empty, Failure, Loading } from '../../components/QueryState';
@@ -35,17 +24,9 @@ export function LabeledField({
         })
       : children;
   return (
-    <div className="field">
-      <label className="field-label" htmlFor={id}>
-        {label}
-      </label>
+    <Form.Item label={label} htmlFor={id} extra={help && <span id={helpId}>{help}</span>}>
       {control}
-      {help && (
-        <span id={helpId} className="field-help">
-          {help}
-        </span>
-      )}
-    </div>
+    </Form.Item>
   );
 }
 
@@ -72,13 +53,13 @@ export function BooleanSelect({
 }) {
   return (
     <LabeledField id={id} label={label} help={help}>
-      <FormSelect
+      <Select
         id={id}
         aria-label={ariaLabel}
+        aria-describedby={help ? `${id}-help` : undefined}
         value={String(value)}
-        onChange={(_, next) => onChange(next === 'true')}
-      >
-        {(falseFirst
+        onChange={(next) => onChange(next === 'true')}
+        options={(falseFirst
           ? [
               [false, falseLabel],
               [true, trueLabel],
@@ -87,14 +68,11 @@ export function BooleanSelect({
               [true, trueLabel],
               [false, falseLabel],
             ]
-        ).map(([optionValue, optionLabel]) => (
-          <FormSelectOption
-            key={String(optionValue)}
-            value={String(optionValue)}
-            label={String(optionLabel)}
-          />
-        ))}
-      </FormSelect>
+        ).map(([optionValue, optionLabel]) => ({
+          value: String(optionValue),
+          label: String(optionLabel),
+        }))}
+      />
     </LabeledField>
   );
 }
@@ -116,13 +94,13 @@ export function SecretInput({
 }) {
   return (
     <LabeledField id={id} label={label} help={help}>
-      <TextInput
+      <Input
         id={id}
         aria-label={label}
         type="password"
         autoComplete="new-password"
         value={value}
-        onChange={(_, next) => onChange(next)}
+        onChange={(event) => onChange(event.target.value)}
         required={required}
       />
     </LabeledField>
@@ -150,18 +128,16 @@ export function NumberInput({
   step?: number;
   ariaLabel?: string;
 }) {
-  const [text, changeText] = useNumericText(value, onChange);
   return (
     <LabeledField id={id} label={label} help={help}>
-      <TextInput
+      <InputNumber
         id={id}
         aria-label={ariaLabel}
-        type="number"
-        value={text}
+        value={Number.isFinite(value) ? value : null}
         min={min}
         max={max}
         step={step}
-        onChange={(_, next) => changeText(next)}
+        onChange={(next) => onChange(next ?? Number.NaN)}
       />
     </LabeledField>
   );
@@ -183,13 +159,13 @@ export function DecimalInput({
   const [text, changeText] = useNumericText(value, onChange);
   return (
     <LabeledField id={id} label={label}>
-      <TextInput
+      <Input
         id={id}
         aria-label={ariaLabel}
         type="text"
         inputMode="decimal"
         value={text}
-        onChange={(_, next) => changeText(next)}
+        onChange={(event) => changeText(event.target.value)}
       />
     </LabeledField>
   );
@@ -263,7 +239,7 @@ export function MutationError({ failed, error }: { failed: boolean; error?: unkn
   const code = (error as { body?: { code?: string } } | undefined)?.body?.code;
   return (
     <Alert
-      variant="danger"
+      type="error"
       title={
         code
           ? (MUTATION_MESSAGES[code] ??
@@ -275,7 +251,7 @@ export function MutationError({ failed, error }: { failed: boolean; error?: unkn
 }
 
 export function ValidationAlert({ message }: { message?: string }) {
-  return message ? <Alert variant="danger" title={message} /> : null;
+  return message ? <Alert type="error" title={message} /> : null;
 }
 
 export function submit(event: FormEvent, action: () => void) {
@@ -319,52 +295,54 @@ export function SettingsDialog({
   }
   return (
     <Modal
-      variant={ModalVariant.medium}
-      className={`settings-dialog${id.startsWith('role-') ? ' settings-dialog-compact' : ''}`}
-      closeOnOutside={false}
-      aria-labelledby={id}
-      isOpen
-      onClose={() => {
+      title={title}
+      open
+      destroyOnHidden
+      transitionName=""
+      maskTransitionName=""
+      mask={{ closable: false }}
+      closable={false}
+      keyboard={!isPending}
+      onCancel={() => {
         if (!isPending) {
           onClose();
         }
       }}
+      footer={
+        <Space>
+          <Button disabled={isPending} onClick={onClose}>
+            취소
+          </Button>
+          {canWrite && (
+            <Button
+              type={submitLabel === '삭제' ? 'default' : 'primary'}
+              danger={submitLabel === '삭제'}
+              htmlType="submit"
+              form={`${id}-form`}
+              aria-label={submitAriaLabel}
+              loading={isPending}
+              disabled={isPending || submitDisabled}
+            >
+              {submitLabel}
+            </Button>
+          )}
+        </Space>
+      }
     >
-      <ModalHeader title={title} labelId={id} />
-      <ModalBody>
-        <form
-          id={`${id}-form`}
-          className="settings-form"
-          onSubmit={(event) =>
-            submit(event, () => {
-              if (canWrite) {
-                onSubmit();
-              }
-            })
-          }
-        >
-          {children}
-        </form>
-        <ValidationAlert message={validation} />
-        <MutationError failed={failed} error={error} />
-      </ModalBody>
-      <ModalFooter>
-        <Button variant="secondary" size="sm" isDisabled={isPending} onClick={onClose}>
-          취소
-        </Button>
-        <Button
-          size="sm"
-          variant={submitLabel === '삭제' ? 'danger' : 'primary'}
-          permission="write"
-          type="submit"
-          form={`${id}-form`}
-          aria-label={submitAriaLabel}
-          isLoading={isPending}
-          isDisabled={isPending || submitDisabled}
-        >
-          {submitLabel}
-        </Button>
-      </ModalFooter>
+      <form
+        id={`${id}-form`}
+        onSubmit={(event) =>
+          submit(event, () => {
+            if (canWrite) {
+              onSubmit();
+            }
+          })
+        }
+      >
+        {children}
+      </form>
+      <ValidationAlert message={validation} />
+      <MutationError failed={failed} error={error} />
     </Modal>
   );
 }

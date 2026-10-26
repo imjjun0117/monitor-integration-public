@@ -39,6 +39,12 @@ function show() {
 test('revoking read also revokes write and saves the complete role grant set', async () => {
   show();
   fireEvent.click(await screen.findByRole('checkbox', { name: 'api 조회' }));
+  expect(
+    screen.getByRole('table', { name: '역할별 메뉴 권한' }).closest('.ant-table-content'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('checkbox', { name: 'api 조회' }).closest('.ant-checkbox'),
+  ).toBeInTheDocument();
   expect(screen.getByRole('checkbox', { name: 'api 변경' })).not.toBeChecked();
   fireEvent.click(screen.getByRole('button', { name: '권한 저장' }));
   await waitFor(() => expect(DefaultService.updatePermissions).toHaveBeenCalledOnce());

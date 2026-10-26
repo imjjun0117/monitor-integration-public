@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 import { Check, Status, ServiceMetric, type ServiceInfo } from '../generated';
 import type { ApiCheck } from '../api';
@@ -50,7 +50,10 @@ test('renders another provider without check ID or project-specific branches', (
     />,
   );
   expect(screen.getByRole('heading', { name: '다른 문자 업체' })).toBeVisible();
-  expect(screen.getByText('정보 정상')).toBeVisible();
+  expect(screen.getByRole('region', { name: /서비스 정보 · 다른 문자 업체/ })).toHaveClass(
+    'ant-card',
+  );
+  expect(screen.getByText('정보 정상')).toHaveClass('ant-tag');
   expect(screen.getByText('잔여 건수').closest('div')).toHaveTextContent('37건');
   expect(screen.getByText('실제 잔액').closest('div')).toHaveTextContent('0건');
   expect(screen.getByText('different-project / prod')).toBeVisible();
@@ -87,7 +90,7 @@ test('information thresholds are distinct from API connectivity and retain unuse
   view.rerender(<ServiceInfoCard check={{ ...check, monitoring_enabled: false }} />);
   expect(screen.getByText('미사용 · 마지막 기록')).toBeVisible();
 });
-test('extra metrics can be expanded and server strings are rendered as inert text', () => {
+test('extra metrics can be expanded and server strings are rendered as inert text', async () => {
   render(
     <ServiceInfoCard
       check={{
@@ -107,9 +110,11 @@ test('extra metrics can be expanded and server strings are rendered as inert tex
     />,
   );
   fireEvent.click(screen.getByText('추가 항목 1개 보기'));
-  expect(screen.getByText('<script>bad()</script>')).toBeVisible();
+  await waitFor(() => expect(screen.getByText('<script>bad()</script>')).toBeVisible());
   expect(document.querySelector('script')).toBeNull();
   expect(
-    within(screen.getByText('추가 항목 1개 보기').closest('details')!).getByText('담당 서비스'),
+    within(screen.getByText('추가 항목 1개 보기').closest('.ant-collapse')!).getByText(
+      '담당 서비스',
+    ),
   ).toBeVisible();
 });

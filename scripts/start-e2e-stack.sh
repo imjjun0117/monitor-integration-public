@@ -5,10 +5,36 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 run_dir="$root/.run/e2e"
 compose_project="hermes-monitor-e2e-$$"
-db_port=55432
+db_port=${HERMES_E2E_DB_PORT:-55432}
+center_port=${HERMES_E2E_CENTER_PORT:-18180}
+bootstrap_port=${HERMES_E2E_BOOTSTRAP_PORT:-18179}
+agent_base_port=${HERMES_E2E_AGENT_BASE_PORT:-18181}
+tls_port=${HERMES_E2E_TLS_PORT:-18443}
+tls_failure_port=${HERMES_E2E_TLS_FAILURE_PORT:-18444}
 center_pid=""
 tls_pid=""
 agent_pid=""
+# 점유 포트에 접속하거나 기존 서비스를 재사용하지 않고, 테스트 리소스 생성 전에 중단
+python3 - "$db_port" "$center_port" "$bootstrap_port" "$agent_base_port" "$tls_port" "$tls_failure_port" <<'PY'
+import socket
+import sys
+
+try:
+    db, center, bootstrap, agent, tls, tls_failure = map(int, sys.argv[1:])
+    ports = [db, center, bootstrap, *range(agent, agent + 4), tls, tls_failure]
+    if len(set(ports)) != len(ports) or any(port < 1 or port > 65535 for port in ports):
+        raise ValueError('ports must be unique and in TCP range')
+    for port in ports:
+        for family, host in [(socket.AF_INET, '127.0.0.1'), (socket.AF_INET6, '::1')]:
+            with socket.socket(family, socket.SOCK_STREAM) as probe:
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                try:
+                    probe.bind((host, port))
+                except OSError as error:
+                    raise OSError(f'{host}:{port}: {error.strerror}') from error
+except (OSError, ValueError) as error:
+    sys.exit(f'E2E port preflight failed: {error}')
+PY
 mkdir -p "$run_dir"
 
 cleanup() {
@@ -74,13 +100,13 @@ openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
 "${HERMES_E2E_JAVA_HOME}/bin/keytool" -importcert -noprompt -alias e2e-localhost \
   -file "$run_dir/e2e-localhost.crt" -keystore "$run_dir/e2e-truststore.p12" \
   -storetype PKCS12 -storepass "$truststore_password" >/dev/null 2>&1
-openssl s_server -quiet -www -accept 18443 -cert "$run_dir/e2e-localhost.crt" \
+openssl s_server -quiet -www -accept "$tls_port" -cert "$run_dir/e2e-localhost.crt" \
   -key "$run_dir/e2e-localhost.key" >"$run_dir/tls-server.log" 2>&1 &
 tls_pid=$!
 tls_ready=false
 for _ in {1..30}; do
   if curl --fail --silent --show-error --max-time 2 --cacert "$run_dir/e2e-localhost.crt" \
-    https://localhost:18443/ >/dev/null 2>&1; then
+    "https://localhost:$tls_port/" >/dev/null 2>&1; then
     tls_ready=true
     break
   fi
@@ -107,12 +133,13 @@ admin_hash=$(htpasswd -bnBC 10 '' "$admin_password" | tr -d ':\n')
 export HERMES_DB_PASSWORD="$db_password"
 export HERMES_DB_PORT="$db_port"
 export HERMES_SAMPLE_AGENT_TOKEN="$agent_token"
-HERMES_E2E_AGENT_TOKEN="$agent_token" node "$root/scripts/e2e-lightweight-agents.mjs" \
+HERMES_E2E_AGENT_TOKEN="$agent_token" HERMES_E2E_AGENT_BASE_PORT="$agent_base_port" \
+  node "$root/scripts/e2e-lightweight-agents.mjs" \
   >"$run_dir/lightweight-agents.log" 2>&1 &
 agent_pid=$!
 docker compose -p "$compose_project" up -d postgres >/dev/null
 
-for port in 18081 18082 18083 18084; do
+for port in $(seq "$agent_base_port" "$((agent_base_port + 3))"); do
   ready=false
   for _ in {1..60}; do
     if curl --fail --silent --show-error --max-time 2 \
@@ -148,6 +175,7 @@ start_center() {
   HERMES_AGENT_ALLOWED_CIDRS="127.0.0.1/32" \
   HERMES_SAMPLE_FIXTURES_ENABLED=true \
   HERMES_SAMPLE_AGENT_TOKEN="$agent_token" \
+  HERMES_E2E_AGENT_BASE_PORT="$agent_base_port" \
   SPRING_PROFILES_ACTIVE=e2e \
     "$java_bin" -Djavax.net.ssl.trustStore="$run_dir/e2e-truststore.p12" \
     -Djavax.net.ssl.trustStorePassword="$truststore_password" \
@@ -192,8 +220,8 @@ database_counts_ready() {
      "$check_latest" -ge 8 && "$check_history" -ge 8 ]]
 }
 
-start_center 18079
-wait_for_health 18079
+start_center "$bootstrap_port"
+wait_for_health "$bootstrap_port"
 for _ in {1..90}; do
   database_counts_ready && break
   sleep 1
@@ -211,8 +239,8 @@ printf 'database_counts_before_restart latest=%s metric=%s disk_latest=%s disk_h
 kill "$center_pid"
 wait "$center_pid" || true
 center_pid=""
-start_center 18080
-wait_for_health 18080
+start_center "$center_port"
+wait_for_health "$center_port"
 if ! database_counts_ready; then
   echo "persisted monitoring rows were not recovered after restart" >&2
   exit 1

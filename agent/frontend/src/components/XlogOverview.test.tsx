@@ -52,8 +52,14 @@ test('overview uses central records, preserves scope links and opens a selected 
     'href',
     '/xlog?project=sample&instance=prod&errorsOnly=true',
   );
+  expect(
+    screen.getByRole('table', { name: 'XLog 요청 목록' }).closest('.ant-pro-table'),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'GET /sample' }));
-  expect(await screen.findByRole('dialog', { name: '요청 정보' })).toHaveTextContent('123 ms');
+  const detail = await screen.findByRole('dialog', { name: '요청 정보' });
+  expect(detail.closest('.ant-modal')).toBeInTheDocument();
+  expect(detail.querySelector('.ant-pro-descriptions')).toBeInTheDocument();
+  expect(detail).toHaveTextContent('123 ms');
 });
 
 test('disabled overview hides empty XLog without starting any collector command', async () => {

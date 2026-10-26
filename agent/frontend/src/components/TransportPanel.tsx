@@ -1,8 +1,9 @@
 // 상세 화면의 수동 연결 제어
+import { Alert, Button, Card, Space, Tag, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { DefaultService } from '../generated';
-import { Button, Label } from './ui';
 import { Link } from 'react-router-dom';
+import { DefaultService } from '../generated';
+import { usePermissions } from './PermissionContext';
 
 export default function TransportPanel({
   projectId,
@@ -16,6 +17,7 @@ export default function TransportPanel({
   isDisabled?: boolean;
 }) {
   const client = useQueryClient();
+  const { canWrite } = usePermissions();
   const args = { projectId, instanceId };
   const state = useQuery({
     queryKey: ['connection', projectId, instanceId],
@@ -62,25 +64,25 @@ export default function TransportPanel({
   };
   const connected = ['CONNECTED', 'CONNECTING'].includes(state.data.state);
   return (
-    <section
-      className={compact ? 'transport-panel transport-panel-compact' : 'transport-panel'}
+    <Card
+      role="region"
       aria-label="Collector 연결 상태"
+      size={compact ? 'small' : 'medium'}
+      title={compact ? undefined : state.data.mode === 'WSS' ? '웹소켓 수집' : 'HTTP 수집'}
     >
-      <div className="transport-controls">
-        {!compact && <strong>{state.data.mode === 'WSS' ? '웹소켓 수집' : 'HTTP 수집'}</strong>}
+      <Space wrap>
         <span role="status">
-          <Label color={state.data.state === 'CONNECTED' ? 'green' : 'grey'}>
+          <Tag color={state.data.state === 'CONNECTED' ? 'green' : 'default'}>
             {state.data.mode === 'WSS'
               ? (labels[state.data.state] ?? state.data.state)
               : 'HTTP 조회'}
-          </Label>
+          </Tag>
         </span>
-        {state.data.mode === 'WSS' && (
+        {state.data.mode === 'WSS' && canWrite && (
           <Button
-            permission="write"
-            variant={connected ? 'secondary' : 'primary'}
-            isLoading={change.isPending}
-            isDisabled={isDisabled || change.isPending}
+            type={connected ? 'default' : 'primary'}
+            loading={change.isPending}
+            disabled={isDisabled || change.isPending}
             onClick={() => change.mutate(connected ? 'stop' : 'start')}
           >
             {connected ? '연결 종료' : '연결 시작'}
@@ -91,19 +93,29 @@ export default function TransportPanel({
             인스턴스 설정 →
           </Link>
         )}
-      </div>
+      </Space>
       {state.data.mode === 'WSS' && (
-        <p className="field-help">연결이 끊어지면 연결 시작으로 다시 연결하세요.</p>
+        <Typography.Paragraph type="secondary">
+          연결이 끊어지면 연결 시작으로 다시 연결하세요.
+        </Typography.Paragraph>
       )}
       {(state.data.dropped ?? 0) > 0 && (
-        <p role="status">전송 대기열 초과로 제외된 요청: {state.data.dropped}건</p>
+        <Alert
+          type="warning"
+          showIcon
+          message={`전송 대기열 초과로 제외된 요청: ${state.data.dropped}건`}
+        />
       )}
       {state.data.reason && reasons[state.data.reason] && (
-        <p role="status">{reasons[state.data.reason]}</p>
+        <Alert type="warning" showIcon message={reasons[state.data.reason]} />
       )}
       {change.isError && (
-        <p role="alert">연결 요청에 실패했습니다. Collector 설정과 접속 가능 여부를 확인하세요.</p>
+        <Alert
+          type="error"
+          showIcon
+          message="연결 요청에 실패했습니다. Collector 설정과 접속 가능 여부를 확인하세요."
+        />
       )}
-    </section>
+    </Card>
   );
 }

@@ -1,6 +1,6 @@
 # SM 통합 모니터링
 
-여러 Java 웹 프로젝트의 상태를 한 화면에서 보는 로컬 MVP입니다. Agent는 Java 21/Spring Boot/PostgreSQL, 화면은 React/TailAdmin 기반 Tailwind CSS와 ECharts, Collector는 Java 7 바이트코드를 목표로 합니다.
+여러 Java 웹 프로젝트의 상태를 한 화면에서 보는 로컬 MVP입니다. Agent는 Java 21/Spring Boot/PostgreSQL, 화면은 React/Ant Design·ProComponents와 ECharts, Collector는 Java 7 바이트코드를 목표로 합니다.
 
 기존 Java 웹 애플리케이션에 Collector를 넣는 방법은 [SDK 적용 가이드](docs/agent-integration.md)를 확인하십시오. Maven/로컬 JAR 설치, Spring MVC endpoint, 인증, 사용자 정의 점검과 DB pool metric 예제를 한 곳에서 설명합니다.
 
@@ -19,7 +19,7 @@ Windows PowerShell 7에서 다음을 실행합니다.
 
 Collector 접속 허용 IP와 도메인은 [`config/agent-allowlist.json`](config/agent-allowlist.json)에서 관리합니다. 목록 변경은 재시작 없이 다음 연결 요청부터 반영됩니다. 파일 형식과 경로 설정은 [운영 가이드](docs/operations.md#agent-연결-allowlist)를 확인하세요.
 
-로그인은 제품 전용 한국어 화면이며 인증 뒤 8개 상위 메뉴(종합 현황, 장애 관리, 프로젝트, API 모니터링, XLog, 실시간 로그, 인증서 관리, 설정)를 제공합니다. 1440px/1024px에서 전체 운영 기능을 사용할 수 있고, 768px 미만 모바일은 안전한 조회 중심 모드입니다. 디자인 규범은 [`DESIGN.md`](DESIGN.md), 공개 Codeit Design System 근거와 자산 재사용 금지는 [`docs/design-reference.md`](docs/design-reference.md), 상세 화면·상태 기준은 [`docs/dashboard-redesign-spec.md`](docs/dashboard-redesign-spec.md)를 확인하십시오.
+로그인은 제품 전용 한국어 화면이며 인증 뒤 8개 상위 메뉴(종합 현황, 장애 관리, 프로젝트, API 모니터링, XLog, 실시간 로그, 인증서 관리, 설정)를 제공합니다. 1440px/1024px에서 전체 운영 기능을 사용할 수 있고, 768px 미만 모바일은 안전한 조회 중심 모드입니다. 공통 화면은 공식 Ant Design·ProComponents를 사용합니다. 이전 디자인 참고는 [`DESIGN.md`](DESIGN.md), 공개 Codeit Design System 근거와 자산 재사용 금지는 [`docs/design-reference.md`](docs/design-reference.md), 상세 화면·상태 기준은 [`docs/dashboard-redesign-spec.md`](docs/dashboard-redesign-spec.md)를 확인하십시오.
 
 같은 신뢰된 개인 Wi-Fi에서 통합 대시보드만 공유하려면 기존 stack을 종료한 뒤 명시적으로 LAN 모드를 켭니다.
 

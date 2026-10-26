@@ -1,7 +1,7 @@
 // 시간별 자원 및 응답시간 차트 표시
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { RotateCcw } from 'lucide-react';
-import { Button } from './ui';
+import { ReloadOutlined } from '@ant-design/icons';
+import { Button, Card } from 'antd';
 import { useTheme, type Theme } from '../theme';
 import {
   byteUnitFor,
@@ -246,7 +246,7 @@ export default function MetricChart({
       animationEasingUpdate: 'linear' as const,
       backgroundColor: 'transparent',
       color: seriesStyles.map((_, index) => metricSeriesStyle(index, theme).color),
-      textStyle: { fontFamily: 'Outfit Variable, Noto Sans KR Variable, sans-serif', fontSize: 12 },
+      textStyle: { fontFamily: 'sans-serif', fontSize: 12 },
       grid: { left: 4, right: 12, top: showLegend ? 58 : 30, bottom: 8, containLabel: true },
       ...(showLegend
         ? {
@@ -448,33 +448,34 @@ export default function MetricChart({
   const summaryText = summaries.join('; ');
   const accessibleTitle = context ? `${context} · ${title}` : title;
   return (
-    <section className="metric-chart-card" aria-label={`${accessibleTitle} 그래프`}>
-      <div className="metric-chart-heading">
-        <h3 className="metric-chart-title">{title}</h3>
-        <div className="metric-chart-actions">
-          <Button
-            size="sm"
-            variant="plain"
-            aria-label={`${title} 확대 초기화`}
-            title="초기화"
-            onClick={() => {
-              if (liveWindow) {
-                exploredWindow.current = undefined;
-                setFollowing(true);
-                updating.current = latestOptions.current.animation;
-                currentChart.current?.setOption(latestOptions.current, {
-                  replaceMerge: ['series'],
-                });
-              } else {
-                currentChart.current?.dispatchAction({ type: 'dataZoom', start: 0, end: 100 });
-              }
-            }}
-          >
-            <RotateCcw size={15} aria-hidden="true" />
-            초기화
-          </Button>
-        </div>
-      </div>
+    <Card
+      className="metric-chart-card"
+      role="region"
+      aria-label={`${accessibleTitle} 그래프`}
+      title={<h3>{title}</h3>}
+      extra={
+        <Button
+          type="text"
+          aria-label={`${title} 확대 초기화`}
+          title="초기화"
+          icon={<ReloadOutlined />}
+          onClick={() => {
+            if (liveWindow) {
+              exploredWindow.current = undefined;
+              setFollowing(true);
+              updating.current = latestOptions.current.animation;
+              currentChart.current?.setOption(latestOptions.current, {
+                replaceMerge: ['series'],
+              });
+            } else {
+              currentChart.current?.dispatchAction({ type: 'dataZoom', start: 0, end: 100 });
+            }
+          }}
+        >
+          초기화
+        </Button>
+      }
+    >
       {summary}
       <div
         ref={container}
@@ -482,7 +483,12 @@ export default function MetricChart({
         role="img"
         aria-label={`${accessibleTitle}: ${summaryText}`}
       />
-      <div className="metric-chart-statistics">
+      <div
+        className="metric-chart-statistics"
+        role="region"
+        tabIndex={0}
+        aria-label={`${accessibleTitle} 수집 표본 통계 스크롤`}
+      >
         <table aria-label={`${accessibleTitle} 수집 표본 통계`}>
           <caption>조회 기간의 수집 표본 기준 · 확대 시에도 동일</caption>
           <thead>
@@ -525,7 +531,7 @@ export default function MetricChart({
       <p className="metric-chart-summary">
         {title} 텍스트 요약: {summaryText}
       </p>
-    </section>
+    </Card>
   );
 }
 

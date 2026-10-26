@@ -60,6 +60,8 @@ test('shows per-series sample statistics without treating missing or invalid sam
       ]}
     />,
   );
+  expect(screen.getByRole('region', { name: 'CPU 그래프' })).toHaveClass('ant-card');
+  expect(screen.getByRole('button', { name: 'CPU 확대 초기화' })).toHaveClass('ant-btn');
   const table = screen.getByRole('table', { name: 'CPU 수집 표본 통계' });
   const rows = within(table).getAllByRole('row').slice(1);
   expect(

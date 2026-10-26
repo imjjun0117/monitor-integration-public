@@ -1,17 +1,7 @@
 // 인스턴스 자원·점검·로그 조회 화면
 import { chartPeriods, liveWindowMs, type ChartPeriod } from '../utils/chartPeriod';
-import {
-  Button,
-  Label,
-  Alert,
-  FormSelect,
-  FormSelectOption,
-  Tab,
-  Tabs,
-  TabTitleText,
-  Title,
-} from '../components/ui';
-import { Table, Tbody, Td, Th, Thead, Tr } from '../components/ui';
+import { Alert, Button, Card, Select, Space, Tabs, Tag, Typography } from 'antd';
+import { ProDescriptions, ProTable } from '@ant-design/pro-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -59,45 +49,69 @@ export default function InstanceDetailPage() {
     <>
       <PageBackLink to={`/projects/${projectId}`}>{`${projectId} 인스턴스 목록으로`}</PageBackLink>
       <TransportPanel projectId={projectId} instanceId={instanceId} />
-      <Tabs activeKey={current} onSelect={(_, key) => setSearch({ tab: String(key) })}>
-        <Tab eventKey="resources" title={<TabTitleText>JVM·서버 자원</TabTitleText>}>
-          {current === 'resources' && <Resources projectId={projectId} instanceId={instanceId} />}
-        </Tab>
-        <Tab eventKey="thresholds" title={<TabTitleText>임계치 관리</TabTitleText>}>
-          {current === 'thresholds' && (
-            <InstanceThresholdSettings
-              key={`${projectId}/${instanceId}`}
-              projectId={projectId}
-              instanceId={instanceId}
-            />
-          )}
-        </Tab>
-        <Tab eventKey="db-pools" title={<TabTitleText>DB Pool</TabTitleText>}>
-          {current === 'db-pools' && <Pools projectId={projectId} instanceId={instanceId} />}
-        </Tab>
-        <Tab eventKey="internal-checks" title={<TabTitleText>내부 점검</TabTitleText>}>
-          {current === 'internal-checks' && (
-            <Checks projectId={projectId} instanceId={instanceId} />
-          )}
-        </Tab>
-        <Tab eventKey="xlog" title={<TabTitleText>XLog</TabTitleText>}>
-          {current === 'xlog' && (
-            <XlogOverview project={projectId} instance={instanceId} detailed />
-          )}
-        </Tab>
-        {canWrite && (
-          <Tab eventKey="log-history" title={<TabTitleText>저장된 로그</TabTitleText>}>
-            {current === 'log-history' && (
-              <CollectorEvents projectId={projectId} instanceId={instanceId} kind="LOG" />
-            )}
-          </Tab>
-        )}
-        {canWrite && (
-          <Tab eventKey="logs" title={<TabTitleText>실시간 로그</TabTitleText>}>
-            {current === 'logs' && <LogPanel projectId={projectId} instanceId={instanceId} />}
-          </Tab>
-        )}
-      </Tabs>
+      <Tabs
+        activeKey={current}
+        onChange={(key) => setSearch({ tab: key })}
+        items={[
+          {
+            key: 'resources',
+            label: 'JVM·서버 자원',
+            children: current === 'resources' && (
+              <Resources projectId={projectId} instanceId={instanceId} />
+            ),
+          },
+          {
+            key: 'thresholds',
+            label: '임계치 관리',
+            children: current === 'thresholds' && (
+              <InstanceThresholdSettings
+                key={`${projectId}/${instanceId}`}
+                projectId={projectId}
+                instanceId={instanceId}
+              />
+            ),
+          },
+          {
+            key: 'db-pools',
+            label: 'DB Pool',
+            children: current === 'db-pools' && (
+              <Pools projectId={projectId} instanceId={instanceId} />
+            ),
+          },
+          {
+            key: 'internal-checks',
+            label: '내부 점검',
+            children: current === 'internal-checks' && (
+              <Checks projectId={projectId} instanceId={instanceId} />
+            ),
+          },
+          {
+            key: 'xlog',
+            label: 'XLog',
+            children: current === 'xlog' && (
+              <XlogOverview project={projectId} instance={instanceId} detailed />
+            ),
+          },
+          ...(canWrite
+            ? [
+                {
+                  key: 'log-history',
+                  label: '저장된 로그',
+                  children: current === 'log-history' && (
+                    <CollectorEvents projectId={projectId} instanceId={instanceId} kind="LOG" />
+                  ),
+                },
+                {
+                  key: 'logs',
+                  label: '실시간 로그',
+                  children: current === 'logs' && (
+                    <LogPanel projectId={projectId} instanceId={instanceId} />
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
     </>
   );
 }
@@ -130,20 +144,15 @@ function Resources({ projectId, instanceId }: { projectId: string; instanceId: s
   return (
     <div className="resource-detail">
       <Stale visible={data.stale || query.isError} />
-      <div className="period-field field">
-        <label className="field-label" htmlFor="resource-period">
-          조회 기간
-        </label>
-        <FormSelect
+      <div className="period-field">
+        <label htmlFor="resource-period">조회 기간</label>
+        <Select
           id="resource-period"
           aria-label="조회 기간"
           value={period}
-          onChange={(_, value) => setPeriod(value as ChartPeriod)}
-        >
-          {Object.entries(chartPeriods).map(([value, label]) => (
-            <FormSelectOption key={value} value={value} label={label} />
-          ))}
-        </FormSelect>
+          onChange={(value) => setPeriod(value as ChartPeriod)}
+          options={Object.entries(chartPeriods).map(([value, label]) => ({ value, label }))}
+        />
       </div>
       <div className="chart-grid">
         <MetricChart
@@ -225,60 +234,50 @@ function Resources({ projectId, instanceId }: { projectId: string; instanceId: s
           />
         ))}
       </div>
-      <Title headingLevel="h2" className="resource-section-title">
-        디스크 상세
-      </Title>
-      <div className="resource-overflow">
-        <Table variant="compact" aria-label="디스크">
-          <Thead>
-            <Tr>
-              <Th>경로</Th>
-              <Th>사용</Th>
-              <Th>전체</Th>
-              <Th>상태</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
-            {data.disks.map((disk) => (
-              <Tr key={disk.path_id}>
-                <Td>{disk.path_display}</Td>
-                <Td>{formatBytes(disk.used_bytes)}</Td>
-                <Td>{formatBytes(disk.total_bytes)}</Td>
-                <Td>
-                  <StatusLabel status={disk.status} />
-                </Td>
-              </Tr>
-            ))}
-          </Tbody>
-        </Table>
-      </div>
-      <Title headingLevel="h2" className="resource-section-title">
-        JVM 실행 정보
-      </Title>
-      <dl>
-        <dt>PID</dt>
-        <dd>{formatCount(latest.pid)}</dd>
-        <dt>JVM 시작</dt>
-        <dd>
-          {latest.jvm_start_time
-            ? new Date(latest.jvm_start_time).toLocaleString('ko-KR')
-            : '미지원'}
-        </dd>
-        <dt>가동시간</dt>
-        <dd>{formatDuration(latest.uptime_ms)}</dd>
-        <dt>프로세스 CPU</dt>
-        <dd>{formatPercent(latest.process_cpu_ratio)}</dd>
-        <dt>Non-Heap</dt>
-        <dd>{formatBytes(latest.non_heap_used_bytes)}</dd>
-        <dt>Threads Live/Peak</dt>
-        <dd>
-          {formatCount(latest.thread_live_count)} / {formatCount(latest.thread_peak_count)}
-        </dd>
-        <dt>GC Count/Time</dt>
-        <dd>
-          {formatCount(latest.gc_count)} / {formatDuration(latest.gc_time_ms)}
-        </dd>
-      </dl>
+      <Card title="디스크 상세">
+        <ProTable<(typeof data.disks)[number]>
+          aria-label="디스크"
+          rowKey="path_id"
+          columns={[
+            { title: '경로', dataIndex: 'path_display' },
+            { title: '사용', render: (_, disk) => formatBytes(disk.used_bytes) },
+            { title: '전체', render: (_, disk) => formatBytes(disk.total_bytes) },
+            { title: '상태', render: (_, disk) => <StatusLabel status={disk.status} /> },
+          ]}
+          dataSource={data.disks}
+          search={false}
+          options={false}
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+        />
+      </Card>
+      <ProDescriptions
+        title="JVM 실행 정보"
+        column={2}
+        dataSource={latest}
+        columns={[
+          { title: 'PID', render: () => formatCount(latest.pid) },
+          {
+            title: 'JVM 시작',
+            render: () =>
+              latest.jvm_start_time
+                ? new Date(latest.jvm_start_time).toLocaleString('ko-KR')
+                : '미지원',
+          },
+          { title: '가동시간', render: () => formatDuration(latest.uptime_ms) },
+          { title: '프로세스 CPU', render: () => formatPercent(latest.process_cpu_ratio) },
+          { title: 'Non-Heap', render: () => formatBytes(latest.non_heap_used_bytes) },
+          {
+            title: 'Threads Live/Peak',
+            render: () =>
+              `${formatCount(latest.thread_live_count)} / ${formatCount(latest.thread_peak_count)}`,
+          },
+          {
+            title: 'GC Count/Time',
+            render: () => `${formatCount(latest.gc_count)} / ${formatDuration(latest.gc_time_ms)}`,
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -304,55 +303,36 @@ function Pools({ projectId, instanceId }: { projectId: string; instanceId: strin
   return (
     <div className="resource-detail">
       <Stale visible={data.stale || query.isError} />
-      <div className="period-field field">
-        <label className="field-label" htmlFor="pool-period">
-          조회 기간
-        </label>
-        <FormSelect
+      <div className="period-field">
+        <label htmlFor="pool-period">조회 기간</label>
+        <Select
           id="pool-period"
           aria-label="DB Pool 조회 기간"
           value={period}
-          onChange={(_, value) => setPeriod(value as ChartPeriod)}
-        >
-          {Object.entries(chartPeriods).map(([value, label]) => (
-            <FormSelectOption key={value} value={value} label={label} />
-          ))}
-        </FormSelect>
+          onChange={(value) => setPeriod(value as ChartPeriod)}
+          options={Object.entries(chartPeriods).map(([value, label]) => ({ value, label }))}
+        />
       </div>
-      <div className="resource-overflow">
-        <Table variant="compact" aria-label="DB Pool">
-          <Thead>
-            <Tr>
-              <Th>Pool</Th>
-              <Th>Active</Th>
-              <Th>Idle</Th>
-              <Th>Max</Th>
-              <Th>Min Idle</Th>
-              <Th>Waiters</Th>
-              <Th>Max Wait</Th>
-              <Th>검증 지연</Th>
-              <Th>상태</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
-            {data.items.map((pool) => (
-              <Tr key={pool.pool_id}>
-                <Td>{pool.name}</Td>
-                <Td>{formatCount(pool.active)}</Td>
-                <Td>{formatCount(pool.idle)}</Td>
-                <Td>{formatCount(pool.max_size)}</Td>
-                <Td>{formatCount(pool.min_idle)}</Td>
-                <Td>{formatCount(pool.waiters)}</Td>
-                <Td>{formatDuration(pool.max_wait_ms)}</Td>
-                <Td>{formatDuration(pool.validation_latency_ms)}</Td>
-                <Td>
-                  <StatusLabel status={pool.status} />
-                </Td>
-              </Tr>
-            ))}
-          </Tbody>
-        </Table>
-      </div>
+      <ProTable<(typeof data.items)[number]>
+        aria-label="DB Pool"
+        rowKey="pool_id"
+        columns={[
+          { title: 'Pool', dataIndex: 'name' },
+          { title: 'Active', render: (_, pool) => formatCount(pool.active) },
+          { title: 'Idle', render: (_, pool) => formatCount(pool.idle) },
+          { title: 'Max', render: (_, pool) => formatCount(pool.max_size) },
+          { title: 'Min Idle', render: (_, pool) => formatCount(pool.min_idle) },
+          { title: 'Waiters', render: (_, pool) => formatCount(pool.waiters) },
+          { title: 'Max Wait', render: (_, pool) => formatDuration(pool.max_wait_ms) },
+          { title: '검증 지연', render: (_, pool) => formatDuration(pool.validation_latency_ms) },
+          { title: '상태', render: (_, pool) => <StatusLabel status={pool.status} /> },
+        ]}
+        dataSource={data.items}
+        search={false}
+        options={false}
+        pagination={false}
+        scroll={{ x: 'max-content' }}
+      />
       <div className="chart-grid">
         <MetricChart
           key={`pool-active/${period}`}
@@ -398,18 +378,18 @@ function Checks({ projectId, instanceId }: { projectId: string; instanceId: stri
         제외하며, 점검 설정에서 자동 실행 여부와 주기를 정할 수 있습니다.
       </p>
       <div className="internal-check-filter">
-        <LabeledField id="internal-check-usage" label="사용 여부">
-          <FormSelect
-            id="internal-check-usage"
-            aria-label="내부 점검 사용 여부 필터"
-            value={usage}
-            onChange={(_, value) => setUsage(value)}
-          >
-            <FormSelectOption value="" label="전체 점검" />
-            <FormSelectOption value="used" label="사용 점검" />
-            <FormSelectOption value="unused" label="미사용 점검" />
-          </FormSelect>
-        </LabeledField>
+        <label htmlFor="internal-check-usage">사용 여부</label>
+        <Select
+          id="internal-check-usage"
+          aria-label="내부 점검 사용 여부 필터"
+          value={usage}
+          onChange={setUsage}
+          options={[
+            { value: '', label: '전체 점검' },
+            { value: 'used', label: '사용 점검' },
+            { value: 'unused', label: '미사용 점검' },
+          ]}
+        />
       </div>
       {query.isPending ? (
         <Loading />
@@ -418,35 +398,55 @@ function Checks({ projectId, instanceId }: { projectId: string; instanceId: stri
       ) : items.length === 0 ? (
         <Empty />
       ) : (
-        <Table variant="compact" className="internal-check-table" aria-label="내부 점검">
-          <Thead>
-            <Tr>
-              <Th>점검</Th>
-              <Th>현재 상태 / 자동 실행</Th>
-              <Th>응답시간</Th>
-              <Th>최근 점검</Th>
-              <Th>마지막 결과</Th>
-              <Th>관리 / 실행</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
-            {items.map((check) => (
-              <InternalCheckRow
-                key={check.check_id}
-                check={check}
-                projectId={projectId}
-                instanceId={instanceId}
-                refetch={query.refetch}
-              />
-            ))}
-          </Tbody>
-        </Table>
+        <ProTable<ApiCheck>
+          aria-label="내부 점검"
+          rowKey="check_id"
+          columns={[
+            { title: '점검', render: (_, check) => checkName(check) },
+            {
+              title: '현재 상태 / 자동 실행',
+              render: (_, check) => (
+                <Space wrap>
+                  {check.monitoring_enabled === false ? (
+                    <Tag>미사용</Tag>
+                  ) : (
+                    <StatusLabel status={check.status} />
+                  )}
+                  <Typography.Text type="secondary">{scheduleLabel(check)}</Typography.Text>
+                </Space>
+              ),
+            },
+            { title: '응답시간', render: (_, check) => `${metric(check.duration_ms)} ms` },
+            {
+              title: '최근 점검',
+              render: (_, check) =>
+                check.checked_at ? new Date(check.checked_at).toLocaleString() : '미수집',
+            },
+            { title: '마지막 결과', render: (_, check) => checkOutcome(check) },
+            {
+              title: '관리 / 실행',
+              render: (_, check) => (
+                <InternalCheckActions
+                  check={check}
+                  projectId={projectId}
+                  instanceId={instanceId}
+                  refetch={query.refetch}
+                />
+              ),
+            },
+          ]}
+          dataSource={items}
+          search={false}
+          options={false}
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+        />
       )}
     </>
   );
 }
 
-function InternalCheckRow({
+function InternalCheckActions({
   check,
   projectId,
   instanceId,
@@ -457,6 +457,7 @@ function InternalCheckRow({
   instanceId: string;
   refetch: () => Promise<unknown>;
 }) {
+  const { canWrite } = usePermissions();
   const polling = useManualRerunPolling(check.checked_at, refetch);
   const client = useQueryClient();
   const usage = useMutation({
@@ -479,50 +480,33 @@ function InternalCheckRow({
   });
   const name = checkName(check);
   return (
-    <Tr>
-      <Td>{name}</Td>
-      <Td>
-        {check.monitoring_enabled === false ? (
-          <Label color="grey">미사용</Label>
-        ) : (
-          <StatusLabel status={check.status} />
-        )}
-        <small>{scheduleLabel(check)}</small>
-      </Td>
-      <Td>{metric(check.duration_ms)} ms</Td>
-      <Td>{check.checked_at ? new Date(check.checked_at).toLocaleString() : '미수집'}</Td>
-      <Td>{checkOutcome(check)}</Td>
-      <Td>
-        <div className="internal-check-action check-row-actions">
-          <CheckSettingsButton check={check} />
+    <Space wrap>
+      <CheckSettingsButton check={check} />
+      {canWrite && (
+        <>
           <Button
-            permission="write"
-            variant="secondary"
-            size="sm"
             aria-label={`${name} ${check.monitoring_enabled === false ? '사용으로 전환' : '미사용으로 전환'}`}
-            isLoading={usage.isPending}
+            loading={usage.isPending}
+            disabled={usage.isPending}
             onClick={() => usage.mutate()}
           >
             {check.monitoring_enabled === false ? '사용 재개' : '사용 중지'}
           </Button>
           <Button
-            permission="write"
-            variant="secondary"
-            size="sm"
             aria-label={`${name} 즉시 점검`}
-            isLoading={rerun.isPending}
-            isDisabled={polling.isPolling || check.monitoring_enabled === false || usage.isPending}
+            loading={rerun.isPending}
+            disabled={polling.isPolling || check.monitoring_enabled === false || usage.isPending}
             onClick={() => rerun.mutate()}
           >
             지금 점검
           </Button>
-          {usage.isError && <Alert variant="danger" title="사용 여부를 저장하지 못했습니다." />}
-          {polling.isPolling && <span role="status">결과 대기 중 (최대 15초)</span>}
-          {polling.didTimeOut && <span role="status">새 결과가 아직 도착하지 않았습니다.</span>}
-          {rerun.isError && <span role="alert">점검 요청에 실패했습니다.</span>}
-        </div>
-      </Td>
-    </Tr>
+        </>
+      )}
+      {usage.isError && <Alert type="error" message="사용 여부를 저장하지 못했습니다." />}
+      {polling.isPolling && <span role="status">결과 대기 중 (최대 15초)</span>}
+      {polling.didTimeOut && <span role="status">새 결과가 아직 도착하지 않았습니다.</span>}
+      {rerun.isError && <span role="alert">점검 요청에 실패했습니다.</span>}
+    </Space>
   );
 }
 

@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getProjects } from '../api';
-import { FormSelect, FormSelectOption } from './ui';
+import { Select } from 'antd';
 
 const Scope = createContext<{ project: string; select: (project: string) => void } | null>(null);
 export function useProjectScope() {
@@ -69,29 +69,37 @@ export function ProjectSelector() {
   }, [query.data, project, dashboard]);
   return (
     <div className="global-project-selector">
-      <FormSelect
+      <label className="visually-hidden" htmlFor="global-project-select">
+        프로젝트
+      </label>
+      <Select
+        id="global-project-select"
         aria-label="프로젝트 선택"
-        searchLabel="프로젝트 검색"
+        showSearch
+        filterOption={(input, option) =>
+          `${option?.label ?? ''} ${option?.value ?? ''}`
+            .toLowerCase()
+            .includes(input.toLowerCase())
+        }
         value={project}
-        onChange={(_, value) => select(value)}
-        isDisabled={query.isPending}
-      >
-        <FormSelectOption
-          value=""
-          label={
-            query.isError ? '프로젝트 조회 실패' : dashboard ? '프로젝트 선택' : '전체 프로젝트'
-          }
-          isDisabled={dashboard}
-        />
-        {items.map((item) => (
-          <FormSelectOption
-            key={item.project_id}
-            value={item.project_id}
-            label={item.display_name}
-            searchText={item.project_id}
-          />
-        ))}
-      </FormSelect>
+        onChange={select}
+        disabled={query.isPending}
+        options={[
+          {
+            value: '',
+            label: query.isError
+              ? '프로젝트 조회 실패'
+              : dashboard
+                ? '프로젝트 선택'
+                : '전체 프로젝트',
+            disabled: dashboard,
+          },
+          ...items.map((item) => ({
+            value: item.project_id,
+            label: item.display_name,
+          })),
+        ]}
+      />
     </div>
   );
 }

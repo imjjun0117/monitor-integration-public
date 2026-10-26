@@ -1,12 +1,6 @@
-# TailAdmin React components
+# TailAdmin React template (historical chart presentation)
 
-Button, InputField, Badge, Table, Alert, Modal, sidebar, header, dropdown surfaces, tabs and sign-in layout are adapted from [TailAdmin's free React template](https://github.com/TailAdmin/free-react-tailwind-admin-dashboard), commit e888dd1716b9803b535c7c2fa4f2c6b7d39b3da9.
-
-The Hermes palette, controlled form interfaces, accessible native dialogs and keyboard tab navigation are local adaptations. Chart presentation follows TailAdmin's chart cards; ECharts remains the rendering engine.
-
-Select interactions use Radix UI (MIT, Copyright (c) 2022 WorkOS); the installed license is copied to `/assets/radix-ui-LICENSE.txt` during the build. Select popup styling follows TailAdmin's Dropdown / DropdownItem.
-
-Outfit and Noto Sans KR variable fonts are served locally from Fontsource packages under the SIL Open Font License 1.1. Their complete licenses are included at `/assets/fonts/outfit-LICENSE.txt` and `/assets/fonts/noto-sans-kr-LICENSE.txt`. No third-party font service is contacted at runtime.
+Chart-card presentation in this application originated from [TailAdmin's free React template](https://github.com/TailAdmin/free-react-tailwind-admin-dashboard), commit e888dd1716b9803b535c7c2fa4f2c6b7d39b3da9. The legacy TailAdmin controls, forms, headers, dialogs, tables and CSS have been removed; the charts are rendered by ECharts. We retain this notice conservatively for any surviving chart presentation lineage.
 
 MIT License
 
@@ -29,8 +23,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-
-# Shadcn Admin components
-
-Button, input, table and dialog are adapted from satnaing/shadcn-admin, commit e16c87f213a5ba5e45964e9b67c792105ec74d26. MIT license: SHADCN_ADMIN_LICENSE.txt. Authentication and routing remain local.

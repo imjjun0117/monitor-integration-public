@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import type { ApiCheck } from '../api';
 import type { ServiceMetric } from '../generated';
-import { Label } from './ui';
+import { Card, Collapse, Tag, Typography } from 'antd';
 
 export default function ServiceInfoCard({
   check,
@@ -37,35 +37,38 @@ export default function ServiceInfoCard({
           ? '정보 정상'
           : '정보 미확인';
   return (
-    <section
-      className="service-balance-card"
+    <Card
+      role="region"
       aria-label={`서비스 정보 · ${info.title} · ${check.project_name ?? check.project_id} / ${check.instance_name ?? check.instance_id}`}
+      title={<h3>{info.title}</h3>}
+      extra={<Tag color={color === 'grey' ? 'default' : color}>{label}</Tag>}
     >
-      <header>
-        <div>
-          <h3>{info.title}</h3>
-          {showServer && (
-            <p>
-              {check.project_name ?? check.project_id} / {check.instance_name ?? check.instance_id}
-            </p>
-          )}
-        </div>
-        <Label color={color}>{label}</Label>
-      </header>
+      {showServer && (
+        <Typography.Paragraph type="secondary">
+          {check.project_name ?? check.project_id} / {check.instance_name ?? check.instance_id}
+        </Typography.Paragraph>
+      )}
       <dl className="service-info-metrics">
         {info.metrics.slice(0, 4).map((metric) => (
           <Metric key={metric.key} metric={metric} unused={unused} />
         ))}
       </dl>
       {info.metrics.length > 4 && (
-        <details className="service-info-more">
-          <summary>추가 항목 {info.metrics.length - 4}개 보기</summary>
-          <dl className="service-info-metrics">
-            {info.metrics.slice(4).map((metric) => (
-              <Metric key={metric.key} metric={metric} unused={unused} />
-            ))}
-          </dl>
-        </details>
+        <Collapse
+          items={[
+            {
+              key: 'more',
+              label: `추가 항목 ${info.metrics.length - 4}개 보기`,
+              children: (
+                <dl className="service-info-metrics">
+                  {info.metrics.slice(4).map((metric) => (
+                    <Metric key={metric.key} metric={metric} unused={unused} />
+                  ))}
+                </dl>
+              ),
+            },
+          ]}
+        />
       )}
       <p className="service-balance-note">{info.description}</p>
       <p className="service-balance-note">
@@ -81,7 +84,7 @@ export default function ServiceInfoCard({
         </span>
         {action}
       </footer>
-    </section>
+    </Card>
   );
 }
 
@@ -118,7 +121,9 @@ function Metric({ metric, unused }: { metric: ServiceMetric; unused: boolean }) 
           <span className="service-info-unit">{metric.unit}</span>
         )}
       </dd>
-      {color && <Label color={color}>{unused ? '마지막 기록' : label}</Label>}
+      {color && (
+        <Tag color={color === 'grey' ? 'default' : color}>{unused ? '마지막 기록' : label}</Tag>
+      )}
       {(metric.warning != null || metric.critical != null) && (
         <small>
           {metric.warning != null &&

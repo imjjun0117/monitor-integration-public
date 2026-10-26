@@ -1,6 +1,6 @@
 // 설정 메뉴와 관리 화면 구성
 import { usePermissions } from '../components/PermissionContext';
-import { Alert } from '../components/ui';
+import { Alert } from 'antd';
 import UserSettingsTab from './settings/UserSettingsTab';
 import AuditSettingsTab from './settings/AuditSettingsTab';
 import MenuSettingsTab from './settings/MenuSettingsTab';
@@ -27,9 +27,7 @@ export default function SettingsPage() {
       <p id="mobile-settings-note" className="mobile-readonly-notice" role="note">
         모바일에서는 조회만 지원합니다. 설정 변경은 태블릿 또는 데스크톱에서 진행해 주세요.
       </p>
-      {!canWrite && (
-        <Alert variant="info" title="조회 전용 계정입니다. 설정을 변경할 수 없습니다." />
-      )}
+      {!canWrite && <Alert type="info" title="조회 전용 계정입니다. 설정을 변경할 수 없습니다." />}
       <fieldset
         className="settings-content"
         disabled={

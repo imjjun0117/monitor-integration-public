@@ -1,6 +1,8 @@
 // API 요청·응답 증적 및 최근 결과 표시
-import { Alert, Button, Modal, ModalBody, ModalHeader } from '../components/ui';
+import { ProDescriptions } from '@ant-design/pro-components';
+import { Alert, Button, Drawer, Space } from 'antd';
 import type { ApiCheck } from '../api';
+import { usePermissions } from '../components/PermissionContext';
 import MetricChart from '../components/MetricChart';
 import StatusLabel from '../components/StatusLabel';
 import ServiceInfoCard from '../components/ServiceInfoCard';
@@ -52,28 +54,32 @@ export default function ApiCheckDetail({
   const http = check.http;
   const history = (check.history ?? []).filter((point) => point.duration_ms != null);
   const name = checkName(check);
+  const { canWrite } = usePermissions();
   return (
-    <Modal
-      variant="drawer"
-      isOpen
+    <Drawer
+      open
+      title="API 점검 상세"
+      size={720}
       aria-label="API 점검 상세"
-      closeLabel="상세 닫기"
       onClose={close}
+      closable={false}
+      extra={<Button onClick={close}>상세 닫기</Button>}
     >
-      <ModalHeader title={name} />
-      <ModalBody>
+      <div>
+        <h2>{name}</h2>
         <p className="api-purpose">
           {check.service_profile?.description ||
             descriptions[check.check_id] ||
             '설정한 요청의 응답과 정상 판정 기준을 확인합니다.'}
         </p>
         {check.monitoring_enabled === false && (
-          <Alert variant="info" title="미사용 API · 점검 중지">
-            자동·수동 점검과 장애 집계에서 제외되어 있습니다. 아래 내용은 마지막 점검 기록이며,
-            목록에서 사용으로 전환할 수 있습니다.
-          </Alert>
+          <Alert
+            type="info"
+            title="미사용 API · 점검 중지"
+            description="자동·수동 점검과 장애 집계에서 제외되어 있습니다. 아래 내용은 마지막 점검 기록이며, 목록에서 사용으로 전환할 수 있습니다."
+          />
         )}
-        <div className="api-execution-summary">
+        <Space>
           {check.monitoring_enabled === false && <span>마지막 점검 결과</span>}
           <StatusLabel status={check.status} />
           <span>
@@ -81,38 +87,43 @@ export default function ApiCheckDetail({
               ? new Date(check.checked_at).toLocaleString('ko-KR')
               : '실행 기록 없음'}
           </span>
-        </div>
+        </Space>
         <p className="api-outcome">{checkOutcome(check)}</p>
-        <dl>
-          <dt>실행 서버</dt>
-          <dd>{check.instance_name ?? check.instance_id}</dd>
-          <dt>걸린 시간</dt>
-          <dd>
-            {check.duration_ms == null
-              ? '미수집'
-              : `${check.duration_ms.toLocaleString('ko-KR')} ms (${(check.duration_ms / 1000).toFixed(3)}초)`}
-          </dd>
-          <dt>결과 코드</dt>
-          <dd>
-            <code>{check.result_code || check.message || '미수집'}</code>
-          </dd>
-        </dl>
+        <ProDescriptions
+          column={1}
+          bordered
+          dataSource={{
+            server: check.instance_name ?? check.instance_id,
+            duration:
+              check.duration_ms == null
+                ? '미수집'
+                : `${check.duration_ms.toLocaleString('ko-KR')} ms (${(check.duration_ms / 1000).toFixed(3)}초)`,
+            result: check.result_code || check.message || '미수집',
+          }}
+          columns={[
+            { title: '실행 서버', dataIndex: 'server' },
+            { title: '걸린 시간', dataIndex: 'duration' },
+            { title: '결과 코드', dataIndex: 'result', render: (value) => <code>{value}</code> },
+          ]}
+        />
         <div className="api-run-action">
-          <Button
-            permission="write"
-            isLoading={running}
-            isDisabled={waiting || check.monitoring_enabled === false}
-            onClick={run}
-          >
-            지금 테스트 실행
-          </Button>
+          {canWrite && (
+            <Button
+              type="primary"
+              loading={running}
+              disabled={waiting || check.monitoring_enabled === false}
+              onClick={run}
+            >
+              지금 테스트 실행
+            </Button>
+          )}
           <ServiceSettingsButton check={check} />
           <p>이 서버에서 같은 요청을 한 번 더 보내고, 아래 결과를 새로 갱신합니다.</p>
         </div>
-        {waiting && <Alert variant="info" title="테스트 결과를 기다리고 있습니다." />}
+        {waiting && <Alert type="info" title="테스트 결과를 기다리고 있습니다." />}
         {timedOut && (
           <Alert
-            variant="warning"
+            type="warning"
             title="아직 새 결과가 도착하지 않았습니다. 결과는 수집되는 대로 표시됩니다."
           />
         )}
@@ -124,21 +135,22 @@ export default function ApiCheckDetail({
           <>
             <section className="api-evidence-section">
               <h3>보낸 요청</h3>
-              <dl>
-                <dt>요청 방식</dt>
-                <dd>{http.method ?? '미수집'}</dd>
-                <dt>요청 주소</dt>
-                <dd>
-                  <code>{http.url ?? '주소 설정 확인 필요'}</code>
-                </dd>
-                <dt>제한 시간</dt>
-                <dd>
-                  연결 {(http.connect_timeout_ms ?? 0) / 1000}초 · 응답{' '}
-                  {(http.read_timeout_ms ?? 0) / 1000}초
-                </dd>
-                <dt>정상 판정 기준</dt>
-                <dd>{http.expected ?? '미수집'}</dd>
-              </dl>
+              <ProDescriptions
+                column={1}
+                bordered
+                dataSource={{
+                  method: http.method ?? '미수집',
+                  url: http.url ?? '주소 설정 확인 필요',
+                  timeout: `연결 ${(http.connect_timeout_ms ?? 0) / 1000}초 · 응답 ${(http.read_timeout_ms ?? 0) / 1000}초`,
+                  expected: http.expected ?? '미수집',
+                }}
+                columns={[
+                  { title: '요청 방식', dataIndex: 'method' },
+                  { title: '요청 주소', dataIndex: 'url', render: (value) => <code>{value}</code> },
+                  { title: '제한 시간', dataIndex: 'timeout' },
+                  { title: '정상 판정 기준', dataIndex: 'expected' },
+                ]}
+              />
               <JsonBlock title="주소에 붙인 입력값" value={http.request_query} />
               <JsonBlock title="요청 헤더" value={http.request_headers} />
               <BodyBlock
@@ -150,18 +162,22 @@ export default function ApiCheckDetail({
             </section>
             <section className="api-evidence-section">
               <h3>받은 응답</h3>
-              <dl>
-                <dt>HTTP 응답 코드</dt>
-                <dd>
-                  {http.status_code == null ? '응답 코드를 받지 못함' : `HTTP ${http.status_code}`}
-                </dd>
-                <dt>본문 크기</dt>
-                <dd>
-                  {http.response_bytes == null
-                    ? '미수집'
-                    : `${http.response_bytes.toLocaleString('ko-KR')} bytes`}
-                </dd>
-              </dl>
+              <ProDescriptions
+                column={1}
+                bordered
+                dataSource={{
+                  code:
+                    http.status_code == null ? '응답 코드를 받지 못함' : `HTTP ${http.status_code}`,
+                  bytes:
+                    http.response_bytes == null
+                      ? '미수집'
+                      : `${http.response_bytes.toLocaleString('ko-KR')} bytes`,
+                }}
+                columns={[
+                  { title: 'HTTP 응답 코드', dataIndex: 'code' },
+                  { title: '본문 크기', dataIndex: 'bytes' },
+                ]}
+              />
               <JsonBlock title="응답 헤더" value={http.response_headers} />
               <BodyBlock
                 title="응답 본문"
@@ -181,9 +197,11 @@ export default function ApiCheckDetail({
           </>
         ) : (
           !check.details && (
-            <Alert variant="info" title="이 실행에는 요청·응답 상세가 수집되지 않았습니다.">
-              상세 수집 기능이 반영된 Collector에서 테스트를 실행하면 실제 요청과 응답이 표시됩니다.
-            </Alert>
+            <Alert
+              type="info"
+              title="이 실행에는 요청·응답 상세가 수집되지 않았습니다."
+              description="상세 수집 기능이 반영된 Collector에서 테스트를 실행하면 실제 요청과 응답이 표시됩니다."
+            />
           )
         )}
         {history.length >= 2 ? (
@@ -205,8 +223,8 @@ export default function ApiCheckDetail({
             시간 비교 차트는 점검 기록이 2개 이상 쌓이면 표시됩니다.
           </p>
         )}
-      </ModalBody>
-    </Modal>
+      </div>
+    </Drawer>
   );
 }
 

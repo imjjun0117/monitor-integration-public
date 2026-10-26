@@ -20,14 +20,17 @@ public final class SampleFixtureSeeder implements ApplicationRunner {
     private final JdbcTemplate db;
     private final TokenCipher cipher;
     private final String token;
+    private final int agentBasePort;
 
     SampleFixtureSeeder(
             JdbcTemplate db,
             TokenCipher cipher,
-            @Value("${HERMES_SAMPLE_AGENT_TOKEN:}") String token) {
+            @Value("${HERMES_SAMPLE_AGENT_TOKEN:}") String token,
+            @Value("${HERMES_E2E_AGENT_BASE_PORT:18081}") int agentBasePort) {
         this.db = db;
         this.cipher = cipher;
         this.token = token;
+        this.agentBasePort = agentBasePort;
     }
 
     @Override
@@ -39,12 +42,15 @@ public final class SampleFixtureSeeder implements ApplicationRunner {
         if (token == null || token.getBytes(java.nio.charset.StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException("HERMES_SAMPLE_AGENT_TOKEN_REQUIRED");
         }
+        if (agentBasePort < 1 || agentBasePort > 65532) {
+            throw new IllegalStateException("HERMES_E2E_AGENT_BASE_PORT_INVALID");
+        }
         project("sample-a", "샘플 A");
         project("sample-b", "샘플 B");
-        instance("sample-a", "local-01", "샘플 A 1", 18081);
-        instance("sample-a", "local-02", "샘플 A 2", 18082);
-        instance("sample-b", "local-01", "샘플 B 1", 18083);
-        instance("sample-b", "local-02", "샘플 B 2", 18084);
+        instance("sample-a", "local-01", "샘플 A 1", agentBasePort);
+        instance("sample-a", "local-02", "샘플 A 2", agentBasePort + 1);
+        instance("sample-b", "local-01", "샘플 B 1", agentBasePort + 2);
+        instance("sample-b", "local-02", "샘플 B 2", agentBasePort + 3);
     }
 
     private void project(String projectId, String displayName) {

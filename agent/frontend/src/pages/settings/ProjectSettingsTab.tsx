@@ -1,14 +1,6 @@
 // 프로젝트 등록 및 사용 여부 관리 화면
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalVariant,
-  TextInput,
-} from '../../components/ui';
-import { Table, Tbody, Td, Th, Thead, Tr } from '../../components/ui';
+import { ProTable, type ProColumns } from '@ant-design/pro-components';
+import { Button, Input, Modal, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Project, ProjectWrite } from '../../generated';
@@ -18,9 +10,11 @@ import { BooleanSelect, LabeledField, MutationError, QueryContent, SettingsDialo
 import { useInvalidateMutation } from './useInvalidateMutation';
 import { emptyProject, validateProject } from './validation';
 import { useProjectScope } from '../../components/ProjectScope';
+import { usePermissions } from '../../components/PermissionContext';
 
 export default function ProjectSettingsTab() {
   const { project: selectedProject } = useProjectScope();
+  const { canWrite, isAdmin } = usePermissions();
   const query = useQuery({ queryKey: ['projects'], queryFn: getProjects });
   const [value, setValue] = useState<ProjectWrite>(emptyProject());
   const [validation, setValidation] = useState<string>();
@@ -45,13 +39,27 @@ export default function ProjectSettingsTab() {
     }
   }
 
+  const columns: ProColumns<Project>[] = [
+    { title: '프로젝트', dataIndex: 'project_id' },
+    {
+      title: 'XLog 수집',
+      render: (_, project) => <ProjectXlogControl project={project} canWrite={canWrite} />,
+    },
+    {
+      title: '작업',
+      valueType: 'option',
+      hideInTable: !isAdmin,
+      render: (_, project) => <ProjectDeleteAction project={project} />,
+    },
+  ];
+
   return (
     <>
-      <div className="settings-toolbar">
-        <Button permission="admin" onClick={openCreate}>
+      {isAdmin && (
+        <Button type="primary" onClick={openCreate}>
           프로젝트 등록
         </Button>
-      </div>
+      )}
       <SettingsDialog
         id="create-project"
         title="프로젝트 등록"
@@ -66,22 +74,22 @@ export default function ProjectSettingsTab() {
         error={create.error}
       >
         <LabeledField id="project-id" label="프로젝트 ID" help="예: sample-a">
-          <TextInput
+          <Input
             id="project-id"
             aria-label="프로젝트 ID"
             value={value.projectId}
-            onChange={(_, projectId) => setValue({ ...value, projectId })}
+            onChange={(event) => setValue({ ...value, projectId: event.target.value })}
             minLength={2}
             maxLength={64}
             required
           />
         </LabeledField>
         <LabeledField id="project-display-name" label="표시명" help="앞뒤 공백 없이 1~120자">
-          <TextInput
+          <Input
             id="project-display-name"
             aria-label="프로젝트 표시명"
             value={value.displayName}
-            onChange={(_, displayName) => setValue({ ...value, displayName })}
+            onChange={(event) => setValue({ ...value, displayName: event.target.value })}
             required
           />
         </LabeledField>
@@ -95,34 +103,24 @@ export default function ProjectSettingsTab() {
         />
       </SettingsDialog>
       <QueryContent query={query} empty={(query.data?.items.length ?? 0) === 0}>
-        <div className="settings-table-scroll">
-          <Table
-            className="settings-table settings-project-table"
-            variant="compact"
-            aria-label="프로젝트 설정"
-          >
-            <Thead>
-              <Tr>
-                <Th>프로젝트</Th>
-                <Th>XLog 수집</Th>
-                <Th>작업</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {query.data?.items
-                .filter((project) => !selectedProject || project.project_id === selectedProject)
-                .map((project) => (
-                  <ProjectRow key={project.project_id} project={project} />
-                ))}
-            </Tbody>
-          </Table>
-        </div>
+        <ProTable<Project>
+          aria-label="프로젝트 설정"
+          rowKey="project_id"
+          dataSource={(query.data?.items ?? []).filter(
+            (project) => !selectedProject || project.project_id === selectedProject,
+          )}
+          columns={columns}
+          search={false}
+          options={false}
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+        />
       </QueryContent>
     </>
   );
 }
 
-function ProjectRow({ project }: { project: Project }) {
+function ProjectXlogControl({ project, canWrite }: { project: Project; canWrite: boolean }) {
   const client = useQueryClient();
   const settings = useQuery({
     queryKey: ['xlog-settings', project.project_id],
@@ -140,6 +138,24 @@ function ProjectRow({ project }: { project: Project }) {
       void client.invalidateQueries({ queryKey: ['connection', project.project_id] });
     },
   });
+  return (
+    <Space>
+      {canWrite && (
+        <Button
+          disabled={!settings.data || xlog.isPending}
+          loading={xlog.isPending}
+          onClick={() => xlog.mutate(!settings.data?.enabled)}
+        >
+          {settings.data?.enabled ? '사용' : '미사용'}
+        </Button>
+      )}
+      {!canWrite && (settings.data?.enabled ? '사용' : '미사용')}
+      {xlog.isError && <span role="alert">저장 실패</span>}
+    </Space>
+  );
+}
+
+function ProjectDeleteAction({ project }: { project: Project }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const permanentDelete = useInvalidateMutation(
     () => deleteProjectPermanently(project.project_id),
@@ -148,64 +164,45 @@ function ProjectRow({ project }: { project: Project }) {
   );
 
   return (
-    <Tr>
-      <Td>{project.project_id}</Td>
-      <Td>
-        <Button
-          permission="write"
-          variant="secondary"
-          isDisabled={!settings.data || xlog.isPending}
-          onClick={() => xlog.mutate(!settings.data?.enabled)}
-        >
-          {settings.data?.enabled ? '사용' : '미사용'}
-        </Button>
-        {xlog.isError && <span role="alert">저장 실패</span>}
-      </Td>
-      <Td>
-        <div className="settings-row-actions">
-          <Button permission="admin" variant="danger" onClick={() => setConfirmDelete(true)}>
-            삭제
-          </Button>
-        </div>
-        <Modal
-          variant={ModalVariant.small}
-          aria-labelledby={`delete-project-${project.project_id}`}
-          isOpen={confirmDelete}
-          onClose={() => {
-            if (!permanentDelete.isPending) {
-              setConfirmDelete(false);
-            }
-          }}
-        >
-          <ModalHeader
-            title={`프로젝트 ${project.project_id} 영구 삭제`}
-            labelId={`delete-project-${project.project_id}`}
-          />
-          <ModalBody>
-            하위 인스턴스, 인증서, 모든 기록과 설정이 함께 삭제되며 복구할 수 없습니다.
-            <MutationError failed={permanentDelete.isError} error={permanentDelete.error} />
-          </ModalBody>
-          <ModalFooter>
+    <>
+      <Button danger onClick={() => setConfirmDelete(true)}>
+        삭제
+      </Button>
+      <Modal
+        title={`프로젝트 ${project.project_id} 영구 삭제`}
+        open={confirmDelete}
+        destroyOnHidden
+        transitionName=""
+        maskTransitionName=""
+        mask={{ closable: false }}
+        closable={false}
+        keyboard={!permanentDelete.isPending}
+        onCancel={() => {
+          if (!permanentDelete.isPending) {
+            setConfirmDelete(false);
+          }
+        }}
+        footer={
+          <Space>
+            <Button disabled={permanentDelete.isPending} onClick={() => setConfirmDelete(false)}>
+              취소
+            </Button>
             <Button
-              permission="admin"
-              variant="danger"
+              danger
+              type="primary"
               aria-label={`프로젝트 ${project.project_id} 영구 삭제 확인`}
-              isLoading={permanentDelete.isPending}
-              isDisabled={permanentDelete.isPending}
+              loading={permanentDelete.isPending}
+              disabled={permanentDelete.isPending}
               onClick={() => permanentDelete.mutate(undefined)}
             >
               영구 삭제
             </Button>
-            <Button
-              variant="link"
-              isDisabled={permanentDelete.isPending}
-              onClick={() => setConfirmDelete(false)}
-            >
-              취소
-            </Button>
-          </ModalFooter>
-        </Modal>
-      </Td>
-    </Tr>
+          </Space>
+        }
+      >
+        <p>하위 인스턴스, 인증서, 모든 기록과 설정이 함께 삭제되며 복구할 수 없습니다.</p>
+        <MutationError failed={permanentDelete.isError} error={permanentDelete.error} />
+      </Modal>
+    </>
   );
 }

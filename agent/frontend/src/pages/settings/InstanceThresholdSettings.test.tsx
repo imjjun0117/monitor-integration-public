@@ -84,10 +84,17 @@ async function add(name: string, warning: string, critical: string, email: strin
 test('starts empty and only opens item registration when add is clicked', async () => {
   page();
   expect(await screen.findByText(/등록된 임계치가 없습니다/)).toBeVisible();
+  expect(
+    screen.getByRole('table', { name: '등록된 임계치' }).closest('.ant-pro-table'),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '추가' })).toHaveClass('ant-btn');
   expect(screen.queryByText('CPU 사용률')).not.toBeInTheDocument();
   expect(screen.queryByLabelText('기본 담당 이메일')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '추가' }));
   expect(screen.getByRole('dialog', { name: '임계치 추가' })).toBeVisible();
+  expect(screen.getByLabelText('항목').closest('.ant-select')).toBeInTheDocument();
+  expect(screen.getByLabelText('경고 기준')).toHaveClass('ant-input');
+  expect(screen.getByLabelText('알림 이메일')).toHaveClass('ant-input');
   expect(screen.getByLabelText('경고 기준')).toHaveValue(null);
   fireEvent.click(screen.getByRole('button', { name: '취소' }));
   expect(saveInstanceThresholds).not.toHaveBeenCalled();
@@ -166,9 +173,11 @@ test('excludes already registered items from add and deletes only after confirma
   });
   page();
   fireEvent.click(await screen.findByRole('button', { name: '추가' }));
-  fireEvent.click(screen.getByLabelText('항목'));
-  expect(screen.queryByRole('option', { name: 'CPU 사용률' })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('option', { name: 'RAM 사용률' }));
+  fireEvent.mouseDown(screen.getByLabelText('항목'));
+  expect(
+    screen.queryByText('CPU 사용률', { selector: '.ant-select-item-option-content' }),
+  ).not.toBeInTheDocument();
+  await selectOption(screen.getByLabelText('항목'), 'RAM 사용률');
   fireEvent.click(screen.getByRole('button', { name: '취소' }));
   fireEvent.click(screen.getByRole('button', { name: 'CPU 사용률 삭제' }));
   expect(saveInstanceThresholds).not.toHaveBeenCalled();

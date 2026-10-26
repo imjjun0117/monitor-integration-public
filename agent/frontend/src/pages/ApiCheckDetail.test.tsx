@@ -41,6 +41,14 @@ function show(check: ApiCheck) {
   );
   return run;
 }
+test('detail uses the official Drawer and ProDescriptions without losing request evidence', () => {
+  show({ ...base, http: { method: HttpCheckDetails.method.GET, url: 'https://nice.example/' } });
+  const dialog = screen.getByRole('dialog', { name: 'API 점검 상세' });
+  expect(dialog.closest('.ant-drawer')).toBeInTheDocument();
+  expect(dialog.querySelector('.ant-pro-descriptions')).toBeInTheDocument();
+  expect(screen.getByText('https://nice.example/')).toBeInTheDocument();
+});
+
 test('explains the check scope and timings without inventing legacy HTTP details', () => {
   const run = show(base);
   expect(screen.getByText(/실제 본인인증 절차/)).toBeVisible();

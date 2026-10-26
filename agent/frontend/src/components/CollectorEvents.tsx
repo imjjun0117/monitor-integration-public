@@ -2,8 +2,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { DefaultService } from '../generated';
-import { Button, Table, Tbody, Td, Th, Thead, Tr } from './ui';
+import { Button, Space } from 'antd';
+import { ProTable, type ProColumns } from '@ant-design/pro-components';
 import { Empty, Failure, Loading } from './QueryState';
+
+type CollectorEvent = Awaited<
+  ReturnType<typeof DefaultService.getCollectorEvents>
+>['items'][number];
+const columns: ProColumns<CollectorEvent>[] = [
+  { title: '시각', render: (_, item) => new Date(item.payload.started_at ?? 0).toLocaleString() },
+  { title: '요청', render: (_, item) => `${item.payload.method} ${item.payload.path}` },
+  { title: '처리 시간', render: (_, item) => `${item.payload.duration_ms} ms` },
+  { title: 'HTTP 결과', render: (_, item) => item.payload.status },
+];
 
 export default function CollectorEvents({
   projectId,
@@ -77,30 +88,16 @@ export default function CollectorEvents({
       {items.length === 0 ? (
         <Empty />
       ) : kind === 'XLOG' ? (
-        <div className="settings-table-scroll">
-          <Table aria-label="XLog 요청 목록">
-            <Thead>
-              <Tr>
-                <Th>시각</Th>
-                <Th>요청</Th>
-                <Th>처리 시간</Th>
-                <Th>HTTP 결과</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {items.map((item) => (
-                <Tr key={item.id}>
-                  <Td>{new Date(item.payload.started_at ?? 0).toLocaleString()}</Td>
-                  <Td>
-                    {item.payload.method} {item.payload.path}
-                  </Td>
-                  <Td>{item.payload.duration_ms} ms</Td>
-                  <Td>{item.payload.status}</Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-        </div>
+        <ProTable<CollectorEvent>
+          aria-label="XLog 요청 목록"
+          rowKey="id"
+          columns={columns}
+          dataSource={items}
+          search={false}
+          options={false}
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+        />
       ) : (
         items.map((item) => (
           <article key={item.id}>
@@ -109,18 +106,12 @@ export default function CollectorEvents({
           </article>
         ))
       )}
-      <div className="transport-controls">
-        <Button variant="secondary" onClick={() => setBeforeId(0)}>
-          최신 기록
-        </Button>
-        <Button
-          variant="secondary"
-          isDisabled={items.length < 100}
-          onClick={() => setBeforeId(items.at(-1)?.id ?? 0)}
-        >
+      <Space wrap>
+        <Button onClick={() => setBeforeId(0)}>최신 기록</Button>
+        <Button disabled={items.length < 100} onClick={() => setBeforeId(items.at(-1)?.id ?? 0)}>
           이전 기록
         </Button>
-      </div>
+      </Space>
     </section>
   );
 }

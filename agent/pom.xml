@@ -214,7 +214,8 @@
           </execution>
           <execution>
             <id>build</id>
-            <phase>prepare-package</phase>
+            <!-- 로그인 자산 HTTP 검사 전에 실제 UI 번들 생성 -->
+            <phase>generate-resources</phase>
             <goals>
               <goal>npm</goal>
             </goals>
@@ -249,7 +250,7 @@
           </execution>
           <execution>
             <id>copy-ui</id>
-            <phase>prepare-package</phase>
+            <phase>process-resources</phase>
             <goals>
               <goal>copy-resources</goal>
             </goals>

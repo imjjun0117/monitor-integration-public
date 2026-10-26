@@ -68,6 +68,9 @@ function show() {
 test('creates a scoped viewer and never fills the editing form with an existing password', async () => {
   show();
   await screen.findByRole('button', { name: 'admin 계정 수정' });
+  expect(
+    screen.getByRole('table', { name: '사용자 목록' }).closest('.ant-table-content'),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '사용자 등록' }));
   fireEvent.change(screen.getByLabelText('계정 ID'), { target: { value: 'reader' } });
   fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'test-password-123' } });

@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -21,7 +22,12 @@ class SampleFixtureSeederTest {
         when(cipher.encrypt(anyString()))
                 .thenReturn(new TokenCipher.EncryptedToken(new byte[32], new byte[12]));
 
-        new SampleFixtureSeeder(db, cipher, "explicit-test-token-value-32-bytes").run();
+        new SampleFixtureSeeder(db, cipher, "explicit-test-token-value-32-bytes", 18181).run();
+
+        verify(db).update(anyString(), eq("sample-a"), eq("local-01"), anyString(),
+                eq("local"), eq("http://127.0.0.1:18181"), any(), any(), eq(true));
+        verify(db).update(anyString(), eq("sample-b"), eq("local-02"), anyString(),
+                eq("local"), eq("http://127.0.0.1:18184"), any(), any(), eq(true));
 
         verify(cipher, times(4)).encrypt("explicit-test-token-value-32-bytes");
         verify(db, times(6)).update(anyString(), any(Object[].class));
@@ -30,7 +36,7 @@ class SampleFixtureSeederTest {
     @Test
     void enabledSeederFailsClosedWhenTokenIsMissing() {
         SampleFixtureSeeder seeder =
-                new SampleFixtureSeeder(mock(JdbcTemplate.class), mock(TokenCipher.class), "");
+                new SampleFixtureSeeder(mock(JdbcTemplate.class), mock(TokenCipher.class), "", 18081);
         assertThrows(IllegalStateException.class, seeder::run);
     }
 }

@@ -2,12 +2,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DefaultService, type ManagedRole, RoleWrite } from '../../generated';
-import { Alert, Button, FormSelect, FormSelectOption, TextInput } from '../../components/ui';
+import { Alert, Button, Card, Checkbox, Input, List, Select, Space, Tabs, Typography } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { Failure, Loading } from '../../components/QueryState';
 import { BooleanSelect, LabeledField, SettingsDialog } from './forms';
 import PermissionSettingsTab from './PermissionSettingsTab';
 import { roleLabels } from '../../components/PermissionContext';
-import { Plus } from 'lucide-react';
 
 export default function RoleSettingsTab() {
   const client = useQueryClient();
@@ -83,157 +83,133 @@ export default function RoleSettingsTab() {
   return (
     <>
       <div className="role-management">
-        <section className="role-list settings-card" aria-label="역할 목록">
-          <div className="settings-card-heading">
-            <h2>역할 목록</h2>
-            <Button size="sm" onClick={() => open()}>
-              <Plus size={14} aria-hidden="true" />
+        <Card
+          role="region"
+          aria-label="역할 목록"
+          title="역할 목록"
+          extra={
+            <Button
+              type="primary"
+              aria-label="역할 등록"
+              icon={<PlusOutlined aria-hidden="true" />}
+              onClick={() => open()}
+            >
               역할 등록
             </Button>
-          </div>
-          <div className="role-search">
-            <TextInput
+          }
+        >
+          <Space wrap>
+            <Input
               aria-label="역할 검색"
               placeholder="역할 이름·ID"
               value={search}
-              onChange={(_, value) => setSearch(value)}
+              onChange={(event) => setSearch(event.target.value)}
             />
-            <FormSelect
+            <Select
               aria-label="역할 사용 여부"
               value={status}
-              onChange={(_, value) => setStatus(value)}
-            >
-              <FormSelectOption value="all" label="전체 상태" />
-              <FormSelectOption value="true" label="사용" />
-              <FormSelectOption value="false" label="미사용" />
-            </FormSelect>
-          </div>
+              onChange={setStatus}
+              options={[
+                { value: 'all', label: '전체 상태' },
+                { value: 'true', label: '사용' },
+                { value: 'false', label: '미사용' },
+              ]}
+            />
+          </Space>
           {roles.isPending ? (
             <Loading />
           ) : roles.isError ? (
             <Failure />
           ) : (
-            <div className="role-list-rows">
-              {visible.map((value) => (
-                <div
+            <List
+              dataSource={visible}
+              locale={{ emptyText: '검색 결과가 없습니다.' }}
+              renderItem={(value) => (
+                <List.Item
                   key={value.roleId}
-                  className={`role-list-row${selected === value.roleId ? ' selected' : ''}`}
+                  actions={[
+                    <Button
+                      key="members"
+                      aria-label={`${value.name} 사용자 ${value.userCount}명`}
+                      onClick={() => {
+                        setSelected(value.roleId);
+                        setTab('users');
+                      }}
+                    >
+                      {value.userCount}명
+                    </Button>,
+                    ...(!value.builtin
+                      ? [
+                          <Button
+                            key="edit"
+                            type="link"
+                            aria-label={`${value.name} 수정`}
+                            onClick={() => open(value)}
+                          >
+                            수정
+                          </Button>,
+                          <Button
+                            key="delete"
+                            type="link"
+                            danger
+                            aria-label={`${value.name} 삭제`}
+                            onClick={() => {
+                              remove.reset();
+                              setDeleting(value);
+                            }}
+                          >
+                            삭제
+                          </Button>,
+                        ]
+                      : []),
+                  ]}
                 >
-                  <button
-                    className="role-select"
+                  <Button
+                    type={selected === value.roleId ? 'primary' : 'text'}
                     aria-pressed={selected === value.roleId}
                     onClick={() => setSelected(value.roleId)}
                   >
-                    <strong>{value.name}</strong>
-                    <small>
-                      {value.roleId} · {value.enabled ? '사용' : '미사용'}
-                    </small>
-                  </button>
-                  <button
-                    className="role-member-count"
-                    aria-label={`${value.name} 사용자 ${value.userCount}명`}
-                    onClick={() => {
-                      setSelected(value.roleId);
-                      setTab('users');
-                    }}
-                  >
-                    {value.userCount}명
-                  </button>
-                  {!value.builtin && (
-                    <div className="role-row-actions">
-                      <Button
-                        variant="link"
-                        size="sm"
-                        aria-label={`${value.name} 수정`}
-                        onClick={() => open(value)}
-                      >
-                        수정
-                      </Button>
-                      <Button
-                        variant="link"
-                        className="settings-delete-action"
-                        size="sm"
-                        aria-label={`${value.name} 삭제`}
-                        onClick={() => {
-                          remove.reset();
-                          setDeleting(value);
-                        }}
-                      >
-                        삭제
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {!visible.length && <p className="settings-help">검색 결과가 없습니다.</p>}
-            </div>
+                    {value.name} · {value.roleId} · {value.enabled ? '사용' : '미사용'}
+                  </Button>
+                </List.Item>
+              )}
+            />
           )}
-        </section>
-        <section className="role-workspace settings-card" aria-label="선택 역할 관리">
+        </Card>
+        <Card role="region" aria-label="선택 역할 관리">
           {role && (
             <>
-              <div className="settings-card-heading">
-                <div>
-                  <h2>{role.name}</h2>
-                  <p className="settings-help">
-                    {role.description || `${roleLabels[role.baseRole]} 기준 권한`} ·{' '}
-                    {role.enabled ? '사용' : '미사용'}
-                  </p>
-                </div>
-                <small>{role.roleId}</small>
-              </div>
-              <div className="role-work-tabs" role="tablist" aria-label="역할 작업">
-                <button
-                  id="role-menu-tab"
-                  role="tab"
-                  aria-selected={tab === 'menus'}
-                  aria-controls="role-menu-panel"
-                  tabIndex={tab === 'menus' ? 0 : -1}
-                  onKeyDown={(event) => {
-                    if (['ArrowLeft', 'ArrowRight', 'End'].includes(event.key)) {
-                      event.preventDefault();
-                      setTab('users');
-                      document.getElementById('role-user-tab')?.focus();
-                    }
-                  }}
-                  onClick={() => setTab('menus')}
-                >
-                  메뉴 권한
-                </button>
-                <button
-                  id="role-user-tab"
-                  role="tab"
-                  aria-selected={tab === 'users'}
-                  aria-controls="role-user-panel"
-                  tabIndex={tab === 'users' ? 0 : -1}
-                  onKeyDown={(event) => {
-                    if (['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) {
-                      event.preventDefault();
-                      setTab('menus');
-                      document.getElementById('role-menu-tab')?.focus();
-                    }
-                  }}
-                  onClick={() => setTab('users')}
-                >
-                  사용자 배정
-                </button>
-              </div>
-              {tab === 'menus' ? (
-                <div id="role-menu-panel" role="tabpanel" aria-labelledby="role-menu-tab">
-                  <PermissionSettingsTab
-                    key={role.roleId}
-                    selectedRole={role.roleId}
-                    baseRole={role.baseRole}
-                  />
-                </div>
-              ) : (
-                <div id="role-user-panel" role="tabpanel" aria-labelledby="role-user-tab">
-                  <RoleUsers key={role.roleId} role={role} />
-                </div>
-              )}
+              <Typography.Title level={4}>{role.name}</Typography.Title>
+              <Typography.Paragraph type="secondary">
+                {role.description || `${roleLabels[role.baseRole]} 기준 권한`} ·{' '}
+                {role.enabled ? '사용' : '미사용'} · {role.roleId}
+              </Typography.Paragraph>
+              <Tabs
+                activeKey={tab}
+                onChange={(key) => setTab(key as 'menus' | 'users')}
+                tabBarExtraContent={null}
+                items={[
+                  {
+                    key: 'menus',
+                    label: '메뉴 권한',
+                    children: tab === 'menus' && (
+                      <PermissionSettingsTab
+                        key={role.roleId}
+                        selectedRole={role.roleId}
+                        baseRole={role.baseRole}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'users',
+                    label: '사용자 배정',
+                    children: tab === 'users' && <RoleUsers key={role.roleId} role={role} />,
+                  },
+                ]}
+              />
             </>
           )}
-        </section>
+        </Card>
       </div>
       {draft && (
         <SettingsDialog
@@ -253,28 +229,28 @@ export default function RoleSettingsTab() {
           error={save.error}
         >
           <LabeledField id="role-id" label="역할 ID">
-            <TextInput
+            <Input
               id="role-id"
               value={draft.roleId}
               maxLength={20}
-              isDisabled={editing}
-              onChange={(_, value) => setDraft({ ...draft, roleId: value.toUpperCase() })}
+              disabled={editing}
+              onChange={(event) => setDraft({ ...draft, roleId: event.target.value.toUpperCase() })}
             />
           </LabeledField>
           <LabeledField id="role-name" label="역할 이름">
-            <TextInput
+            <Input
               id="role-name"
               value={draft.name}
               maxLength={60}
-              onChange={(_, value) => setDraft({ ...draft, name: value })}
+              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
             />
           </LabeledField>
           <LabeledField id="role-description" label="설명">
-            <TextInput
+            <Input
               id="role-description"
               value={draft.description}
               maxLength={500}
-              onChange={(_, value) => setDraft({ ...draft, description: value })}
+              onChange={(event) => setDraft({ ...draft, description: event.target.value })}
             />
           </LabeledField>
           <LabeledField
@@ -282,15 +258,16 @@ export default function RoleSettingsTab() {
             label="기준 권한"
             help="조회용은 변경·실행이 제한됩니다. 등록 후 기준 권한은 변경할 수 없습니다."
           >
-            <FormSelect
+            <Select
               id="role-base"
               value={draft.baseRole}
-              isDisabled={editing}
-              onChange={(_, value) => setDraft({ ...draft, baseRole: value as RoleWrite.baseRole })}
-            >
-              <FormSelectOption value="VIEWER" label="조회용" />
-              <FormSelectOption value="OPERATOR" label="운영용" />
-            </FormSelect>
+              disabled={editing}
+              onChange={(value) => setDraft({ ...draft, baseRole: value as RoleWrite.baseRole })}
+              options={[
+                { value: 'VIEWER', label: '조회용' },
+                { value: 'OPERATOR', label: '운영용' },
+              ]}
+            />
           </LabeledField>
           <BooleanSelect
             id="role-enabled"
@@ -349,62 +326,61 @@ function RoleUsers({ role }: { role: ManagedRole }) {
   });
   return (
     <>
-      <div className="role-user-toolbar">
-        <TextInput
+      <Space wrap>
+        <Input
           aria-label="배정 사용자 검색"
           placeholder="계정 ID 검색"
           value={search}
-          onChange={(_, value) => setSearch(value)}
+          onChange={(event) => setSearch(event.target.value)}
         />
         <Button
-          isDisabled={!draft || !role.enabled}
-          isLoading={save.isPending}
+          type="primary"
+          disabled={!draft || !role.enabled}
+          loading={save.isPending}
           onClick={() => save.mutate()}
         >
           배정 저장
         </Button>
-      </div>
+      </Space>
       <p className="settings-help">
         사용자는 하나의 역할을 가집니다. 선택하면 기존 역할에서 이동하고, 해제하면 조회자 역할로
         돌아갑니다. 담당 프로젝트는 유지됩니다. 관리자 회수는 사용자 관리에서 진행하세요.
       </p>
-      {save.isError && <Alert variant="danger" title="사용자 배정을 저장하지 못했습니다." />}
-      {save.isSuccess && <Alert variant="success" title="사용자 배정을 저장했습니다." />}
+      {save.isError && <Alert type="error" message="사용자 배정을 저장하지 못했습니다." />}
+      {save.isSuccess && <Alert type="success" message="사용자 배정을 저장했습니다." />}
       {query.isPending ? (
         <Loading />
       ) : query.isError ? (
         <Failure />
       ) : (
-        <div className="role-user-list">
-          {query.data
-            .filter((user) => user.username.toLowerCase().includes(search.toLowerCase()))
-            .map((user) => (
-              <label key={user.username}>
-                <input
-                  type="checkbox"
-                  checked={values.includes(user.username)}
-                  disabled={
-                    save.isPending ||
-                    !role.enabled ||
-                    user.role === 'ADMIN' ||
-                    (role.roleId === 'VIEWER' && user.assigned)
-                  }
-                  onChange={(event) => {
-                    save.reset();
-                    setDraft(
-                      event.target.checked
-                        ? [...values, user.username]
-                        : values.filter((name) => name !== user.username),
-                    );
-                  }}
-                />
-                <strong>{user.username}</strong>
-                <small>
-                  {user.enabled ? '사용' : '중지'} · {user.role}
-                </small>
-              </label>
-            ))}
-        </div>
+        <List
+          dataSource={query.data.filter((user) =>
+            user.username.toLowerCase().includes(search.toLowerCase()),
+          )}
+          renderItem={(user) => (
+            <List.Item key={user.username}>
+              <Checkbox
+                checked={values.includes(user.username)}
+                disabled={
+                  save.isPending ||
+                  !role.enabled ||
+                  user.role === 'ADMIN' ||
+                  (role.roleId === 'VIEWER' && user.assigned)
+                }
+                onChange={(event) => {
+                  save.reset();
+                  setDraft(
+                    event.target.checked
+                      ? [...values, user.username]
+                      : values.filter((name) => name !== user.username),
+                  );
+                }}
+              >
+                {user.username} · {user.enabled ? '사용' : '중지'} · {user.role}
+              </Checkbox>
+            </List.Item>
+          )}
+        />
       )}
     </>
   );

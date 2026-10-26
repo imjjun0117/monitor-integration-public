@@ -73,6 +73,17 @@ function show(path = '/api-monitoring') {
   return client;
 }
 
+test('API results use ProTable and preserve the visible, operable filters', async () => {
+  show('/api-monitoring?status=DOWN&usage=used');
+  const result = await screen.findByRole('button', { name: 'Partner API' });
+  expect(result.closest('.ant-pro-table')).toBeInTheDocument();
+  expect(screen.getByRole('table', { name: 'API 점검 목록' })).toBeInTheDocument();
+  await selectOption(screen.getByRole('combobox', { name: '사용 여부 필터' }), '미사용 API');
+  await waitFor(() =>
+    expect(getApiChecks).toHaveBeenLastCalledWith(expect.objectContaining({ usage: 'unused' })),
+  );
+});
+
 test('failed refresh keeps prior API results with a warning and retry', async () => {
   const client = show();
   expect(await screen.findByRole('button', { name: 'Partner API' })).toBeVisible();
@@ -217,6 +228,7 @@ test('failed updates leave usage unchanged and explain the failure', async () =>
   show();
   fireEvent.click(await screen.findByRole('button', { name: 'Partner API 미사용으로 전환' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('사용 여부를 저장하지 못했습니다');
+  expect(screen.getByRole('alert')).toHaveClass('ant-alert');
   expect(screen.getByRole('button', { name: 'Partner API 미사용으로 전환' })).toBeEnabled();
   expect(screen.queryByRole('button', { name: 'Partner API 사용으로 전환' })).toBeNull();
 });

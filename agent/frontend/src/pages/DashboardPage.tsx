@@ -1,6 +1,6 @@
 // 선택 프로젝트·인스턴스의 상태와 자원 차트 표시
 import { chartPeriods, liveWindowMs, type ChartPeriod } from '../utils/chartPeriod';
-import { Alert, FormSelect, FormSelectOption, Title } from '../components/ui';
+import { Alert, Card, Form, Listy, Select, Space, Statistic, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getDashboard, getResources } from '../api';
@@ -18,6 +18,7 @@ import XlogOverview from '../components/XlogOverview';
 import { usePermissions } from '../components/PermissionContext';
 
 export default function DashboardPage() {
+  const { token } = theme.useToken();
   const { project } = useProjectScope();
   const [params, setParams] = useSearchParams();
   const instance = params.get('instance') ?? '';
@@ -33,7 +34,11 @@ export default function DashboardPage() {
     refetchInterval: liveWindowMs(period) ? 5_000 : 15_000,
   });
   const filters = (
-    <div className="dashboard-scope-toolbar" aria-label="대시보드 조회 범위">
+    <Form
+      layout="vertical"
+      className="dashboard-scope-toolbar query-filters"
+      aria-label="대시보드 조회 범위"
+    >
       <InstanceScope
         key={project}
         project={project}
@@ -45,21 +50,24 @@ export default function DashboardPage() {
           setParams(params, { replace: true });
         }}
       />
-      <div className="dashboard-period-select">
-        <FormSelect
+      <Form.Item
+        label="조회 기간"
+        htmlFor="dashboard-period"
+        extra={<span id="dashboard-period-help">최근 수집 데이터를 조회합니다.</span>}
+      >
+        <Select
+          id="dashboard-period"
           aria-label="관제 조회 기간"
+          aria-describedby="dashboard-period-help"
           value={period}
-          onChange={(_, value) => {
+          onChange={(value) => {
             params.set('period', value);
             setParams(params);
           }}
-        >
-          {Object.entries(chartPeriods).map(([value, label]) => (
-            <FormSelectOption key={value} value={value} label={label} />
-          ))}
-        </FormSelect>
-      </div>
-    </div>
+          options={Object.entries(chartPeriods).map(([value, label]) => ({ value, label }))}
+        />
+      </Form.Item>
+    </Form>
   );
   if (!project || !instance) {
     return (
@@ -100,50 +108,51 @@ export default function DashboardPage() {
     <>
       {filters}
       {query.isError && (
-        <Alert variant="warning" title="갱신에 실패해 마지막 데이터를 표시합니다." />
+        <Alert type="warning" showIcon message="갱신에 실패해 마지막 데이터를 표시합니다." />
       )}
-      <div className="summary-bar" aria-label="선택 인스턴스 요약">
-        <span className="summary-item">
-          수집 상태{' '}
+      <div className="dashboard-summary" aria-label="선택 인스턴스 요약">
+        <Card title="수집 상태">
           <StatusLabel
             status={selectedInstance?.collection_status ?? selectedInstance?.status}
             context="collection"
           />
-        </span>
-        <span className="summary-item">
-          실패 API{' '}
+        </Card>
+        <Card>
           <Link
-            className="summary-number"
             aria-label={`실패 API ${data.failed_api_count}개 목록`}
             to={`/api-monitoring?${scope}&status=DOWN&usage=used`}
           >
-            <strong className={data.failed_api_count ? 'summary-value attention' : 'summary-value'}>
-              {data.failed_api_count}
-            </strong>
+            <Statistic
+              title="실패 API"
+              value={data.failed_api_count}
+              suffix="개"
+              styles={{ content: data.failed_api_count ? { color: token.colorError } : {} }}
+            />
           </Link>
-        </span>
-        <span className="summary-item">
-          만료 예정 인증서{' '}
+        </Card>
+        <Card>
           <Link
-            className="summary-number"
             aria-label={`만료 예정 인증서 ${data.expiring_certificate_count}개 목록`}
             to={`/certificates?${scope}&expiry=soon`}
           >
-            <strong
-              className={
-                data.expiring_certificate_count ? 'summary-value attention' : 'summary-value'
-              }
-            >
-              {data.expiring_certificate_count}
-            </strong>
+            <Statistic
+              title="만료 예정 인증서"
+              value={data.expiring_certificate_count}
+              suffix="개"
+              styles={{
+                content: data.expiring_certificate_count ? { color: token.colorError } : {},
+              }}
+            />
           </Link>
-        </span>
-        <span className="summary-item">
-          확인 필요{' '}
-          <strong className={causes.length ? 'summary-value attention' : 'summary-value'}>
-            {causes.length}
-          </strong>
-        </span>
+        </Card>
+        <Card>
+          <Statistic
+            title="확인 필요"
+            value={causes.length}
+            suffix="건"
+            styles={{ content: causes.length ? { color: token.colorError } : {} }}
+          />
+        </Card>
       </div>
       {selectedProject && selectedInstance ? (
         <InstanceDashboard
@@ -162,7 +171,7 @@ export default function DashboardPage() {
         <div className="dashboard-status-row has-issues">
           {balances.length > 0 && (
             <section className="service-balances" aria-label="선택 프로젝트 서비스 정보">
-              <Title headingLevel="h2">외부 서비스 정보</Title>
+              <Typography.Title level={2}>외부 서비스 정보</Typography.Title>
               <div className="service-balance-grid">
                 {balances.map((check) => (
                   <ServiceInfoCard
@@ -181,24 +190,26 @@ export default function DashboardPage() {
             </section>
           )}
           {causes.length > 0 && (
-            <section className="issue-panel" aria-labelledby="cause-title">
-              <Title headingLevel="h2" id="cause-title">
-                확인 필요 <small>{causes.length}</small>
-              </Title>
+            <Card title={`확인 필요 ${causes.length}`} className="issue-panel">
               <div className="issue-scroll" role="region" tabIndex={0} aria-label="상태 이상 목록">
-                <ul className="issue-list">
-                  {causes.map((cause, index) => (
-                    <li className="issue-row" key={`${cause.kind}-${cause.subject_id}-${index}`}>
-                      <span className="issue-category">{causeCategory(cause)}</span>
-                      <strong>{causeSubject(cause)}</strong>
-                      <span className="issue-reason">{causeReason(cause)}</span>
+                <Listy
+                  items={causes.map((cause, index) => ({
+                    cause,
+                    key: `${cause.kind}-${cause.subject_id}-${index}`,
+                  }))}
+                  rowKey="key"
+                  itemRender={({ cause }) => (
+                    <Space wrap>
+                      <Typography.Text>{causeCategory(cause)}</Typography.Text>
+                      <Typography.Text strong>{causeSubject(cause)}</Typography.Text>
+                      <Typography.Text type="secondary">{causeReason(cause)}</Typography.Text>
                       <time>{formatTime(cause.observed_at)}</time>
                       <Link to={causeLink(cause)}>확인 →</Link>
-                    </li>
-                  ))}
-                </ul>
+                    </Space>
+                  )}
+                />
               </div>
-            </section>
+            </Card>
           )}
         </div>
       )}
@@ -228,15 +239,22 @@ function InstanceDashboard({
   const context = `${project.display_name} / ${instance.display_name}`;
   return (
     <section className="instance-dashboard" aria-label={context}>
-      <div className="instance-dashboard-heading">
-        <Link to={`/projects/${project.project_id}/instances/${instance.instance_id}`}>
-          {context}
-        </Link>
-        <StatusLabel status={instance.status} context="overview" />
-        <time>{formatTime(latest?.central_received_at ?? instance.last_seen_at)}</time>
-      </div>
+      <Card
+        title={
+          <Typography.Title level={2}>
+            <Link to={`/projects/${project.project_id}/instances/${instance.instance_id}`}>
+              {context}
+            </Link>
+          </Typography.Title>
+        }
+      >
+        <Space wrap>
+          <StatusLabel status={instance.status} context="overview" />
+          <time>{formatTime(latest?.central_received_at ?? instance.last_seen_at)}</time>
+        </Space>
+      </Card>
       {(resource?.stale || query.isError) && (
-        <Alert variant="warning" title="마지막 정상 자원 데이터를 표시합니다." />
+        <Alert type="warning" showIcon message="마지막 정상 자원 데이터를 표시합니다." />
       )}
       {query.isPending ? (
         <Loading />

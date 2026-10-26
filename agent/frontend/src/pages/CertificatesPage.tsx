@@ -1,14 +1,6 @@
 // 인증서 검사 결과 및 만료 상태 조회 화면
-import {
-  Alert,
-  Button,
-  FormSelect,
-  FormSelectOption,
-  Modal,
-  ModalBody,
-  ModalHeader,
-} from '../components/ui';
-import { Table, Tbody, Td, Th, Thead, Tr } from '../components/ui';
+import { ProDescriptions, ProTable, type ProColumns } from '@ant-design/pro-components';
+import { Alert, Button, Drawer, Form, Select, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -17,11 +9,12 @@ import { checkCertificate, getCertificates, getDashboard, getProjects } from '..
 import type { DashboardStatusCause } from '../generated';
 import { Empty, Failure, Loading, RefreshFailure } from '../components/QueryState';
 import StatusLabel, { statusLabels } from '../components/StatusLabel';
-import { LabeledField } from './settings/forms';
 import { useManualRerunPolling } from '../hooks/useManualRerunPolling';
 import { useProjectScope } from '../components/ProjectScope';
+import { usePermissions } from '../components/PermissionContext';
 
 export default function CertificatesPage() {
+  const { canWrite } = usePermissions();
   const { project: scopedProject, select: selectProject } = useProjectScope();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState({
@@ -75,8 +68,7 @@ export default function CertificatesPage() {
       {Object.values(filters).some(Boolean) && (
         <div className="filter-actions">
           <Button
-            variant="link"
-            size="sm"
+            type="link"
             onClick={() => {
               setFilters({ project: '', status: '', expiry: '' });
               setSearchParams({}, { replace: true });
@@ -86,65 +78,71 @@ export default function CertificatesPage() {
           </Button>
         </div>
       )}
-      <div className="filters certificate-filters">
-        <LabeledField id="certificate-expiry-filter" label="만료 대상">
-          <FormSelect
-            id="certificate-expiry-filter"
-            aria-label="만료 대상 필터"
-            value={filters.expiry}
-            onChange={(_, expiry) => setFilters({ ...filters, expiry })}
-          >
-            <FormSelectOption value="" label="전체 인증서" />
-            <FormSelectOption value="soon" label="만료 예정 · 만료 인증서" />
-          </FormSelect>
-        </LabeledField>
-        <LabeledField id="certificate-project-filter" label="프로젝트">
-          <FormSelect
-            id="certificate-project-filter"
-            aria-label="프로젝트 필터"
-            value={filters.project}
-            onChange={(_, project) => {
-              setFilters({ ...filters, project });
-              selectProject(project);
-            }}
-            isDisabled={projects.isPending || projects.isError}
-          >
-            <FormSelectOption
-              value=""
-              label={
-                projects.isPending
-                  ? '프로젝트 불러오는 중…'
-                  : projects.isError
-                    ? '프로젝트를 불러오지 못했습니다'
-                    : projects.data?.items.length === 0
-                      ? '등록된 프로젝트가 없습니다'
-                      : '전체 프로젝트'
-              }
+      <Form layout="vertical">
+        <div className="query-filters">
+          <Form.Item label="만료 대상" htmlFor="certificate-expiry-filter">
+            <Select
+              id="certificate-expiry-filter"
+              aria-label="만료 대상 필터"
+              value={filters.expiry}
+              onChange={(expiry) => setFilters({ ...filters, expiry })}
+              options={[
+                { value: '', label: '전체 인증서' },
+                { value: 'soon', label: '만료 예정 · 만료 인증서' },
+              ]}
+              style={{ minWidth: 190 }}
             />
-            {projects.data?.items.map((project) => (
-              <FormSelectOption
-                key={project.project_id}
-                value={project.project_id}
-                label={`${project.display_name} (${project.project_id})`}
-              />
-            ))}
-          </FormSelect>
-        </LabeledField>
-        <LabeledField id="certificate-status-filter" label="상태">
-          <FormSelect
-            id="certificate-status-filter"
-            aria-label="상태 필터"
-            value={filters.status}
-            onChange={(_, value) => setFilters({ ...filters, status: value })}
-          >
-            <FormSelectOption value="" label="전체" />
-            {(['UP', 'WARN', 'DOWN', 'UNKNOWN'] as const).map((value) => (
-              <FormSelectOption key={value} value={value} label={statusLabels[value]} />
-            ))}
-          </FormSelect>
-        </LabeledField>
-      </div>
-      {recheck.isError && <Alert variant="danger" title="인증서 재검사에 실패했습니다." />}
+          </Form.Item>
+          <Form.Item label="프로젝트" htmlFor="certificate-project-filter">
+            <Select
+              id="certificate-project-filter"
+              aria-label="프로젝트 필터"
+              showSearch
+              optionFilterProp="label"
+              value={filters.project}
+              onChange={(project) => {
+                setFilters({ ...filters, project });
+                selectProject(project);
+              }}
+              disabled={projects.isPending || projects.isError}
+              options={[
+                {
+                  value: '',
+                  label: projects.isPending
+                    ? '프로젝트 불러오는 중…'
+                    : projects.isError
+                      ? '프로젝트를 불러오지 못했습니다'
+                      : projects.data?.items.length === 0
+                        ? '등록된 프로젝트가 없습니다'
+                        : '전체 프로젝트',
+                },
+                ...(projects.data?.items.map((project) => ({
+                  value: project.project_id,
+                  label: `${project.display_name} (${project.project_id})`,
+                })) ?? []),
+              ]}
+              style={{ minWidth: 200 }}
+            />
+          </Form.Item>
+          <Form.Item label="상태" htmlFor="certificate-status-filter">
+            <Select
+              id="certificate-status-filter"
+              aria-label="상태 필터"
+              value={filters.status}
+              onChange={(status) => setFilters({ ...filters, status })}
+              options={[
+                { value: '', label: '전체' },
+                ...(['UP', 'WARN', 'DOWN', 'UNKNOWN'] as const).map((value) => ({
+                  value,
+                  label: statusLabels[value],
+                })),
+              ]}
+              style={{ minWidth: 130 }}
+            />
+          </Form.Item>
+        </div>
+      </Form>
+      {recheck.isError && <Alert type="error" title="인증서 재검사에 실패했습니다." />}
       <RefreshFailure
         visible={query.isError && Boolean(query.data)}
         updatedAt={query.dataUpdatedAt}
@@ -166,74 +164,90 @@ export default function CertificatesPage() {
         }}
       />
       {current && (
-        <Modal
-          variant="drawer"
-          isOpen
-          aria-label="SSL 인증서 상세"
-          closeLabel="상세 닫기"
+        <Drawer
+          open
+          title="SSL 인증서 상세"
+          size={640}
+          closable={false}
+          extra={
+            <Button
+              onClick={() => {
+                polling.reset();
+                setSelected(undefined);
+              }}
+            >
+              상세 닫기
+            </Button>
+          }
           onClose={() => {
             polling.reset();
             setSelected(undefined);
           }}
         >
-          <ModalHeader title="SSL 인증서 상세" />
-          <ModalBody>
+          <div>
             <p className="api-purpose">
               {current.hostname}:{current.port}에 HTTPS 보안 연결을 맺어 실제 인증서를 조회한
               결과입니다.
             </p>
-            <div className="api-execution-summary">
+            <Space>
               <StatusLabel status={current.status} />
               <span>{time(current.checked_at)}</span>
-            </div>
+            </Space>
             <p className="api-outcome">{certificateOutcome(current)}</p>
-            <dl>
-              <dt>남은 기간</dt>
-              <dd className="api-balance">
-                {current.days_remaining == null ? '미수집' : `${current.days_remaining}일`}
-              </dd>
-              <dt>유효 시작일</dt>
-              <dd>{time(current.not_before)}</dd>
-              <dt>만료일</dt>
-              <dd>{time(current.not_after)}</dd>
-              <dt>도메인 일치</dt>
-              <dd>{yesNo(current.hostname_valid)}</dd>
-              <dt>인증서 신뢰</dt>
-              <dd>{yesNo(current.chain_valid)}</dd>
-              <dt>인증 대상</dt>
-              <dd>{current.subject ?? '미수집'}</dd>
-              <dt>발급 기관</dt>
-              <dd>{current.issuer ?? '미수집'}</dd>
-              <dt>서명 알고리즘</dt>
-              <dd>{current.signature_algorithm ?? '미수집'}</dd>
-              <dt>일련번호</dt>
-              <dd>{current.serial_number ?? '미수집'}</dd>
-              <dt>요청 도메인</dt>
-              <dd>{current.sni_hostname}</dd>
-              <dt>자동 점검</dt>
-              <dd>{current.enabled ? `${current.check_interval_minutes}분마다` : '중지'}</dd>
-              <dt>결과 코드</dt>
-              <dd>{current.message ?? '미수집'}</dd>
-            </dl>
+            <ProDescriptions
+              column={1}
+              bordered
+              dataSource={{
+                remaining:
+                  current.days_remaining == null ? '미수집' : `${current.days_remaining}일`,
+                notBefore: time(current.not_before),
+                notAfter: time(current.not_after),
+                hostnameValid: yesNo(current.hostname_valid),
+                chainValid: yesNo(current.chain_valid),
+                subject: current.subject ?? '미수집',
+                issuer: current.issuer ?? '미수집',
+                algorithm: current.signature_algorithm ?? '미수집',
+                serial: current.serial_number ?? '미수집',
+                sni: current.sni_hostname,
+                schedule: current.enabled ? `${current.check_interval_minutes}분마다` : '중지',
+                message: current.message ?? '미수집',
+              }}
+              columns={[
+                { title: '남은 기간', dataIndex: 'remaining' },
+                { title: '유효 시작일', dataIndex: 'notBefore' },
+                { title: '만료일', dataIndex: 'notAfter' },
+                { title: '도메인 일치', dataIndex: 'hostnameValid' },
+                { title: '인증서 신뢰', dataIndex: 'chainValid' },
+                { title: '인증 대상', dataIndex: 'subject' },
+                { title: '발급 기관', dataIndex: 'issuer' },
+                { title: '서명 알고리즘', dataIndex: 'algorithm' },
+                { title: '일련번호', dataIndex: 'serial' },
+                { title: '요청 도메인', dataIndex: 'sni' },
+                { title: '자동 점검', dataIndex: 'schedule' },
+                { title: '결과 코드', dataIndex: 'message' },
+              ]}
+            />
             <div className="api-run-action">
-              <Button
-                permission="write"
-                isLoading={recheck.isPending}
-                isDisabled={polling.isPolling}
-                onClick={() => recheck.mutate(current.certificate_target_id)}
-              >
-                지금 인증서 확인
-              </Button>
+              {canWrite && (
+                <Button
+                  type="primary"
+                  loading={recheck.isPending}
+                  disabled={polling.isPolling}
+                  onClick={() => recheck.mutate(current.certificate_target_id)}
+                >
+                  지금 인증서 확인
+                </Button>
+              )}
               <p>서버에 다시 접속해 인증서를 새로 조회합니다.</p>
             </div>
             {polling.isPolling && (
-              <Alert variant="info" title="인증서 조회 결과를 기다리고 있습니다." />
+              <Alert type="info" title="인증서 조회 결과를 기다리고 있습니다." />
             )}
             {polling.didTimeOut && (
-              <Alert variant="warning" title="아직 새 조회 결과가 도착하지 않았습니다." />
+              <Alert type="warning" title="아직 새 조회 결과가 도착하지 않았습니다." />
             )}
-          </ModalBody>
-        </Modal>
+          </div>
+        </Drawer>
       )}
     </>
   );
@@ -254,6 +268,7 @@ function CertificateTable({
   onSelect: (certificate: Certificate) => void;
   checking: boolean;
 }) {
+  const { canWrite } = usePermissions();
   if (query.isPending) {
     return <Loading />;
   }
@@ -267,7 +282,7 @@ function CertificateTable({
         {filtered ? (
           <>
             조건에 맞는 인증서가 없습니다.{' '}
-            <Button variant="link" onClick={reset}>
+            <Button type="link" onClick={reset}>
               필터 초기화
             </Button>
           </>
@@ -279,58 +294,60 @@ function CertificateTable({
       </Empty>
     );
   }
+  const columns: ProColumns<Certificate>[] = [
+    { title: '프로젝트', dataIndex: 'project_id' },
+    {
+      title: '호스트',
+      dataIndex: 'hostname',
+      render: (_, certificate) => (
+        <Button type="link" onClick={() => onSelect(certificate)}>
+          {certificate.hostname}:{certificate.port}
+        </Button>
+      ),
+    },
+    {
+      title: '인증 대상 / 발급 기관',
+      dataIndex: 'subject',
+      render: (_, certificate) =>
+        `${String(certificate.subject ?? '미수집')} / ${String(certificate.issuer ?? '미수집')}`,
+    },
+    { title: '일련번호', dataIndex: 'serial_number', renderText: (value) => value ?? '미수집' },
+    { title: '유효 시작', dataIndex: 'not_before', renderText: time },
+    { title: '만료', dataIndex: 'not_after', renderText: time },
+    {
+      title: '남은 일수',
+      dataIndex: 'days_remaining',
+      renderText: (value) => String(value ?? '미수집'),
+    },
+    { title: '신뢰 검증', dataIndex: 'chain_valid', renderText: yesNo },
+    { title: '도메인 일치', dataIndex: 'hostname_valid', renderText: yesNo },
+    {
+      title: '상태',
+      dataIndex: 'status',
+      render: (_, certificate) => <StatusLabel status={certificate.status} />,
+    },
+    {
+      title: '작업',
+      valueType: 'option',
+      hideInTable: !canWrite,
+      render: (_, certificate) => (
+        <Button disabled={checking} onClick={() => onCheck(certificate)}>
+          지금 확인
+        </Button>
+      ),
+    },
+  ];
   return (
-    <Table variant="compact" aria-label="인증서 목록">
-      <Thead>
-        <Tr>
-          <Th>프로젝트</Th>
-          <Th>호스트</Th>
-          <Th>인증 대상 / 발급 기관</Th>
-          <Th>일련번호</Th>
-          <Th>유효 시작</Th>
-          <Th>만료</Th>
-          <Th>남은 일수</Th>
-          <Th>신뢰 검증</Th>
-          <Th>도메인 일치</Th>
-          <Th>상태</Th>
-          <Th>작업</Th>
-        </Tr>
-      </Thead>
-      <Tbody>
-        {certificates.map((certificate) => (
-          <Tr key={certificate.certificate_target_id}>
-            <Td>{certificate.project_id}</Td>
-            <Td>
-              <Button variant="link" onClick={() => onSelect(certificate)}>
-                {certificate.hostname}:{certificate.port}
-              </Button>
-            </Td>
-            <Td>
-              {String(certificate.subject ?? '미수집')} / {String(certificate.issuer ?? '미수집')}
-            </Td>
-            <Td>{certificate.serial_number ?? '미수집'}</Td>
-            <Td>{time(certificate.not_before)}</Td>
-            <Td>{time(certificate.not_after)}</Td>
-            <Td>{String(certificate.days_remaining ?? '미수집')}</Td>
-            <Td>{yesNo(certificate.chain_valid)}</Td>
-            <Td>{yesNo(certificate.hostname_valid)}</Td>
-            <Td>
-              <StatusLabel status={certificate.status} />
-            </Td>
-            <Td>
-              <Button
-                permission="write"
-                variant="secondary"
-                isDisabled={checking}
-                onClick={() => onCheck(certificate)}
-              >
-                지금 확인
-              </Button>
-            </Td>
-          </Tr>
-        ))}
-      </Tbody>
-    </Table>
+    <ProTable<Certificate>
+      aria-label="인증서 목록"
+      rowKey="certificate_target_id"
+      dataSource={certificates}
+      columns={columns}
+      search={false}
+      options={false}
+      pagination={false}
+      scroll={{ x: 'max-content' }}
+    />
   );
 }
 

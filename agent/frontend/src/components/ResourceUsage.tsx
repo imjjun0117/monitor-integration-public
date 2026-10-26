@@ -1,5 +1,6 @@
 // 사용량·전체 용량·사용률 표시
 import { byteUnitFor, formatBytes, formatPercent } from '../utils/format';
+import { Progress, Typography } from 'antd';
 
 export default function ResourceUsage({
   used,
@@ -30,19 +31,15 @@ export default function ResourceUsage({
         </div>
         {unit === 'bytes' && <span className="resource-usage-percent">{formatPercent(ratio)}</span>}
       </div>
-      {ratio != null ? (
-        <meter
-          className="resource-usage-meter"
-          min={0}
-          max={1}
-          value={Math.min(1, ratio)}
+      {ratio != null && (
+        <Progress
+          percent={Math.min(100, ratio * 100)}
+          showInfo={false}
           aria-label={`${label ?? capacityLabel} 사용률`}
           aria-valuetext={formatPercent(ratio)}
         />
-      ) : (
-        <div className="resource-usage-meter unavailable" aria-hidden="true" />
       )}
-      <p className="resource-usage-note">
+      <Typography.Text type="secondary" className="resource-usage-note">
         {unit === 'ratio' ? (
           '전체 CPU 기준 사용률'
         ) : (
@@ -53,7 +50,7 @@ export default function ResourceUsage({
             )}
           </>
         )}
-      </p>
+      </Typography.Text>
     </div>
   );
 }

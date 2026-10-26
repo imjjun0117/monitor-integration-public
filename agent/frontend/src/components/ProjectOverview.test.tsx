@@ -41,9 +41,20 @@ function view(projects: DashboardProject[], onSelect = vi.fn()) {
   );
 }
 
+test('overview uses a ProTable and keyboard-selectable project controls', () => {
+  const onSelect = vi.fn();
+  view([project(0), project(1)], onSelect);
+  expect(screen.getByRole('table').closest('.ant-pro-table')).toBeInTheDocument();
+  const button = screen.getByRole('button', { name: 'Project 001 자원 보기' });
+  button.focus();
+  fireEvent.click(button);
+  expect(onSelect).toHaveBeenCalledWith('project-1');
+});
+
 test('search and pagination cover a hundred projects with twenty rows per page', () => {
   view(Array.from({ length: 100 }, (_, index) => project(index)));
-  const rows = () => screen.getByRole('table').querySelectorAll('tbody tr');
+  const rows = () =>
+    screen.getByRole('table').querySelectorAll('tbody tr:has(button[aria-pressed])');
   expect(rows()).toHaveLength(20);
   expect(screen.getByText('1–20 / 100개')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '다음 프로젝트 페이지' }));
@@ -59,9 +70,9 @@ test('search and pagination cover a hundred projects with twenty rows per page',
 test('prioritizes incidents and filters status or sorts by usage across the entire dataset', async () => {
   view([project(1), project(2, Status.DOWN), project(3, Status.WARN), project(4, Status.UNKNOWN)]);
   const names = () =>
-    Array.from(screen.getByRole('table').querySelectorAll('tbody tr')).map(
-      (row) => row.querySelector('strong')?.textContent,
-    );
+    Array.from(
+      screen.getByRole('table').querySelectorAll('tbody tr:has(button[aria-pressed])'),
+    ).map((row) => row.querySelector('strong')?.textContent);
   expect(names()).toEqual(['Project 002', 'Project 003', 'Project 004', 'Project 001']);
   await selectOption(screen.getByLabelText('프로젝트 상태 필터'), '확인 필요');
   expect(names()).toEqual(['Project 002', 'Project 003', 'Project 004']);

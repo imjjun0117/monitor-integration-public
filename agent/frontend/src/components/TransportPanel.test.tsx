@@ -30,6 +30,8 @@ it('never starts on mount and starts only after the button click', async () => {
     </MemoryRouter>,
   );
   const button = await screen.findByRole('button', { name: '연결 시작' });
+  expect(screen.getByRole('region', { name: 'Collector 연결 상태' })).toHaveClass('ant-card');
+  expect(screen.getByText('연결 대기')).toHaveClass('ant-tag');
   expect(start).not.toHaveBeenCalled();
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   fireEvent.click(button);

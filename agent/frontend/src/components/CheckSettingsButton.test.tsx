@@ -5,6 +5,7 @@ import { saveCheckSettings, type ApiCheck } from '../api';
 import { Check, Status } from '../generated';
 import { selectOption } from '../test-select';
 import CheckSettingsButton from './CheckSettingsButton';
+import { PermissionContext } from './PermissionContext';
 
 vi.mock('../api', () => ({ saveCheckSettings: vi.fn() }));
 const check: ApiCheck = {
@@ -40,6 +41,25 @@ function view(value = check) {
   );
   fireEvent.click(screen.getByRole('button', { name: '판매특허 소멸 배치 점검 점검 설정' }));
 }
+test('check schedule editor uses Ant Design Modal and ProForm while preserving seconds', async () => {
+  view();
+  const dialog = screen.getByRole('dialog', { name: '판매특허 소멸 배치 점검 점검 설정' });
+  expect(dialog.closest('.ant-modal')).toBeInTheDocument();
+  expect(dialog.querySelector('.ant-pro-form')).toBeInTheDocument();
+  await selectOption(screen.getByRole('combobox', { name: '자동 실행' }), '사용');
+  fireEvent.change(screen.getByRole('spinbutton', { name: '점검 주기(분)' }), {
+    target: { value: '60' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  await waitFor(() =>
+    expect(saveCheckSettings).toHaveBeenCalledWith(check, {
+      monitoringEnabled: true,
+      automaticEnabled: true,
+      checkIntervalSeconds: 3600,
+    }),
+  );
+});
+
 test('internal check uses plain name and saves automatic interval in seconds', async () => {
   view();
   expect(screen.getByRole('spinbutton', { name: '점검 주기(분)' })).toBeDisabled();
@@ -88,4 +108,28 @@ test('invalid interval cannot submit and save failure keeps draft open', async (
   ).toBeVisible();
   expect(screen.getByRole('dialog')).toBeVisible();
   expect(screen.getByRole('spinbutton')).toHaveValue(10);
+});
+
+test('viewer cannot edit a check; operator sees the native Ant Design settings button', () => {
+  const queryClient = new QueryClient();
+  const view = render(
+    <QueryClientProvider client={queryClient}>
+      <PermissionContext.Provider
+        value={{ username: 'reader', role: 'VIEWER', isAdmin: false, canWrite: false }}
+      >
+        <CheckSettingsButton check={check} />
+      </PermissionContext.Provider>
+    </QueryClientProvider>,
+  );
+  expect(screen.queryByRole('button', { name: /점검 설정/ })).not.toBeInTheDocument();
+  view.rerender(
+    <QueryClientProvider client={queryClient}>
+      <PermissionContext.Provider
+        value={{ username: 'operator', role: 'OPERATOR', isAdmin: false, canWrite: true }}
+      >
+        <CheckSettingsButton check={check} />
+      </PermissionContext.Provider>
+    </QueryClientProvider>,
+  );
+  expect(screen.getByRole('button', { name: /점검 설정/ })).toHaveClass('ant-btn');
 });

@@ -1,4 +1,7 @@
-.incident-page {
+/* 장애 조사 열과 증거 콘텐츠의 반응형 배치만 유지. 표면은 AntD 구성요소 사용 */
+.incident-page,
+.incident-side,
+.incident-section {
   display: grid;
   gap: 20px;
   min-width: 0;
@@ -8,302 +11,73 @@
 .incident-side > * {
   min-width: 0;
 }
-.incident-page .api-page-help {
-  margin: 0;
-}
-.incident-filters,
-.incident-metric-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.incident-page button[aria-pressed="true"] {
-  color: var(--hm-primary);
-  background: var(--hm-primary-soft);
-  border-color: var(--hm-primary);
-  font-weight: 700;
-}
-.incident-list-count {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 0;
-}
-.incident-list-count span {
-  color: var(--hm-muted);
-  font-size: 13px;
-}
-.incident-list td {
-  vertical-align: top;
-  padding-top: 20px;
-  padding-bottom: 20px;
-}
-.incident-list th:first-child {
-  width: 130px;
-}
-.incident-list th:nth-child(3) {
-  width: 210px;
-}
-.incident-row-summary {
-  margin: 8px 0 0;
-  color: var(--hm-secondary);
-  white-space: normal;
-  overflow-wrap: anywhere;
-  line-height: 1.6;
-}
-.incident-item-title {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-.incident-item-title a {
-  font-size: 15px;
-}
-.incident-page .incident-state-OPEN {
-  color: var(--hm-danger);
-  background: var(--hm-danger-soft);
-}
-.incident-page .incident-state-ACKNOWLEDGED {
-  color: var(--hm-warning);
-  background: var(--hm-warning-soft);
-}
-.incident-page .incident-state-IN_PROGRESS {
-  color: var(--hm-info);
-  background: var(--hm-info-soft);
-}
-.incident-page .incident-state-RECOVERED {
-  color: var(--hm-success);
-  background: var(--hm-success-soft);
-}
-.incident-page .incident-state-MONITORING_STOPPED {
-  color: var(--hm-secondary);
-  background: var(--hm-subtle);
-}
-.incident-heading,
-.incident-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-.incident-heading {
-  justify-content: space-between;
-}
-.incident-heading h2 {
-  margin: 4px 0 8px;
-  font-size: 24px;
-  font-weight: 700;
-}
-.incident-overview .incident-heading p {
-  color: var(--hm-secondary);
-}
-.incident-cause {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 8px;
-  background: var(--hm-subtle);
-  line-height: 1.7;
-}
 .incident-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 20px;
   align-items: start;
 }
-.incident-side {
-  display: grid;
-  gap: 20px;
-  min-width: 0;
-}
-.incident-investigation .ta-tab-content {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-}
-.incident-investigation .ta-tab-list {
-  max-width: 100%;
-  overflow-x: auto;
-}
-.incident-investigation .ta-tab-button {
-  flex-shrink: 0;
-}
-.incident-evidence-range {
-  display: grid;
-  gap: 4px;
-  color: var(--hm-secondary);
-  font-size: 13px;
-}
-.incident-evidence-range span {
-  color: var(--hm-muted);
-  font-size: 12px;
-}
-.incident-metric-options .ta-button {
-  min-height: 36px;
-  padding: 6px 10px;
-  font-size: 12px;
-}
-.incident-meta {
-  display: block;
-  margin-top: 5px;
-  color: var(--hm-muted);
+.incident-heading,
+.incident-toolbar,
+.incident-filters,
+.incident-metric-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }
 .incident-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px 24px;
-  margin: 0;
-}
-.incident-facts dt {
-  color: var(--hm-muted);
-  font-size: 12px;
-}
-.incident-facts dd {
-  margin: 6px 0 0;
-  overflow-wrap: anywhere;
-}
-.incident-section {
-  display: grid;
-  gap: 16px;
-  padding: 20px;
-  border: 1px solid var(--hm-border);
-  border-radius: 12px;
-  background: var(--hm-surface);
-  min-width: 0;
-}
-.incident-section h3,
-.incident-section h4,
-.incident-section p {
-  margin: 0;
-}
-.incident-section small {
-  color: var(--hm-muted);
-  font-size: 12px;
-  font-weight: normal;
-}
-.incident-comparison {
-  padding-top: 14px;
-  border-top: 1px solid var(--hm-border);
-}
-.incident-comparison summary,
-.incident-history summary {
-  cursor: pointer;
-  font-weight: 600;
-  padding-block: 4px;
-}
-.incident-comparison summary:focus-visible,
-.incident-history summary:focus-visible {
-  outline: 2px solid var(--hm-primary);
-  outline-offset: 4px;
-}
-.incident-comparison[open] > :not(summary),
-.incident-history[open] > :not(summary) {
-  margin-top: 16px;
-}
-.incident-history summary span {
-  color: var(--hm-muted);
-  font-size: 12px;
-  margin-left: 8px;
 }
 .incident-observations {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
 }
-.incident-observations > div {
-  display: grid;
-  gap: 10px;
+.incident-row-summary,
+.incident-facts dd,
+.incident-observations > div,
+.incident-note {
   overflow-wrap: anywhere;
-}
-.incident-observations .ta-badge {
-  justify-self: start;
-}
-.incident-timeline {
-  margin: 0;
-  padding-left: 22px;
-  display: grid;
-  gap: 16px;
-  max-height: 480px;
-  overflow-y: auto;
-}
-.incident-timeline li > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.incident-timeline span {
-  color: var(--hm-muted);
-  font-size: 12px;
 }
 .incident-note {
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  margin-top: 6px !important;
 }
-.incident-actions textarea {
-  width: 100%;
-  padding: 12px;
-  color: inherit;
-  background: var(--hm-canvas);
-  border: 1px solid var(--hm-border);
-  border-radius: 8px;
-  resize: vertical;
+.incident-comparison summary:focus-visible,
+.incident-history summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
 }
-.incident-actions textarea:focus-visible {
-  outline: 2px solid var(--hm-info);
-  outline-offset: 2px;
+.incident-timeline,
+.incident-filters {
+  overflow: auto;
 }
-.incident-actions .field {
-  min-width: 0;
-  width: 100%;
-}
-.incident-actions > .ta-button {
-  justify-self: start;
+.incident-timeline {
+  max-height: 480px;
 }
 .incident-log {
   max-height: 360px;
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  padding: 12px;
-  background: var(--hm-canvas);
+  font-family: Consolas, monospace;
 }
 @media (max-width: 1199px) {
   .incident-workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .incident-side {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
   }
 }
 @media (max-width: 767px) {
-  .incident-observations,
-  .incident-side {
-    grid-template-columns: 1fr;
+  .incident-side,
+  .incident-observations {
+    grid-template-columns: minmax(0, 1fr);
   }
   .incident-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .incident-heading h2 {
-    font-size: 20px;
-  }
-  .incident-filters {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 4px;
-  }
-  .incident-filters .ta-button {
-    flex-shrink: 0;
-  }
-  .incident-actions {
-    display: none;
-  }
-  .incident-section {
-    padding: 14px;
   }
 }

@@ -50,6 +50,15 @@ function view() {
     </QueryClientProvider>,
   );
 }
+test('log sources use ProTable and settings use Ant Design Modal with ProForm', async () => {
+  view();
+  const source = await screen.findByRole('button', { name: 'WAS' });
+  expect(source.closest('.ant-pro-table')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '설정' }));
+  const dialog = screen.getByRole('dialog', { name: '로그 설정' });
+  expect(dialog.closest('.ant-modal')).toBeInTheDocument();
+  expect(dialog.querySelector('.ant-pro-form')).toBeInTheDocument();
+});
 test('polls only while open, uses configured interval, and pauses for hidden tabs and navigation', async () => {
   const rendered = view();
   const button = await screen.findByRole('button', { name: 'WAS' });

@@ -75,6 +75,9 @@ function show() {
 test('role registration defaults to viewer and builtin editing stays protected', async () => {
   show();
   await screen.findByRole('button', { name: '팀 조회 수정' });
+  expect(screen.getByRole('region', { name: '역할 목록' })).toHaveClass('ant-card');
+  expect(screen.getByRole('tablist').closest('.ant-tabs-nav')).toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: '역할 검색' })).toHaveClass('ant-input');
   expect(screen.queryByRole('button', { name: '관리자 수정' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '역할 등록' }));
   fireEvent.change(screen.getByLabelText('역할 ID'), { target: { value: 'team_new' } });

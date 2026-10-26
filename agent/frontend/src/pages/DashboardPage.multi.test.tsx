@@ -272,8 +272,8 @@ test('initial dashboard selects one project and one instance without querying ev
   state.many = true;
   view();
   const panel = await ready();
-  expect(screen.getByLabelText('프로젝트 선택')).toHaveTextContent('Alpha');
-  expect(screen.getByLabelText('인스턴스 선택')).toHaveTextContent('Up');
+  expect(screen.getByLabelText('프로젝트 선택').closest('.ant-select')).toHaveTextContent('Alpha');
+  expect(screen.getByLabelText('인스턴스 선택').closest('.ant-select')).toHaveTextContent('Up');
   expect(getResources).toHaveBeenCalledTimes(1);
   expect(getResources).toHaveBeenCalledWith('alpha', 'up', '15m');
   expect(
@@ -286,15 +286,34 @@ test('initial dashboard selects one project and one instance without querying ev
   }
 });
 
+test('dashboard displays operational summaries in official Ant Design cards without changing links', async () => {
+  view();
+  await ready();
+  expect(screen.getByText('조회 기간', { selector: 'label' })).toBeVisible();
+  expect(screen.getByText(/최근 수집 데이터를 조회/)).toBeVisible();
+  const summary = screen.getByLabelText('선택 인스턴스 요약');
+  expect(summary.querySelectorAll('.ant-card')).toHaveLength(4);
+  expect(summary.querySelectorAll('.ant-statistic')).toHaveLength(3);
+  expect(within(summary).getByRole('link', { name: '실패 API 0개 목록' })).toHaveAttribute(
+    'href',
+    '/api-monitoring?project=alpha&instance=up&status=DOWN&usage=used',
+  );
+});
+
 test('dropdown search selects another project then its first instance and clears the previous target', async () => {
   view();
   await ready();
-  fireEvent.click(screen.getByLabelText('프로젝트 선택'));
-  fireEvent.change(await screen.findByRole('textbox', { name: '프로젝트 검색' }), {
+  const projectPicker = screen.getByRole('combobox', { name: '프로젝트 선택' });
+  fireEvent.mouseDown(projectPicker);
+  fireEvent.change(projectPicker, {
     target: { value: 'beta' },
   });
   expect(screen.queryByRole('option', { name: 'Alpha' })).toBeNull();
-  fireEvent.click(screen.getByRole('option', { name: 'Beta' }));
+  fireEvent.click(
+    (await screen.findByText('Beta', { selector: '.ant-select-item-option-content' })).closest(
+      '.ant-select-item-option',
+    )!,
+  );
   await ready('Beta / Warn');
   expect(getResources).toHaveBeenCalledWith('beta', 'warn', '15m');
   expect(screen.queryByRole('region', { name: 'Alpha / Up' })).toBeNull();
@@ -304,12 +323,18 @@ test('instance dropdown searches its ID and changes only the selected instance',
   view();
   await ready();
   getResources.mockClear();
-  fireEvent.click(screen.getByLabelText('인스턴스 선택'));
-  fireEvent.change(await screen.findByRole('textbox', { name: '인스턴스 검색' }), {
+  expect(screen.getByText('인스턴스', { selector: 'label' })).toBeVisible();
+  const picker = screen.getByRole('combobox', { name: '인스턴스 선택' });
+  expect(picker.closest('.ant-select')).toBeInTheDocument();
+  fireEvent.mouseDown(picker);
+  fireEvent.change(picker, {
     target: { value: 'extra-4' },
   });
-  expect(screen.queryByRole('option', { name: 'Up' })).toBeNull();
-  fireEvent.click(screen.getByRole('option', { name: 'Extra 4' }));
+  fireEvent.click(
+    (await screen.findByText('Extra 4', { selector: '.ant-select-item-option-content' })).closest(
+      '.ant-select-item-option',
+    )!,
+  );
   await ready('Alpha / Extra 4');
   expect(getResources).toHaveBeenCalledTimes(1);
   expect(getResources).toHaveBeenCalledWith('alpha', 'extra-4', '15m');
@@ -321,6 +346,7 @@ test('explicit instance and period survive initial entry and period changes stay
   expect(getResources).toHaveBeenCalledWith('beta', 'warn', '30d');
   getResources.mockClear();
   await selectOption(screen.getByLabelText('관제 조회 기간'), '1년');
+  expect(screen.getByLabelText('관제 조회 기간').closest('.ant-select')).toHaveTextContent('1년');
   await waitFor(() => expect(getResources).toHaveBeenCalledWith('beta', 'warn', '365d'));
   expect(getResources).toHaveBeenCalledTimes(1);
 });
@@ -366,7 +392,11 @@ test('selected instance errors do not fetch a different server or plot false zer
 test('project without instances does not invent a target or request resource history', async () => {
   state.empty = true;
   view();
-  await waitFor(() => expect(screen.getByLabelText('프로젝트 선택')).toHaveTextContent('Alpha'));
+  await waitFor(() =>
+    expect(screen.getByLabelText('프로젝트 선택').closest('.ant-select')).toHaveTextContent(
+      'Alpha',
+    ),
+  );
   expect(await screen.findByText('프로젝트와 인스턴스를 선택하세요.')).toBeVisible();
   expect(getResources).not.toHaveBeenCalled();
   expect(getDashboard).not.toHaveBeenCalled();

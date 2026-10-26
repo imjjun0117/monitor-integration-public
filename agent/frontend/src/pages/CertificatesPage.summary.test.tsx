@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -59,4 +59,23 @@ test('expiry summary uses dashboard expiry causes, excludes TLS failures, and in
   expect(screen.queryByRole('button', { name: 'host-1.example:443' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'host-2.example:443' })).not.toBeInTheDocument();
   expect(getCertificates).toHaveBeenCalledWith(expect.objectContaining({ expiry: 'soon' }), 1);
+});
+
+test('certificate results and detail use ProTable, Drawer and ProDescriptions', async () => {
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MemoryRouter initialEntries={['/certificates']}>
+        <CertificatesPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  const host = await screen.findByRole('button', { name: 'host-1.example:443' });
+  expect(host.closest('.ant-pro-table')).toBeInTheDocument();
+  fireEvent.click(host);
+  const detail = screen.getByRole('dialog', { name: 'SSL 인증서 상세' });
+  expect(detail.closest('.ant-drawer')).toBeInTheDocument();
+  expect(detail.querySelector('.ant-pro-descriptions')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '지금 인증서 확인' })).toBeInTheDocument();
 });

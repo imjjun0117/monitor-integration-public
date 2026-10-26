@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { getProjects, getInstances } from '../../api';
 import { useProjectScope } from '../../components/ProjectScope';
 import { Loading, Failure } from '../../components/QueryState';
-import { FormSelect, FormSelectOption } from '../../components/ui';
+import { Select } from 'antd';
 import { LabeledField } from './forms';
 import InstanceThresholdSettings from './InstanceThresholdSettings';
 
@@ -22,40 +22,38 @@ export default function ThresholdSettingsTab() {
     <div className="threshold-entry">
       <div className="threshold-selectors">
         <LabeledField id="threshold-project" label="프로젝트">
-          <FormSelect
+          <Select
             id="threshold-project"
+            aria-label="프로젝트"
             value={project}
-            onChange={(_, next) => {
+            onChange={(next) => {
               setProject(next);
               setInstance('');
             }}
-          >
-            <FormSelectOption value="" label="프로젝트 선택" />
-            {(projects.data?.items ?? []).map((item) => (
-              <FormSelectOption
-                key={item.project_id}
-                value={item.project_id}
-                label={item.display_name}
-              />
-            ))}
-          </FormSelect>
+            options={[
+              { value: '', label: '프로젝트 선택' },
+              ...(projects.data?.items ?? []).map((item) => ({
+                value: item.project_id,
+                label: item.display_name,
+              })),
+            ]}
+          />
         </LabeledField>
         <LabeledField id="threshold-instance" label="인스턴스">
-          <FormSelect
+          <Select
             id="threshold-instance"
+            aria-label="인스턴스"
             value={instance}
-            isDisabled={!project || instances.isPending || instances.isError}
-            onChange={(_, next) => setInstance(next)}
-          >
-            <FormSelectOption value="" label="인스턴스 선택" />
-            {(instances.data?.items ?? []).map((item) => (
-              <FormSelectOption
-                key={item.instance_id}
-                value={item.instance_id}
-                label={item.display_name}
-              />
-            ))}
-          </FormSelect>
+            disabled={!project || instances.isPending || instances.isError}
+            onChange={setInstance}
+            options={[
+              { value: '', label: '인스턴스 선택' },
+              ...(instances.data?.items ?? []).map((item) => ({
+                value: item.instance_id,
+                label: item.display_name,
+              })),
+            ]}
+          />
         </LabeledField>
       </div>
       {projects.isError && <Failure />}

@@ -232,17 +232,27 @@ class MigrationStartupIntegrationTest {
                                 .build(),
                         HttpResponse.BodyHandlers.ofString());
         assertEquals(200, login.statusCode());
-        assertTrue(login.body().contains("Monitoring"));
+        assertTrue(login.body().contains("id=\"login-root\""));
+        assertTrue(login.body().contains("<form method=\"post\" action=\"/api/v1/session/login\""));
+        assertTrue(login.body().contains("src=\"/assets/login.js\""));
+        assertTrue(login.body().contains("name=\"_csrf\" value=\""));
+        assertTrue(login.body().contains("<label for=\"username\">아이디</label>"));
+        assertTrue(login.body().contains("<label for=\"password\">비밀번호</label>"));
+        assertTrue(login.body().contains("<button type=\"submit\""));
+        assertFalse(login.body().contains("{{CSRF_TOKEN}}"));
+        assertFalse(login.body().contains("<style>"));
         assertFalse(login.body().contains("Hermes Monitoring"));
-        assertTrue(login.body().contains("<h1 id=\"login-title\" lang=\"en\">Login</h1>"));
-        assertTrue(login.body().contains("alt=\"\""));
-        assertTrue(login.body().contains("/monitoring.svg"));
-        assertFalse(login.body().contains("security-copy"));
-        assertFalse(login.body().contains("product-panel"));
-        assertFalse(login.body().contains("관리자 계정으로 계속하세요."));
-        assertFalse(login.body().contains("OPERATIONS CONSOLE"));
-        assertFalse(login.body().contains("Please sign in"));
-        assertTrue(login.body().contains("name=\"_csrf\""));
+        assertFalse(login.body().contains("attacker.example"));
+
+        HttpResponse<String> loginAsset =
+                client.send(
+                        HttpRequest.newBuilder()
+                                .uri(URI.create("http://127.0.0.1:" + port + "/assets/login.js"))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, loginAsset.statusCode());
+        assertTrue(loginAsset.headers().firstValue("content-type").orElse("").contains("javascript"));
 
         HttpResponse<String> brand =
                 client.send(
@@ -254,6 +264,126 @@ class MigrationStartupIntegrationTest {
         assertEquals(200, brand.statusCode());
         assertTrue(brand.headers().firstValue("content-type").orElse("").contains("image/svg+xml"));
         assertTrue(brand.body().contains("<svg"));
+    }
+
+    @Test
+    void nativeLoginPostUsesPageCsrfAndKeepsFailureAndSuccessRedirectsLocal() throws Exception {
+        java.net.CookieManager cookies = new java.net.CookieManager();
+        HttpClient client =
+                HttpClient.newBuilder()
+                        .cookieHandler(cookies)
+                        .followRedirects(HttpClient.Redirect.NEVER)
+                        .build();
+        URI loginUri = URI.create("http://127.0.0.1:" + port + "/api/v1/session/login");
+        String account = "login-ui-contract";
+        String password = "login-ui-fixture-password";
+        db.update(
+                "insert into app_users(username,password_hash,role,enabled) values(?,?,'ADMIN',true)"
+                        + " on conflict(username) do update set password_hash=excluded.password_hash,enabled=true",
+                account,
+                passwordEncoder.encode(password));
+        try {
+            HttpResponse<String> page =
+                    client.send(
+                            HttpRequest.newBuilder()
+                                    .uri(URI.create("http://127.0.0.1:" + port + "/login"))
+                                    .GET()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, page.statusCode());
+            java.util.regex.Matcher tokenField =
+                    java.util.regex.Pattern.compile("name=\"_csrf\" value=\"([^\"]+)\"")
+                            .matcher(page.body());
+            assertTrue(tokenField.find());
+            String token = tokenField.group(1);
+            // tunnel 프로필의 Secure 쿠키는 로컬 HTTP 테스트 연결에서 자동 전송되지 않음
+            assertFalse(cookies.getCookieStore().getCookies().isEmpty());
+            String pageCookies =
+                    cookies.getCookieStore().getCookies().stream()
+                            .map(java.net.HttpCookie::toString)
+                            .collect(java.util.stream.Collectors.joining("; "));
+            HttpResponse<String> failure =
+                    client.send(
+                            HttpRequest.newBuilder()
+                                    .uri(loginUri)
+                                    .header("Cookie", pageCookies)
+                                    .header("Accept", "text/html")
+                                    .header("Content-Type", "application/x-www-form-urlencoded")
+                                    .POST(HttpRequest.BodyPublishers.ofString(
+                                            "username=" + account + "&password=incorrect&_csrf="
+                                                    + java.net.URLEncoder.encode(token, java.nio.charset.StandardCharsets.UTF_8)))
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+            assertEquals(302, failure.statusCode());
+            assertEquals("/login?error", failure.headers().firstValue("Location").orElseThrow());
+
+            // 로그인 실패 후 새 토큰을 같은 브라우저 세션에서 다시 조회
+            HttpResponse<String> retryPage =
+                    client.send(
+                            HttpRequest.newBuilder()
+                                    .uri(URI.create("http://127.0.0.1:" + port + "/login?error"))
+                                    .header("Cookie", pageCookies)
+                                    .GET()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, retryPage.statusCode());
+            tokenField.reset(retryPage.body());
+            assertTrue(tokenField.find());
+            String retryToken = tokenField.group(1);
+            pageCookies =
+                    cookies.getCookieStore().getCookies().stream()
+                            .map(java.net.HttpCookie::toString)
+                            .collect(java.util.stream.Collectors.joining("; "));
+
+            HttpResponse<String> success =
+                    client.send(
+                            HttpRequest.newBuilder()
+                                    .uri(loginUri)
+                                    .header("Cookie", pageCookies)
+                                    .header("Content-Type", "application/x-www-form-urlencoded")
+                                    .POST(HttpRequest.BodyPublishers.ofString(
+                                            "username=" + account + "&password=" + password + "&_csrf="
+                                                    + java.net.URLEncoder.encode(retryToken, java.nio.charset.StandardCharsets.UTF_8)))
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+            assertEquals(302, success.statusCode());
+            assertEquals(
+                    URI.create("http://127.0.0.1:" + port + "/"),
+                    URI.create(success.headers().firstValue("Location").orElseThrow()));
+            assertTrue(
+                    cookies.getCookieStore().getCookies().stream()
+                            .anyMatch(cookie -> cookie.getName().equals("JSESSIONID")));
+            String sessionCookie =
+                    cookies.getCookieStore().getCookies().stream()
+                            .filter(cookie -> cookie.getName().equals("JSESSIONID"))
+                            .findFirst()
+                            .orElseThrow()
+                            .toString();
+            HttpResponse<String> session =
+                    client.send(
+                            HttpRequest.newBuilder()
+                                    .uri(URI.create("http://127.0.0.1:" + port + "/api/v1/session/me"))
+                                    .header("Cookie", sessionCookie)
+                                    .GET()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, session.statusCode());
+            assertTrue(session.body().contains(account));
+
+            HttpResponse<String> missingCsrf =
+                    client.send(
+                            HttpRequest.newBuilder()
+                                    .uri(loginUri)
+                                    .header("Cookie", sessionCookie)
+                                    .header("Content-Type", "application/x-www-form-urlencoded")
+                                    .POST(HttpRequest.BodyPublishers.ofString(
+                                            "username=" + account + "&password=" + password))
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+            assertEquals(403, missingCsrf.statusCode());
+        } finally {
+            db.update("delete from app_users where username=?", account);
+        }
     }
 
     @Test

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { Status, type DashboardProject, type DashboardResourceSample } from '../generated';
 import ProjectComparison from './ProjectComparison';
@@ -47,6 +47,7 @@ function read(title: string) {
 
 test('keeps projects separate and preserves actual zero and missing collection gaps', () => {
   render(<ProjectComparison projects={projects} history={history} />);
+  expect(screen.getByLabelText('차트 프로젝트').closest('.ant-select')).toBeInTheDocument();
   const series = read('CPU');
   expect(series.map((item: { name: string }) => item.name)).toEqual(['Alpha (a)', 'Beta (b)']);
   expect(series[0].points.map((item: { value: number | null }) => item.value)).toEqual([0, null]);
@@ -75,6 +76,7 @@ test('hundreds of projects remain available without inventing zero values for mi
   render(<ProjectComparison projects={many} history={[]} />);
   expect(read('CPU')).toHaveLength(100);
   expect(read('CPU')[99].points).toEqual([]);
+  fireEvent.change(screen.getByLabelText('차트 프로젝트'), { target: { value: 'Project 99' } });
   await selectOption(screen.getByLabelText('차트 프로젝트'), 'Project 99 (p99)');
   expect(read('CPU')).toHaveLength(1);
   expect(read('CPU')[0].points).toEqual([]);

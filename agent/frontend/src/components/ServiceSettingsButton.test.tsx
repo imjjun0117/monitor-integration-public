@@ -56,6 +56,20 @@ function view(value = check) {
   fireEvent.click(screen.getByRole('button', { name: '다른 문자 업체 서비스 설정' }));
 }
 
+test('service editor uses Ant Design Modal and ProForm while preserving conditional mapping', async () => {
+  view({ ...check, service_profile: profile });
+  const dialog = screen.getByRole('dialog', { name: '서비스 설정' });
+  expect(dialog.closest('.ant-modal')).toBeInTheDocument();
+  expect(dialog.querySelector('.ant-pro-form')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  await waitFor(() =>
+    expect(saveServiceProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ check_id: 'other-sms', service_profile: profile }),
+      profile,
+    ),
+  );
+});
+
 test('saves provider-specific response mapping for the selected project and instance', async () => {
   view();
   fireEvent.change(screen.getByLabelText('서비스명'), { target: { value: '문자 잔여량' } });

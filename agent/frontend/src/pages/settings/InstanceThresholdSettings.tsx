@@ -8,19 +8,8 @@ import {
 } from '../../api';
 import { usePermissions } from '../../components/PermissionContext';
 import { Failure, Loading } from '../../components/QueryState';
-import {
-  Alert,
-  Button,
-  FormSelect,
-  FormSelectOption,
-  Table,
-  Tbody,
-  Td,
-  Th,
-  Thead,
-  Tr,
-  TextInput,
-} from '../../components/ui';
+import { Alert as AntAlert, Button as AntButton, Input, Select, Space } from 'antd';
+import { ProTable, type ProColumns } from '@ant-design/pro-components';
 import type {
   InstanceThresholdMetric as Metric,
   InstanceThresholdMetricKey as MetricKey,
@@ -226,12 +215,86 @@ export default function InstanceThresholdSettings({
     });
   }
   const description = draft?.metricKey ? descriptions[draft.metricKey] : undefined;
+  const columns: ProColumns<Metric>[] = [
+    {
+      title: '항목',
+      render: (_, metric) => (
+        <>
+          {descriptions[metric.metricKey].name}
+          {metric.metricKey === 'CERTIFICATE_DAYS' && (
+            <span className="threshold-certificate-label">
+              {metric.certificateTargetLabel ?? '인증서 대상 연결 필요'}
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      title: '경고',
+      render: (_, metric) => (
+        <>
+          {displayed(metric.warningValue, metric.metricKey)}
+          {descriptions[metric.metricKey].unit}{' '}
+          {metric.metricKey === 'CERTIFICATE_DAYS' ? '이하' : '이상'}
+        </>
+      ),
+    },
+    {
+      title: '위험',
+      render: (_, metric) => (
+        <>
+          {displayed(metric.criticalValue, metric.metricKey)}
+          {descriptions[metric.metricKey].unit}{' '}
+          {metric.metricKey === 'CERTIFICATE_DAYS' ? '이하' : '이상'}
+        </>
+      ),
+    },
+    {
+      title: '알림 이메일',
+      render: (_, metric) =>
+        metric.recipientEmails.length ? (
+          <ul className="threshold-email-list">
+            {metric.recipientEmails.map((email) => (
+              <li key={email}>{email}</li>
+            ))}
+          </ul>
+        ) : (
+          '미설정'
+        ),
+    },
+    {
+      title: '작업',
+      render: (_, metric) => (
+        <Space>
+          <AntButton
+            aria-label={`${descriptions[metric.metricKey].name} 수정`}
+            disabled={!canWrite || save.isPending}
+            onClick={() => openEdit(metric)}
+          >
+            수정
+          </AntButton>
+          <AntButton
+            danger
+            aria-label={`${descriptions[metric.metricKey].name} 삭제`}
+            disabled={!canWrite || save.isPending}
+            onClick={() => {
+              save.reset();
+              setRemoving(metric);
+            }}
+          >
+            삭제
+          </AntButton>
+        </Space>
+      ),
+    },
+  ];
   return (
     <div className="instance-threshold-settings">
       <div className="settings-toolbar">
         <span>{settings.metrics.length}개 항목</span>
-        <Button
-          isDisabled={
+        <AntButton
+          type="primary"
+          disabled={
             !canWrite ||
             settings.metrics.length === Object.keys(descriptions).length ||
             save.isPending
@@ -239,87 +302,20 @@ export default function InstanceThresholdSettings({
           onClick={openAdd}
         >
           추가
-        </Button>
+        </AntButton>
       </div>
-      <Table className="settings-table threshold-list" aria-label="등록된 임계치">
-        <Thead>
-          <Tr>
-            <Th>항목</Th>
-            <Th>경고</Th>
-            <Th>위험</Th>
-            <Th>알림 이메일</Th>
-            <Th>작업</Th>
-          </Tr>
-        </Thead>
-        <Tbody>
-          {settings.metrics.map((metric) => (
-            <Tr key={metric.metricKey}>
-              <Td>
-                {descriptions[metric.metricKey].name}
-                {metric.metricKey === 'CERTIFICATE_DAYS' && (
-                  <span className="threshold-certificate-label">
-                    {metric.certificateTargetLabel ?? '인증서 대상 연결 필요'}
-                  </span>
-                )}
-              </Td>
-              <Td>
-                {displayed(metric.warningValue, metric.metricKey)}
-                {descriptions[metric.metricKey].unit}{' '}
-                {metric.metricKey === 'CERTIFICATE_DAYS' ? '이하' : '이상'}
-              </Td>
-              <Td>
-                {displayed(metric.criticalValue, metric.metricKey)}
-                {descriptions[metric.metricKey].unit}{' '}
-                {metric.metricKey === 'CERTIFICATE_DAYS' ? '이하' : '이상'}
-              </Td>
-              <Td>
-                {metric.recipientEmails.length ? (
-                  <ul className="threshold-email-list">
-                    {metric.recipientEmails.map((email) => (
-                      <li key={email}>{email}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  '미설정'
-                )}
-              </Td>
-              <Td>
-                <div className="row-actions">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    aria-label={`${descriptions[metric.metricKey].name} 수정`}
-                    isDisabled={!canWrite || save.isPending}
-                    onClick={() => openEdit(metric)}
-                  >
-                    수정
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    aria-label={`${descriptions[metric.metricKey].name} 삭제`}
-                    isDisabled={!canWrite || save.isPending}
-                    onClick={() => {
-                      save.reset();
-                      setRemoving(metric);
-                    }}
-                  >
-                    삭제
-                  </Button>
-                </div>
-              </Td>
-            </Tr>
-          ))}
-          {!settings.metrics.length && (
-            <Tr>
-              <Td colSpan={5} className="threshold-empty">
-                등록된 임계치가 없습니다.
-              </Td>
-            </Tr>
-          )}
-        </Tbody>
-      </Table>
-      {save.isSuccess && <Alert variant="success" title="저장했습니다." />}
+      <ProTable<Metric>
+        aria-label="등록된 임계치"
+        rowKey="metricKey"
+        columns={columns}
+        dataSource={settings.metrics}
+        search={false}
+        options={false}
+        pagination={false}
+        scroll={{ x: 'max-content' }}
+        locale={{ emptyText: '등록된 임계치가 없습니다.' }}
+      />
+      {save.isSuccess && <AntAlert type="success" message="저장했습니다." />}
       <SettingsDialog
         id="instance-threshold-dialog"
         title={draft?.originalKey ? '임계치 수정' : '임계치 추가'}
@@ -334,10 +330,10 @@ export default function InstanceThresholdSettings({
         {draft && (
           <>
             <LabeledField id="threshold-metric" label="항목" help={description?.help}>
-              <FormSelect
+              <Select
                 id="threshold-metric"
                 value={draft.metricKey}
-                onChange={(_, key) =>
+                onChange={(key) =>
                   setDraft({
                     ...draft,
                     metricKey: key as MetricKey,
@@ -346,18 +342,17 @@ export default function InstanceThresholdSettings({
                     certificateTargetId: undefined,
                   })
                 }
-              >
-                <FormSelectOption value="" label="항목 선택" />
-                {Object.entries(descriptions)
-                  .filter(
-                    ([key]) =>
-                      key === draft.originalKey ||
-                      !settings.metrics.some((metric) => metric.metricKey === key),
-                  )
-                  .map(([key, item]) => (
-                    <FormSelectOption key={key} value={key} label={item.name} />
-                  ))}
-              </FormSelect>
+                options={[
+                  { value: '', label: '항목 선택' },
+                  ...Object.entries(descriptions)
+                    .filter(
+                      ([key]) =>
+                        key === draft.originalKey ||
+                        !settings.metrics.some((metric) => metric.metricKey === key),
+                    )
+                    .map(([value, item]) => ({ value, label: item.name })),
+                ]}
+              />
             </LabeledField>
             {draft.metricKey === 'CERTIFICATE_DAYS' && (
               <>
@@ -366,23 +361,21 @@ export default function InstanceThresholdSettings({
                   label="인증서 대상"
                   help="이 프로젝트에 등록된 인증서를 선택하세요. 다른 인스턴스에 연결된 대상은 제외됩니다."
                 >
-                  <FormSelect
+                  <Select
                     id="threshold-certificate"
                     value={String(draft.certificateTargetId ?? '')}
-                    isDisabled={certificates.isPending || certificates.isError}
-                    onChange={(_, id) =>
+                    disabled={certificates.isPending || certificates.isError}
+                    onChange={(id) =>
                       setDraft({ ...draft, certificateTargetId: id ? Number(id) : undefined })
                     }
-                  >
-                    <FormSelectOption value="" label="인증서 선택" />
-                    {(certificates.data ?? []).map((target) => (
-                      <FormSelectOption
-                        key={target.id}
-                        value={String(target.id)}
-                        label={target.label}
-                      />
-                    ))}
-                  </FormSelect>
+                    options={[
+                      { value: '', label: '인증서 선택' },
+                      ...(certificates.data ?? []).map((target) => ({
+                        value: String(target.id),
+                        label: target.label,
+                      })),
+                    ]}
+                  />
                 </LabeledField>
                 {certificates.isError && <Failure message="인증서 대상을 불러오지 못했습니다." />}
                 {certificates.isSuccess && !certificates.data.length && (
@@ -397,7 +390,7 @@ export default function InstanceThresholdSettings({
                 id="threshold-warning"
                 label={`경고 (${description?.unit ?? '%'} ${draft.metricKey === 'CERTIFICATE_DAYS' ? '이하' : '이상'})`}
               >
-                <TextInput
+                <Input
                   id="threshold-warning"
                   aria-label="경고 기준"
                   type="number"
@@ -405,16 +398,16 @@ export default function InstanceThresholdSettings({
                   max={description?.unit === '%' ? 100 : undefined}
                   step={draft.metricKey === 'CERTIFICATE_DAYS' ? '1' : 'any'}
                   required
-                  isDisabled={!draft.metricKey}
+                  disabled={!draft.metricKey}
                   value={draft.warning}
-                  onChange={(_, warning) => setDraft({ ...draft, warning })}
+                  onChange={(event) => setDraft({ ...draft, warning: event.target.value })}
                 />
               </LabeledField>
               <LabeledField
                 id="threshold-critical"
                 label={`위험 (${description?.unit ?? '%'} ${draft.metricKey === 'CERTIFICATE_DAYS' ? '이하' : '이상'})`}
               >
-                <TextInput
+                <Input
                   id="threshold-critical"
                   aria-label="위험 기준"
                   type="number"
@@ -422,9 +415,9 @@ export default function InstanceThresholdSettings({
                   max={description?.unit === '%' ? 100 : undefined}
                   step={draft.metricKey === 'CERTIFICATE_DAYS' ? '1' : 'any'}
                   required
-                  isDisabled={!draft.metricKey}
+                  disabled={!draft.metricKey}
                   value={draft.critical}
-                  onChange={(_, critical) => setDraft({ ...draft, critical })}
+                  onChange={(event) => setDraft({ ...draft, critical: event.target.value })}
                 />
               </LabeledField>
             </div>
@@ -433,12 +426,12 @@ export default function InstanceThresholdSettings({
               label="알림 이메일"
               help="이 항목의 알림을 받을 주소입니다. 여러 명은 쉼표로 구분하세요. 최대 10개까지 등록할 수 있습니다."
             >
-              <TextInput
+              <Input
                 id="threshold-emails"
                 value={draft.emails}
                 maxLength={2550}
                 placeholder="ops@example.com, dev@example.com"
-                onChange={(_, value) => setDraft({ ...draft, emails: value })}
+                onChange={(event) => setDraft({ ...draft, emails: event.target.value })}
               />
             </LabeledField>
           </>

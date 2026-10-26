@@ -6,88 +6,28 @@
   <meta name="color-scheme" content="dark light">
   <script src="/assets/theme-init.js"></script>
   <link rel="icon" type="image/svg+xml" href="/monitoring.svg">
-  <link rel="stylesheet" href="/assets/fonts/fonts.css">
+  <link rel="stylesheet" href="/assets/login.css">
   <title>Login · Monitoring</title>
-  <style>
-    :root { font-family:"Outfit Variable","Noto Sans KR Variable",sans-serif; color:#101828; background:#fff; font-synthesis:none; }
-    * { box-sizing:border-box; }
-    body { min-height:100vh; margin:0; line-height:1.6; }
-    .login-shell { display:grid; grid-template-columns:1fr 1fr; min-height:100dvh; }
-    .login-content { display:flex; flex-direction:column; padding:40px; }
-    .brand { display:flex; align-items:center; gap:12px; font-size:23px; font-weight:600; letter-spacing:-.035em; }
-    .brand-mark { display:block; width:36px; height:36px; }
-    .form-panel { width:min(100%,440px); margin:auto; padding:64px 0; }
-    form { width:100%; }
-    h1 { margin:0 0 10px; font-size:36px; font-weight:600; line-height:1.3; letter-spacing:-.025em; }
-    .brand-panel { display:flex; position:relative; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; padding:56px; text-align:center; background:#f5f3ff; border-left:1px solid #e9e4f5; }
-    .brand-grid { position:absolute; width:720px; height:720px; background-image:linear-gradient(#5b21b60c 1px,transparent 1px),linear-gradient(90deg,#5b21b60c 1px,transparent 1px); background-size:48px 48px; transform:rotate(-12deg); }
-    .brand-panel > :not(.brand-grid) { position:relative; }
-    .brand-panel img { width:80px; height:80px; margin-bottom:24px; }
-    .brand-panel h2 { margin:0; color:#5b21b6; font-size:40px; font-weight:600; letter-spacing:-.035em; }
-    .brand-subtitle { margin:12px 0 0; color:#9fb2cc; font-size:18px; }
-
-    label { display:grid; gap:8px; margin-top:24px; color:#344054; font-size:14px; font-weight:500; }
-    input { width:100%; height:44px; padding:0 16px; border:1px solid #d0d5dd; border-radius:8px; color:#101828; background:#fff; font:inherit; font-size:14px; box-shadow:0 1px 2px #1018280d; }
-    input:hover { border-color:#888893; }
-    input:focus { border-color:#5b21b6; outline:3px solid rgba(91,33,182,.16); outline-offset:1px; }
-    button { width:100%; min-height:44px; margin-top:32px; border:0; border-radius:8px; color:#fff; background:#5b21b6; font:inherit; font-size:14px; font-weight:500; cursor:pointer; box-shadow:0 1px 2px #1018280d; }
-    button:hover { background:#4c1d95; }
-    button:focus-visible { outline:3px solid rgba(91,33,182,.32); outline-offset:3px; }
-    .login-error { margin:0 0 16px; padding:11px 13px; border:1px solid #f4bbb6; border-radius:8px; color:#b42318; background:#fdecea; font-size:13px; }
-
-    @media (max-width:1023px) {
-      .login-shell { grid-template-columns:1fr; }
-      .brand-panel { display:none; }
-    }
-    @media (max-width:767px) {
-      .login-content { padding:28px 24px; }
-      h1 { font-size:30px; }
-      input { font-size:16px; }
-    }
-    @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; transition:none!important; } }
-    :root { color-scheme:dark; color:#e8f0fb; background:#081321; }
-    .login-content { background:radial-gradient(ellipse at top,#162d49,#081321 70%); }
-    .brand-panel { background:#102239; border-color:#2b415b; }
-    .brand-panel h2 { color:#c4b5fd; }
-    label { color:#c2d2e6; }
-    input { color:#e8f0fb; background:#102239; border-color:#3a5573; }
-    input:focus { border-color:#c4b5fd; outline-color:#c4b5fd30; }
-    button { background:#c4b5fd; color:#201039; font-weight:600; }
-    button:hover { background:#8be9fb; }
-    .login-error { background:#422b37; color:#ff9da6; border-color:#8e4d5b; }
-    :root[data-theme='light'] { color-scheme:light; color:#101828; background:#f5f7fb; }
-    :root[data-theme='light'] .login-content { background:#fff; }
-    :root[data-theme='light'] .brand-panel { background:#f0f6fc; border-color:#dce3ed; }
-    :root[data-theme='light'] .brand-panel h2 { color:#5b21b6; }
-    :root[data-theme='light'] .brand-subtitle { color:#667085; }
-    :root[data-theme='light'] label { color:#344054; }
-    :root[data-theme='light'] input { background:#fff; color:#101828; border-color:#b9c7d8; }
-    :root[data-theme='light'] button { background:#5b21b6; color:#fff; }
-    :root[data-theme='light'] button:hover { background:#005c91; }
-    :root[data-theme='light'] .login-error { background:#fdecea; color:#b42318; border-color:#f4bbb6; }
-  </style>
 </head>
-<body>
+<body data-login-error="{{LOGIN_ERROR}}">
   <main class="login-shell">
-    <div class="login-content">
-    <div class="brand"><img class="brand-mark" src="/monitoring.svg" alt="">Monitoring</div>
-    <section class="form-panel" aria-labelledby="login-title">
+    <section class="login-panel" aria-labelledby="login-title">
       <form method="post" action="/api/v1/session/login">
-        <h1 id="login-title" lang="en">Login</h1>
-        {{ERROR}}
-        <label for="username">아이디<input id="username" name="username" type="text" autocomplete="username" required autofocus></label>
-        <label for="password">비밀번호<input id="password" name="password" type="password" autocomplete="current-password" required></label>
         <input type="hidden" name="_csrf" value="{{CSRF_TOKEN}}">
-        <button type="submit" lang="en">Login</button>
+        <div id="login-root">
+          <h1 id="login-title" lang="en">Login</h1>
+          {{ERROR}}
+          <div class="native-login-fields">
+            <label for="username">아이디</label>
+            <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+            <label for="password">비밀번호</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <button type="submit" lang="en">Login</button>
+          </div>
+        </div>
       </form>
     </section>
-    </div>
-    <aside class="brand-panel" aria-label="Monitoring 소개">
-      <div class="brand-grid" aria-hidden="true"></div>
-      <img src="/monitoring.svg" alt="">
-      <h2>Monitoring</h2>
-      <p class="brand-subtitle" lang="en">System Monitoring</p>
-    </aside>
   </main>
+  <script type="module" src="/assets/login.js"></script>
 </body>
 </html>

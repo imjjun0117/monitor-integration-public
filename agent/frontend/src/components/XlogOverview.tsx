@@ -4,19 +4,8 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DefaultService } from '../generated';
 import XlogChart, { type XlogItem } from './XlogChart';
-import {
-  Alert,
-  Button,
-  Modal,
-  ModalHeader,
-  ModalBody,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-} from './ui';
+import { ProDescriptions, ProTable, type ProColumns } from '@ant-design/pro-components';
+import { Alert, Button, Modal } from 'antd';
 import { Empty, Failure, Loading } from './QueryState';
 
 const PAGE_SIZE = 20;
@@ -59,6 +48,33 @@ export default function XlogOverview({
   const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const activePage = Math.min(page, pageCount - 1);
   const visibleItems = items.slice(activePage * PAGE_SIZE, (activePage + 1) * PAGE_SIZE);
+  const columns: ProColumns<XlogItem>[] = [
+    {
+      title: '시각',
+      dataIndex: ['payload', 'started_at'],
+      render: (_, item) => new Date(item.payload.started_at).toLocaleTimeString(),
+    },
+    {
+      title: '프로젝트 / 인스턴스',
+      dataIndex: 'project_name',
+      render: (_, item) => `${item.project_name} / ${item.instance_name}`,
+    },
+    {
+      title: '요청',
+      dataIndex: ['payload', 'path'],
+      render: (_, item) => (
+        <Button type="link" onClick={() => choose(item)}>
+          {item.payload.method} {item.payload.path}
+        </Button>
+      ),
+    },
+    {
+      title: '응답시간',
+      dataIndex: ['payload', 'duration_ms'],
+      render: (_, item) => `${item.payload.duration_ms} ms`,
+    },
+    { title: 'HTTP', dataIndex: ['payload', 'status'] },
+  ];
 
   if (!detailed && !enabled_projects && !items.length) {
     return null;
@@ -83,7 +99,7 @@ export default function XlogOverview({
               : '웹소켓 연결 끊김 · 수집이 중단되어 저장된 요청만 표시합니다.'}
         </p>
       )}
-      {query.isError && <Alert variant="warning" title="갱신에 실패해 마지막 기록을 표시합니다." />}
+      {query.isError && <Alert type="warning" title="갱신에 실패해 마지막 기록을 표시합니다." />}
       <div className={compact ? 'xlog-chart-summary' : 'xlog-kpis'}>
         <div>
           <span>수집 요청</span>
@@ -135,60 +151,31 @@ export default function XlogOverview({
       )}
       {detailed && (
         <>
-          <div className="settings-table-scroll">
-            <Table aria-label="XLog 요청 목록">
-              <Thead>
-                <Tr>
-                  <Th>시각</Th>
-                  <Th>프로젝트 / 인스턴스</Th>
-                  <Th>요청</Th>
-                  <Th>응답시간</Th>
-                  <Th>HTTP</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {visibleItems.map((item) => (
-                  <Tr key={item.id}>
-                    <Td>{new Date(item.payload.started_at).toLocaleTimeString()}</Td>
-                    <Td>
-                      {item.project_name} / {item.instance_name}
-                    </Td>
-                    <Td>
-                      <Button variant="link" onClick={() => choose(item)}>
-                        {item.payload.method} {item.payload.path}
-                      </Button>
-                    </Td>
-                    <Td>{item.payload.duration_ms} ms</Td>
-                    <Td>{item.payload.status}</Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </div>
+          <ProTable<XlogItem>
+            aria-label="XLog 요청 목록"
+            rowKey="id"
+            columns={columns}
+            dataSource={visibleItems}
+            search={false}
+            options={false}
+            pagination={false}
+            scroll={{ x: 'max-content' }}
+          />
           <div className="xlog-pagination" aria-label="XLog 요청 페이지 이동">
             <span>조회한 {items.length.toLocaleString()}건 · 페이지당 20건</span>
-            <Button
-              variant="secondary"
-              isDisabled={activePage === 0}
-              onClick={() => setPage(activePage - 1)}
-            >
+            <Button disabled={activePage === 0} onClick={() => setPage(activePage - 1)}>
               이전 페이지
             </Button>
             <span aria-live="polite">
               {activePage + 1} / {pageCount} 페이지
             </span>
-            <Button
-              variant="secondary"
-              isDisabled={activePage >= pageCount - 1}
-              onClick={() => setPage(activePage + 1)}
-            >
+            <Button disabled={activePage >= pageCount - 1} onClick={() => setPage(activePage + 1)}>
               다음 페이지
             </Button>
           </div>
           <div className="xlog-pagination">
             <Button
-              variant="secondary"
-              isDisabled={!beforeId}
+              disabled={!beforeId}
               onClick={() => {
                 setBeforeId(0);
                 setPage(0);
@@ -197,8 +184,7 @@ export default function XlogOverview({
               최근 기록
             </Button>
             <Button
-              variant="secondary"
-              isDisabled={items.length < 1000}
+              disabled={items.length < 1000}
               onClick={() => {
                 setBeforeId(items.at(-1)?.id ?? 0);
                 setPage(0);
@@ -210,26 +196,30 @@ export default function XlogOverview({
         </>
       )}
       {selected && (
-        <Modal isOpen onClose={() => select(undefined)} aria-label="요청 정보">
-          <ModalHeader title="요청 정보" />
-          <ModalBody>
-            <dl className="request-detail">
-              <dt>프로젝트 / 인스턴스</dt>
-              <dd>
-                {selected.project_name} / {selected.instance_name}
-              </dd>
-              <dt>시각</dt>
-              <dd>{new Date(selected.payload.started_at).toLocaleString()}</dd>
-              <dt>요청</dt>
-              <dd>
-                {selected.payload.method} {selected.payload.path}
-              </dd>
-              <dt>응답시간</dt>
-              <dd>{selected.payload.duration_ms} ms</dd>
-              <dt>HTTP 결과</dt>
-              <dd>{selected.payload.status}</dd>
-            </dl>
-          </ModalBody>
+        <Modal
+          open
+          title="요청 정보"
+          onCancel={() => select(undefined)}
+          footer={<Button onClick={() => select(undefined)}>닫기</Button>}
+        >
+          <ProDescriptions
+            column={1}
+            bordered
+            dataSource={{
+              scope: `${selected.project_name} / ${selected.instance_name}`,
+              started: new Date(selected.payload.started_at).toLocaleString(),
+              request: `${selected.payload.method} ${selected.payload.path}`,
+              duration: `${selected.payload.duration_ms} ms`,
+              status: selected.payload.status,
+            }}
+            columns={[
+              { title: '프로젝트 / 인스턴스', dataIndex: 'scope' },
+              { title: '시각', dataIndex: 'started' },
+              { title: '요청', dataIndex: 'request' },
+              { title: '응답시간', dataIndex: 'duration' },
+              { title: 'HTTP 결과', dataIndex: 'status' },
+            ]}
+          />
         </Modal>
       )}
     </section>

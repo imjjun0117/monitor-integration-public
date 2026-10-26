@@ -1,8 +1,9 @@
 // 사용자 접근 및 설정 변경 이력 조회 화면
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Button, FormSelect, FormSelectOption, TextInput } from '../../components/ui';
-import { Table, Tbody, Td, Th, Thead, Tr } from '../../components/ui';
+import { ProTable, type ProColumns } from '@ant-design/pro-components';
+import { Button, Collapse, Input, Select, Space } from 'antd';
+import type { AuditEntry } from '../../generated';
 import { getAudit, getProjects } from '../../api';
 import { Empty, Failure, Loading, RefreshFailure } from '../../components/QueryState';
 import { roleLabels } from '../../components/PermissionContext';
@@ -95,10 +96,66 @@ export default function AuditSettingsTab() {
     refetchInterval: 15_000,
   });
   const projects = useQuery({ queryKey: ['projects'], queryFn: getProjects });
+  const columns: ProColumns<AuditEntry>[] = [
+    {
+      title: '시각',
+      dataIndex: 'occurred_at',
+      render: (_, entry) => new Date(entry.occurred_at).toLocaleString('ko-KR'),
+    },
+    { title: '변경자', dataIndex: 'actor' },
+    {
+      title: '항목',
+      dataIndex: 'entity_type',
+      renderText: (entity) => entities[String(entity)] ?? entity,
+    },
+    { title: '대상', dataIndex: 'target_id' },
+    {
+      title: '작업',
+      dataIndex: 'action',
+      renderText: (action) => actions[String(action)] ?? action,
+    },
+    {
+      title: '결과·변경 내용',
+      dataIndex: 'outcome',
+      render: (_, entry) => {
+        const before = entry.before_values ?? {};
+        const after = entry.after_values ?? {};
+        const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
+          (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
+        );
+        return (
+          <>
+            {outcomes[entry.outcome] ?? entry.outcome}
+            {keys.length > 0 && (
+              <Collapse
+                items={[
+                  {
+                    key: 'diff',
+                    label: `변경 내용 ${keys.length}건`,
+                    children: (
+                      <dl>
+                        {keys.map((key) => (
+                          <div key={key}>
+                            <dt>{fields[key] ?? key}</dt>
+                            <dd>
+                              {valueText(before[key])} → {valueText(after[key])}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ),
+                  },
+                ]}
+              />
+            )}
+          </>
+        );
+      },
+    },
+  ];
   return (
     <>
       <form
-        className="filters audit-filters"
         onSubmit={(event) => {
           event.preventDefault();
           setPage(0);
@@ -106,32 +163,29 @@ export default function AuditSettingsTab() {
         }}
       >
         <LabeledField id="audit-project" label="프로젝트">
-          <FormSelect
+          <Select
             id="audit-project"
+            aria-label="프로젝트"
             value={draft.project}
-            onChange={(_, project) => setDraft({ ...draft, project })}
-          >
-            <FormSelectOption value="" label="전체 프로젝트" />
-            {projects.data?.items.map((project) => (
-              <FormSelectOption
-                key={project.project_id}
-                value={project.project_id}
-                label={project.display_name}
-              />
-            ))}
-          </FormSelect>
+            onChange={(project) => setDraft({ ...draft, project })}
+            options={[
+              { value: '', label: '전체 프로젝트' },
+              ...(projects.data?.items ?? []).map((project) => ({
+                value: project.project_id,
+                label: project.display_name,
+              })),
+            ]}
+          />
         </LabeledField>
         <LabeledField id="audit-actor" label="변경자">
-          <TextInput
+          <Input
             id="audit-actor"
             value={draft.actor}
             placeholder="계정 ID"
-            onChange={(_, actor) => setDraft({ ...draft, actor })}
+            onChange={(event) => setDraft({ ...draft, actor: event.target.value })}
           />
         </LabeledField>
-        <Button type="submit" variant="secondary">
-          검색
-        </Button>
+        <Button htmlType="submit">검색</Button>
       </form>
       <RefreshFailure
         visible={query.isError && Boolean(query.data)}
@@ -146,74 +200,29 @@ export default function AuditSettingsTab() {
         <Empty>변경 이력이 없습니다.</Empty>
       ) : (
         <>
-          <Table aria-label="변경 이력">
-            <Thead>
-              <Tr>
-                <Th>시각</Th>
-                <Th>변경자</Th>
-                <Th>항목</Th>
-                <Th>대상</Th>
-                <Th>작업</Th>
-                <Th>결과·변경 내용</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {query.data.items.map((entry) => {
-                const before = entry.before_values ?? {},
-                  after = entry.after_values ?? {};
-                const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
-                  (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
-                );
-                return (
-                  <Tr key={entry.audit_id}>
-                    <Td>{new Date(entry.occurred_at).toLocaleString('ko-KR')}</Td>
-                    <Td>{entry.actor}</Td>
-                    <Td>{entities[entry.entity_type] ?? entry.entity_type}</Td>
-                    <Td>{entry.target_id}</Td>
-                    <Td>{actions[entry.action] ?? entry.action}</Td>
-                    <Td>
-                      {outcomes[entry.outcome] ?? entry.outcome}
-                      {keys.length > 0 && (
-                        <details className="audit-diff">
-                          <summary>변경 내용 {keys.length}건</summary>
-                          <dl>
-                            {keys.map((key) => (
-                              <div key={key}>
-                                <dt>{fields[key] ?? key}</dt>
-                                <dd>
-                                  {valueText(before[key])} → {valueText(after[key])}
-                                </dd>
-                              </div>
-                            ))}
-                          </dl>
-                        </details>
-                      )}
-                    </Td>
-                  </Tr>
-                );
-              })}
-            </Tbody>
-          </Table>
-          <div className="project-overview-pagination">
+          <ProTable<AuditEntry>
+            aria-label="변경 이력"
+            rowKey="audit_id"
+            dataSource={query.data.items}
+            columns={columns}
+            search={false}
+            options={false}
+            pagination={false}
+            scroll={{ x: 'max-content' }}
+          />
+          <Space wrap>
             <span>전체 {query.data.total}건</span>
-            <Button
-              variant="secondary"
-              size="sm"
-              isDisabled={page === 0}
-              onClick={() => setPage(page - 1)}
-            >
+            <Button disabled={page === 0} onClick={() => setPage(page - 1)}>
               이전
             </Button>
             <span>{page + 1}</span>
             <Button
-              variant="secondary"
-              size="sm"
-              isDisabled={(page + 1) * 50 >= query.data.total}
+              disabled={(page + 1) * 50 >= query.data.total}
               onClick={() => setPage(page + 1)}
             >
               다음
             </Button>
-          </div>
+          </Space>
         </>
       )}
     </>

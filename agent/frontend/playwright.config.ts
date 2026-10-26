@@ -4,12 +4,15 @@ import { resolve } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
 const repositoryRoot = resolve(import.meta.dirname, '../..');
+const centerPort = Number(process.env.HERMES_E2E_CENTER_PORT ?? 18180);
 const e2eJavaHome = findJava21Home();
 const configuredChrome = process.env.HERMES_E2E_CHROME_PATH;
-const relocatedChrome = '/Users/Shared/Relocated Items/Security/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const nativeChrome = process.platform === 'darwin'
-  ? [configuredChrome, relocatedChrome].find((candidate) => candidate && existsSync(candidate))
-  : undefined;
+const relocatedChrome =
+  '/Users/Shared/Relocated Items/Security/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const nativeChrome =
+  process.platform === 'darwin'
+    ? [configuredChrome, relocatedChrome].find((candidate) => candidate && existsSync(candidate))
+    : undefined;
 
 export default defineConfig({
   testDir: './e2e',
@@ -17,7 +20,7 @@ export default defineConfig({
   workers: 1,
   timeout: 60_000,
   use: {
-    baseURL: 'http://127.0.0.1:18080',
+    baseURL: `http://127.0.0.1:${centerPort}`,
     ...devices['Desktop Chrome'],
     launchOptions: nativeChrome ? { executablePath: nativeChrome } : undefined,
   },
@@ -28,7 +31,7 @@ export default defineConfig({
       HERMES_E2E_JAVA_HOME: e2eJavaHome,
       PATH: `${e2eJavaHome}/bin:${process.env.PATH}`,
     },
-    url: 'http://127.0.0.1:18080/actuator/health',
+    url: `http://127.0.0.1:${centerPort}/actuator/health`,
     reuseExistingServer: false,
     timeout: 240_000,
     gracefulShutdown: { signal: 'SIGTERM', timeout: 15_000 },
@@ -40,8 +43,8 @@ function findJava21Home(): string {
   const toolingRoot = resolve(repositoryRoot, '.tooling');
   const local = existsSync(toolingRoot)
     ? readdirSync(toolingRoot)
-      .filter((name) => name.startsWith('jdk-21'))
-      .map((name) => resolve(toolingRoot, name, 'Contents/Home'))
+        .filter((name) => name.startsWith('jdk-21'))
+        .map((name) => resolve(toolingRoot, name, 'Contents/Home'))
     : [];
   for (const home of [...local, ...configured]) {
     if (!home) continue;
