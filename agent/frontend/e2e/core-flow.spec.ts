@@ -45,9 +45,13 @@ async function login(page: Page) {
 }
 
 async function chooseOption(page: Page, label: string, option: string) {
-  await page.getByRole('combobox', { name: label, exact: true }).click();
+  const control = page.getByRole('combobox', { name: label, exact: true });
+  await control.click();
+  await expect(control).toHaveAttribute('aria-expanded', 'true');
   await page.locator('.ant-select-dropdown:visible').getByText(option, { exact: true }).click();
-  await expect(page.getByRole('combobox', { name: label, exact: true })).toBeVisible();
+  // 선택 반영 전에 문서를 이동하여 프로젝트 범위 저장이 중단되지 않도록 검증
+  await expect(control.locator('..')).toHaveAttribute('title', option);
+  await expect(control).toHaveAttribute('aria-expanded', 'false');
 }
 
 test('custom login and responsive dashboard meet visual behavior gates', async ({ page }) => {
@@ -434,6 +438,9 @@ test('settings edits persist and agent tokens remain write-only', async ({ page 
     ]),
   );
   await page.reload();
+  await expect(
+    page.getByRole('combobox', { name: '프로젝트', exact: true }).locator('..'),
+  ).toHaveAttribute('title', '샘플 A');
   await chooseOption(page, '인스턴스', '샘플 A 1');
   await page.getByRole('button', { name: 'CPU 사용률 수정' }).click();
   const savedThresholdDialog = page.getByRole('dialog', { name: '임계치 수정' });

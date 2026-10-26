@@ -38,8 +38,23 @@ async function login(page: Page) {
   await expect(page.getByRole('heading', { name: 'Login' })).toBeVisible();
   await page.getByRole('textbox', { name: '아이디' }).fill(credentials.username);
   await page.locator('input[name="password"]').fill(credentials.password);
+  const instancesLoaded = page.waitForResponse((response) => {
+    const path = new URL(response.url()).pathname;
+    return (
+      /^\/api\/v1\/projects\/[^/]+\/instances$/.test(path) &&
+      response.request().method() === 'GET' &&
+      response.status() === 200
+    );
+  });
   await page.getByRole('button', { name: 'Login' }).click();
   await expect(page.getByRole('heading', { name: '종합 현황' })).toBeVisible();
+  // 제목은 조회 전에 렌더링되므로 실제 범위와 요약 수신 후 다음 화면으로 이동
+  const instances = (await (await instancesLoaded).json()) as { items: unknown[] };
+  await expect(page.getByRole('combobox', { name: '인스턴스 선택' })).toBeEnabled();
+  if (instances.items.length > 0) {
+    await expect(page.getByLabel('선택 인스턴스 요약')).toBeVisible();
+  }
+  await waitForRequests(page);
 }
 
 // 실제 네트워크 실패와 콘솔 오류만 테스트 산출물에 기록
