@@ -481,7 +481,7 @@ test('settings edits persist and agent tokens remain write-only', async ({ page 
   await chooseOption(page, '인스턴스', '샘플 A 1');
   await page.getByRole('button', { name: '추가', exact: true }).click();
   const thresholdDialog = page.getByRole('dialog', { name: '임계치 추가' });
-  await chooseOption(page, '항목 :', 'CPU 사용률');
+  await chooseOption(page, '항목', 'CPU 사용률');
   await thresholdDialog.getByLabel('경고 기준', { exact: true }).fill('81');
   await thresholdDialog.getByLabel('위험 기준', { exact: true }).fill('90');
   const thresholdPath = '/api/v1/projects/sample-a/instances/local-01/thresholds';
