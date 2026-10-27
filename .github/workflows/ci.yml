@@ -89,7 +89,7 @@ jobs:
 
   verify:
     needs: dependency-vulnerability
-    # 고정된 Playwright 1.56의 지원 OS에서 브라우저 검증 실행
+    # Playwright가 지원하는 고정 OS에서 브라우저 검증 실행
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

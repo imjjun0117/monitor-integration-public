@@ -747,7 +747,8 @@ for (const width of [320, 390]) {
         }
         if (section === 'instances') {
           const table = page.getByRole('table', { name: '인스턴스 설정', exact: true });
-          await expect(table.getByRole('columnheader')).toHaveCount(1);
+          // 내부 Descriptions의 레이블 셀과 구분하여 목록 표의 실제 열 수 검증
+          await expect(table.locator(':scope > thead > tr > th')).toHaveCount(1);
           await expect(table.getByText('샘플 A 1', { exact: true })).toBeVisible();
           await expect(
             table.getByText('Collector Base URL', { exact: true }).first(),
