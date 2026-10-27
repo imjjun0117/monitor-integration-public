@@ -48,7 +48,7 @@ test('overview uses central records, preserves scope links and opens a selected 
   expect(read).toHaveBeenCalledWith(
     expect.objectContaining({ project: 'sample', instance: 'prod', minutes: 60 }),
   );
-  expect(screen.getAllByRole('link', { name: '1건' })[1]).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'HTTP 오류 1건 보기' })).toHaveAttribute(
     'href',
     '/xlog?project=sample&instance=prod&errorsOnly=true',
   );

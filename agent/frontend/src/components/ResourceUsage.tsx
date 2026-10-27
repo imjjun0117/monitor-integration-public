@@ -1,6 +1,6 @@
 // 사용량·전체 용량·사용률 표시
 import { byteUnitFor, formatBytes, formatPercent } from '../utils/format';
-import { Progress, Typography } from 'antd';
+import { Progress, Typography, theme } from 'antd';
 
 export default function ResourceUsage({
   used,
@@ -17,6 +17,7 @@ export default function ResourceUsage({
   label?: string;
   valueLabel?: string;
 }) {
+  const { token } = theme.useToken();
   const usage = typeof used === 'number' && Number.isFinite(used) && used >= 0 ? used : null;
   const capacity = typeof total === 'number' && Number.isFinite(total) && total > 0 ? total : null;
   const ratio = usage != null && capacity != null ? usage / capacity : null;
@@ -26,7 +27,9 @@ export default function ResourceUsage({
       {label && <span className="resource-usage-label">{label}</span>}
       <div className="resource-usage-heading">
         <div className="resource-usage-value" aria-label={valueLabel}>
-          <strong>{unit === 'ratio' ? formatPercent(usage) : formatBytes(usage, byteUnit)}</strong>
+          <Typography.Text strong style={{ fontSize: token.fontSizeHeading3 }}>
+            {unit === 'ratio' ? formatPercent(usage) : formatBytes(usage, byteUnit)}
+          </Typography.Text>
           {unit === 'bytes' && <span> / {formatBytes(capacity, byteUnit)}</span>}
         </div>
         {unit === 'bytes' && <span className="resource-usage-percent">{formatPercent(ratio)}</span>}

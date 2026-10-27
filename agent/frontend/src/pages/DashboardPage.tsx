@@ -111,13 +111,16 @@ export default function DashboardPage() {
         <Alert type="warning" showIcon message="갱신에 실패해 마지막 데이터를 표시합니다." />
       )}
       <div className="dashboard-summary" aria-label="선택 인스턴스 요약">
-        <Card title="수집 상태">
-          <StatusLabel
-            status={selectedInstance?.collection_status ?? selectedInstance?.status}
-            context="collection"
-          />
+        <Card size="small" styles={{ body: { padding: token.padding } }}>
+          <Typography.Text type="secondary">수집 상태</Typography.Text>
+          <div style={{ marginTop: token.marginXS }}>
+            <StatusLabel
+              status={selectedInstance?.collection_status ?? selectedInstance?.status}
+              context="collection"
+            />
+          </div>
         </Card>
-        <Card>
+        <Card size="small" styles={{ body: { padding: token.padding } }}>
           <Link
             aria-label={`실패 API ${data.failed_api_count}개 목록`}
             to={`/api-monitoring?${scope}&status=DOWN&usage=used`}
@@ -130,7 +133,7 @@ export default function DashboardPage() {
             />
           </Link>
         </Card>
-        <Card>
+        <Card size="small" styles={{ body: { padding: token.padding } }}>
           <Link
             aria-label={`만료 예정 인증서 ${data.expiring_certificate_count}개 목록`}
             to={`/certificates?${scope}&expiry=soon`}
@@ -145,13 +148,15 @@ export default function DashboardPage() {
             />
           </Link>
         </Card>
-        <Card>
-          <Statistic
-            title="확인 필요"
-            value={causes.length}
-            suffix="건"
-            styles={{ content: causes.length ? { color: token.colorError } : {} }}
-          />
+        <Card size="small" styles={{ body: { padding: token.padding } }}>
+          <a href="#dashboard-issues" aria-label="확인 필요 항목 보기">
+            <Statistic
+              title="확인 필요"
+              value={causes.length}
+              suffix="건"
+              styles={{ content: causes.length ? { color: token.colorError } : {} }}
+            />
+          </a>
         </Card>
       </div>
       {selectedProject && selectedInstance ? (
@@ -167,52 +172,64 @@ export default function DashboardPage() {
       ) : (
         <Empty>선택한 인스턴스의 정보가 없습니다.</Empty>
       )}
-      {(causes.length > 0 || balances.length > 0) && (
-        <div className="dashboard-status-row has-issues">
-          {balances.length > 0 && (
-            <section className="service-balances" aria-label="선택 프로젝트 서비스 정보">
-              <Typography.Title level={2}>외부 서비스 정보</Typography.Title>
-              <div className="service-balance-grid">
-                {balances.map((check) => (
-                  <ServiceInfoCard
-                    key={check.check_id}
-                    check={check}
-                    action={
-                      <Link
-                        to={`/api-monitoring?${scope}&check=${encodeURIComponent(check.check_id)}`}
-                      >
-                        요청 기록 →
-                      </Link>
-                    }
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-          {causes.length > 0 && (
-            <Card title={`확인 필요 ${causes.length}`} className="issue-panel">
-              <div className="issue-scroll" role="region" tabIndex={0} aria-label="상태 이상 목록">
-                <Listy
-                  items={causes.map((cause, index) => ({
-                    cause,
-                    key: `${cause.kind}-${cause.subject_id}-${index}`,
-                  }))}
-                  rowKey="key"
-                  itemRender={({ cause }) => (
-                    <Space wrap>
-                      <Typography.Text>{causeCategory(cause)}</Typography.Text>
-                      <Typography.Text strong>{causeSubject(cause)}</Typography.Text>
-                      <Typography.Text type="secondary">{causeReason(cause)}</Typography.Text>
-                      <time>{formatTime(cause.observed_at)}</time>
-                      <Link to={causeLink(cause)}>확인 →</Link>
-                    </Space>
-                  )}
+      <div className={`dashboard-status-row${balances.length > 0 ? ' has-issues' : ''}`}>
+        {balances.length > 0 && (
+          <section className="service-balances" aria-label="선택 프로젝트 서비스 정보">
+            <Typography.Title level={2} style={{ fontSize: token.fontSizeLG, marginTop: 0 }}>
+              외부 서비스 정보
+            </Typography.Title>
+            <div className="service-balance-grid">
+              {balances.map((check) => (
+                <ServiceInfoCard
+                  key={check.check_id}
+                  check={check}
+                  action={
+                    <Link
+                      to={`/api-monitoring?${scope}&check=${encodeURIComponent(check.check_id)}`}
+                    >
+                      요청 기록 →
+                    </Link>
+                  }
                 />
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
+              ))}
+            </div>
+          </section>
+        )}
+        <Card
+          id="dashboard-issues"
+          tabIndex={-1}
+          size="small"
+          title={
+            <h2 style={{ fontSize: token.fontSizeLG, margin: 0 }}>확인 필요 {causes.length}건</h2>
+          }
+          className="issue-panel"
+        >
+          <div className="issue-scroll" role="region" tabIndex={0} aria-label="상태 이상 목록">
+            {causes.length === 0 ? (
+              <Typography.Text type="secondary">
+                현재 확인이 필요한 항목이 없습니다.
+              </Typography.Text>
+            ) : (
+              <Listy
+                items={causes.map((cause, index) => ({
+                  cause,
+                  key: `${cause.kind}-${cause.subject_id}-${index}`,
+                }))}
+                rowKey="key"
+                itemRender={({ cause }) => (
+                  <Space wrap>
+                    <Typography.Text>{causeCategory(cause)}</Typography.Text>
+                    <Typography.Text strong>{causeSubject(cause)}</Typography.Text>
+                    <Typography.Text type="secondary">{causeReason(cause)}</Typography.Text>
+                    <time>{formatTime(cause.observed_at)}</time>
+                    <Link to={causeLink(cause)}>확인 →</Link>
+                  </Space>
+                )}
+              />
+            )}
+          </div>
+        </Card>
+      </div>
     </>
   );
 }
@@ -226,6 +243,7 @@ function InstanceDashboard({
   period: ChartPeriod;
   showXlog: boolean;
 }) {
+  const { token } = theme.useToken();
   const instance = project.instances[0];
   const query = useQuery({
     queryKey: ['resources', project.project_id, instance.instance_id, period],
@@ -239,20 +257,24 @@ function InstanceDashboard({
   const context = `${project.display_name} / ${instance.display_name}`;
   return (
     <section className="instance-dashboard" aria-label={context}>
-      <Card
-        title={
-          <Typography.Title level={2}>
-            <Link to={`/projects/${project.project_id}/instances/${instance.instance_id}`}>
-              {context}
-            </Link>
+      <div className="instance-context" aria-label="인스턴스 상태">
+        <Space wrap size={[token.marginSM, token.marginXS]}>
+          <Typography.Title level={2} style={{ fontSize: token.fontSizeLG, margin: 0 }}>
+            자원 현황
           </Typography.Title>
-        }
-      >
-        <Space wrap>
           <StatusLabel status={instance.status} context="overview" />
-          <time>{formatTime(latest?.central_received_at ?? instance.last_seen_at)}</time>
+          <Typography.Text type="secondary">
+            최근 수집{' '}
+            <time>{formatTime(latest?.central_received_at ?? instance.last_seen_at)}</time>
+          </Typography.Text>
         </Space>
-      </Card>
+        <Link
+          aria-label={`${context} 상세 보기`}
+          to={`/projects/${project.project_id}/instances/${instance.instance_id}`}
+        >
+          인스턴스 상세 →
+        </Link>
+      </div>
       {(resource?.stale || query.isError) && (
         <Alert type="warning" showIcon message="마지막 정상 자원 데이터를 표시합니다." />
       )}

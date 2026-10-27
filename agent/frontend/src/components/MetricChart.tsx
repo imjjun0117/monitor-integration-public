@@ -1,7 +1,7 @@
 // 시간별 자원 및 응답시간 차트 표시
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ReloadOutlined } from '@ant-design/icons';
-import { Button, Card } from 'antd';
+import { Button, Card, theme as antTheme } from 'antd';
 import { useTheme, type Theme } from '../theme';
 import {
   byteUnitFor,
@@ -83,6 +83,7 @@ export default function MetricChart({
   showLegend?: boolean;
   liveWindow?: number;
 }) {
+  const { token } = antTheme.useToken();
   const theme = useTheme();
   const [following, setFollowing] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(
@@ -449,10 +450,12 @@ export default function MetricChart({
   const accessibleTitle = context ? `${context} · ${title}` : title;
   return (
     <Card
+      size="small"
+      styles={{ body: { padding: token.padding } }}
       className="metric-chart-card"
       role="region"
       aria-label={`${accessibleTitle} 그래프`}
-      title={<h3>{title}</h3>}
+      title={<h3 style={{ fontSize: token.fontSizeLG, margin: 0 }}>{title}</h3>}
       extra={
         <Button
           type="text"
@@ -489,8 +492,13 @@ export default function MetricChart({
         tabIndex={0}
         aria-label={`${accessibleTitle} 수집 표본 통계 스크롤`}
       >
-        <table aria-label={`${accessibleTitle} 수집 표본 통계`}>
-          <caption>조회 기간의 수집 표본 기준 · 확대 시에도 동일</caption>
+        <table
+          aria-label={`${accessibleTitle} 수집 표본 통계`}
+          style={{ fontSize: token.fontSizeSM }}
+        >
+          <caption style={{ color: token.colorTextSecondary }}>
+            조회 기간의 수집 표본 기준 · 확대 시에도 동일
+          </caption>
           <thead>
             <tr>
               <th scope="col">지표</th>

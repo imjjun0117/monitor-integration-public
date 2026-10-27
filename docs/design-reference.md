@@ -54,3 +54,15 @@
 [15] https://design.codeit.com/components/toast
 [16] https://design.codeit.com/components/snackbar
 [17] https://design.codeit.com/components/dropdown
+
+
+## Ant Design 관제 화면 정보 위계 (2026-10-27)
+
+공식 제품 문서와 공개 화면을 확인하고 현재 Ant Design/ProComponents 구성에 적용했다. 위의 과거 라이브러리 선택 기록을 현재 구현의 근거로 사용하지 않는다.
+
+- [Grafana 대시보드 설계 원칙](https://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboards/best-practices/)의 전체 상태 → 구체적인 지표 → 원인 확인 순서와 일관된 패널 구성을 참고한다. [공식 화면 예시](https://grafana.com/docs/grafana/latest/visualizations/dashboards/use-dashboards/)처럼 패널 제목은 데이터보다 과도하게 크지 않게 배치한다.
+- [Datadog 범위 필터](https://docs.datadoghq.com/dashboards/template_variables/)의 공통 조회 범위와 제한된 필터 폭을 참고한다. 현재 프로젝트·인스턴스·기간 URL 계약과 개별 XLog의 최근 1시간 범위를 유지한다.
+- [IBM Carbon 업무 화면 타이포그래피](https://www.carbondesignsystem.com/building-blocks/foundations/typography/style-strategies)의 고정 크기 제목 원칙을 참고한다. 브랜드 로고·폰트·색상을 유지하며 패널 제목은 Ant Design의 16px 토큰, 핵심 자원 수치는 24px 토큰을 사용한다.
+- 큰 인스턴스명 카드를 상태·최근 수집·상세 링크 행으로 정리한다. 네 요약 항목은 동일한 레이블·값 구조를 사용하며 확인 필요 숫자는 실제 원인 목록으로 이동한다.
+- CPU·RAM·JVM Heap·디스크·XLog는 공식 Card 표면을 사용한다. XLog를 사용하지 않는 인스턴스는 자원 차트 두 열로 공간을 채우고 모바일에서는 한 열로 읽는다. 통계·미수집·오류·권한·수집 동작은 유지한다.
+- 외부 제품의 자산·로고·CSS를 복제하지 않는다. CSS는 그리드·간격·줄바꿈에만 사용하고 제목·수치·색상은 공식 컴포넌트와 토큰으로 지정한다.

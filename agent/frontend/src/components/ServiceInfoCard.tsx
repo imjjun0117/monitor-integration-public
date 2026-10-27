@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import type { ApiCheck } from '../api';
 import type { ServiceMetric } from '../generated';
-import { Card, Collapse, Tag, Typography } from 'antd';
+import { Card, Collapse, Tag, Typography, theme } from 'antd';
 
 export default function ServiceInfoCard({
   check,
@@ -13,6 +13,7 @@ export default function ServiceInfoCard({
   action?: ReactNode;
   showServer?: boolean;
 }) {
+  const { token } = theme.useToken();
   const info = check.service_info;
   if (!info) {
     return null;
@@ -38,9 +39,11 @@ export default function ServiceInfoCard({
           : '정보 미확인';
   return (
     <Card
+      size="small"
+      styles={{ body: { padding: token.padding } }}
       role="region"
       aria-label={`서비스 정보 · ${info.title} · ${check.project_name ?? check.project_id} / ${check.instance_name ?? check.instance_id}`}
-      title={<h3>{info.title}</h3>}
+      title={<h3 style={{ fontSize: token.fontSizeLG, margin: 0 }}>{info.title}</h3>}
       extra={<Tag color={color === 'grey' ? 'default' : color}>{label}</Tag>}
     >
       {showServer && (

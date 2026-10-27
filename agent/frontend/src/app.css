@@ -33,7 +33,7 @@ body {
 .service-balance-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 16px;
 }
 .chart-grid > *,
 .service-balance-grid > *,
@@ -50,9 +50,10 @@ body {
   overflow-wrap: anywhere;
 }
 .dashboard-status-row {
+  margin-top: 24px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 20px;
+  gap: 16px;
 }
 .dashboard-status-row.has-issues {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.36fr);
@@ -134,6 +135,12 @@ body {
 .metric-chart-statistics th:first-child {
   text-align: left;
 }
+.metric-chart-statistics th[scope='row'] {
+  min-width: 72px;
+  max-width: 120px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .metric-chart-statistics caption {
   caption-side: bottom;
   text-align: left;
@@ -160,8 +167,44 @@ body {
 .xlog-chart text {
   fill: currentColor;
 }
+.instance-dashboard {
+  display: grid;
+  gap: 16px;
+}
+.instance-context,
+.resource-usage-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px 16px;
+}
+.instance-context > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.instance-context > a {
+  flex-shrink: 0;
+}
 .instance-chart-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+@media (min-width: 1201px) {
+  .instance-chart-grid:has(> .xlog-chart-card) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.05fr);
+  }
+  .xlog-chart-card {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}
+.dashboard-disk-usage {
+  display: grid;
+  gap: 12px;
+}
+#dashboard-issues {
+  scroll-margin-top: 80px;
 }
 .instance-chart-grid .chart,
 .xlog-chart-card .xlog-scatter {
@@ -225,11 +268,6 @@ body {
   font-family: Consolas, monospace;
 }
 
-@media (max-width: 1200px) {
-  .instance-chart-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 @media (max-width: 767px) {
   .chart-grid,
   .service-balance-grid,

@@ -363,7 +363,7 @@ test('dashboard background and header remain visible across viewport and theme',
           })),
           titleOverflow: (() => {
             const title = document.querySelector(
-              '.instance-dashboard > .ant-card .ant-card-head-title',
+              '.instance-context',
             )!;
             return { scroll: title.scrollWidth, client: title.clientWidth };
           })(),
@@ -447,6 +447,57 @@ test('dashboard background and header remain visible across viewport and theme',
         .soft(layout.brand.bottom, `${appearance} ${width}: brand bottom`)
         .toBeLessThanOrEqual(layout.header.bottom);
     }
+  }
+});
+
+test('dashboard uses compact hierarchy and consistent chart surfaces', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+  await expect(page.locator('.instance-chart-grid > .ant-card')).toHaveCount(4);
+  // 격리된 샘플 프로젝트에서 실제 설정 API를 통해 빈 XLog 패널도 검증
+  await waitForRequests(page);
+  await page.goto('/settings/projects?project=sample-a');
+  const row = page.getByRole('row', { name: /sample-a/ });
+  const enabled = page.waitForResponse(response =>
+    new URL(response.url()).pathname === '/api/v1/projects/sample-a/xlog-settings' && response.request().method() === 'PUT',
+  );
+  await row.getByRole('button', { name: '미사용', exact: true }).click();
+  expect((await enabled).status()).toBe(200);
+  try {
+    await waitForRequests(page);
+    await page.goto('/?project=sample-a&instance=local-01');
+    await expect(page.locator('.instance-chart-grid .chart').first()).toBeVisible();
+    const panels = page.locator('.instance-chart-grid > .ant-card');
+    await expect(panels).toHaveCount(5);
+    await page.screenshot({ path: resolve(screenshotDirectory, 'dashboard-hierarchy.png'), fullPage: true });
+    const summary = await page.getByLabel('선택 인스턴스 요약').boundingBox();
+    expect(summary!.height).toBeLessThanOrEqual(112);
+    const titles = await panels.locator('.ant-card-head h3').evaluateAll(
+      elements => elements.map(element => Number.parseFloat(getComputedStyle(element).fontSize)),
+    );
+    expect(titles).toHaveLength(5);
+    expect(titles.every(size => size <= 18)).toBe(true);
+    const context = page.getByLabel('인스턴스 상태');
+    await expect(context).toBeVisible();
+    expect((await context.boundingBox())!.height).toBeLessThanOrEqual(64);
+    expect((await panels.first().boundingBox())!.y).toBeLessThanOrEqual(400);
+    const issues = page.getByRole('link', { name: '확인 필요 항목 보기' });
+    await expect(issues).toHaveAttribute('href', '#dashboard-issues');
+    await issues.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#dashboard-issues')).toBeInViewport();
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  } finally {
+    await waitForRequests(page);
+    await page.goto('/settings/projects?project=sample-a');
+    const disabled = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/v1/projects/sample-a/xlog-settings' && response.request().method() === 'PUT',
+    );
+    await row.getByRole('button', { name: '사용', exact: true }).click();
+    expect((await disabled).status()).toBe(200);
+    await waitForRequests(page);
+    await page.reload();
+    await expect(row.getByRole('button', { name: '미사용', exact: true })).toBeEnabled();
   }
 });
 

@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { DefaultService } from '../generated';
 import XlogChart, { type XlogItem } from './XlogChart';
 import { ProDescriptions, ProTable, type ProColumns } from '@ant-design/pro-components';
-import { Alert, Button, Modal } from 'antd';
+import { Alert, Button, Card, Modal, Statistic, Typography, theme } from 'antd';
 import { Empty, Failure, Loading } from './QueryState';
 
 const PAGE_SIZE = 20;
@@ -27,6 +27,7 @@ export default function XlogOverview({
   detailed?: boolean;
   compact?: boolean;
 }) {
+  const { token } = theme.useToken();
   const [selected, select] = useState<XlogItem>();
   const [beforeId, setBeforeId] = useState(0);
   const [page, setPage] = useState(0);
@@ -80,16 +81,22 @@ export default function XlogOverview({
     return null;
   }
   return (
-    <section
+    <Card
+      size="small"
+      styles={{ body: { padding: token.padding } }}
       className={compact ? 'metric-chart-card xlog-chart-card' : 'xlog-overview'}
+      role={compact ? 'region' : undefined}
       aria-label={compact ? 'XLog 그래프' : undefined}
+      title={
+        <Typography.Title level={compact ? 3 : 2} style={{ fontSize: token.fontSizeLG, margin: 0 }}>
+          XLog{' '}
+          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, fontWeight: 400 }}>
+            {compact ? `최근 ${minutes / 60}시간` : '요청 응답시간'}
+          </Typography.Text>
+        </Typography.Title>
+      }
+      extra={<Link to={`/xlog?${new URLSearchParams({ project, instance })}`}>요청 기록 →</Link>}
     >
-      <div className="xlog-heading">
-        <h2 className={compact ? 'metric-chart-title' : undefined}>
-          XLog <span>{compact ? `최근 ${minutes / 60}시간` : '요청 응답시간'}</span>
-        </h2>
-        <Link to={`/xlog?${new URLSearchParams({ project, instance })}`}>요청 기록 →</Link>
-      </div>
       {!compact && enabled_projects > 0 && (
         <p className="xlog-connection-status">
           {!eligible_instances
@@ -101,38 +108,45 @@ export default function XlogOverview({
       )}
       {query.isError && <Alert type="warning" title="갱신에 실패해 마지막 기록을 표시합니다." />}
       <div className={compact ? 'xlog-chart-summary' : 'xlog-kpis'}>
-        <div>
-          <span>수집 요청</span>
-          <Link to={`/xlog?${new URLSearchParams({ project, instance })}`}>
-            <strong>
-              {summary.count.toLocaleString()}
-              <small>건</small>
-            </strong>
-          </Link>
-        </div>
-        <div className="xlog-error-kpi">
-          <span>HTTP 오류</span>
-          <Link to={`/xlog?${new URLSearchParams({ project, instance, errorsOnly: 'true' })}`}>
-            <strong>
-              {summary.errors.toLocaleString()}
-              <small>건</small>
-            </strong>
-          </Link>
-        </div>
-        <div>
-          <span>평균 응답시간</span>
-          <strong>
-            {summary.count ? Math.round(summary.average_ms).toLocaleString() : '—'}
-            <small>ms</small>
-          </strong>
-        </div>
-        <div>
-          <span>P95 응답시간</span>
-          <strong>
-            {summary.count ? Math.round(summary.p95_ms).toLocaleString() : '—'}
-            <small>ms</small>
-          </strong>
-        </div>
+        <Link
+          aria-label={`수집 요청 ${summary.count.toLocaleString()}건 보기`}
+          to={`/xlog?${new URLSearchParams({ project, instance })}`}
+        >
+          <Statistic
+            title="수집 요청"
+            value={summary.count}
+            suffix="건"
+            styles={{ content: { fontSize: token.fontSizeHeading3 } }}
+          />
+        </Link>
+        <Link
+          aria-label={`HTTP 오류 ${summary.errors.toLocaleString()}건 보기`}
+          to={`/xlog?${new URLSearchParams({ project, instance, errorsOnly: 'true' })}`}
+        >
+          <Statistic
+            title="HTTP 오류"
+            value={summary.errors}
+            suffix="건"
+            styles={{
+              content: {
+                fontSize: token.fontSizeHeading3,
+                color: summary.errors ? token.colorError : undefined,
+              },
+            }}
+          />
+        </Link>
+        <Statistic
+          title="평균 응답시간"
+          value={summary.count ? Math.round(summary.average_ms) : '—'}
+          suffix="ms"
+          styles={{ content: { fontSize: token.fontSizeHeading3 } }}
+        />
+        <Statistic
+          title="P95 응답시간"
+          value={summary.count ? Math.round(summary.p95_ms) : '—'}
+          suffix="ms"
+          styles={{ content: { fontSize: token.fontSizeHeading3 } }}
+        />
       </div>
       {items.length ? (
         <XlogChart items={items} onSelect={choose} />
@@ -222,6 +236,6 @@ export default function XlogOverview({
           />
         </Modal>
       )}
-    </section>
+    </Card>
   );
 }
