@@ -11,22 +11,34 @@
 </head>
 <body data-login-error="{{LOGIN_ERROR}}">
   <main class="login-shell">
-    <section class="login-panel" aria-labelledby="login-title">
-      <form method="post" action="/api/v1/session/login">
-        <input type="hidden" name="_csrf" value="{{CSRF_TOKEN}}">
-        <div id="login-root">
-          <h1 id="login-title" lang="en">Login</h1>
-          {{ERROR}}
-          <div class="native-login-fields">
-            <label for="username">아이디</label>
-            <input id="username" name="username" type="text" autocomplete="username" required autofocus>
-            <label for="password">비밀번호</label>
-            <input id="password" name="password" type="password" autocomplete="current-password" required>
-            <button type="submit" lang="en">Login</button>
+    <div class="login-content">
+      <header class="login-brand">
+        <img src="/monitoring.svg" alt="" width="36" height="36">
+        <span>Monitoring</span>
+      </header>
+      <section class="login-panel" aria-labelledby="login-title">
+        <form method="post" action="/api/v1/session/login">
+          <input type="hidden" name="_csrf" value="{{CSRF_TOKEN}}">
+          <div id="login-root">
+            <h1 id="login-title" lang="en">Login</h1>
+            {{ERROR}}
+            <div class="native-login-fields">
+              <label for="username">아이디</label>
+              <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+              <label for="password">비밀번호</label>
+              <input id="password" name="password" type="password" autocomplete="current-password" required>
+              <button type="submit" lang="en">Login</button>
+            </div>
           </div>
-        </div>
-      </form>
-    </section>
+        </form>
+      </section>
+    </div>
+    <aside class="login-brand-panel" aria-label="Monitoring 소개">
+      <div class="login-brand-grid" aria-hidden="true"></div>
+      <img src="/monitoring.svg" alt="" width="80" height="80">
+      <h2>Monitoring</h2>
+      <p lang="en">System Monitoring</p>
+    </aside>
   </main>
   <script type="module" src="/assets/login.js"></script>
 </body>

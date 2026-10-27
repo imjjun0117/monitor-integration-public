@@ -4,23 +4,105 @@ body {
   margin: 0;
 }
 
+.login-shell,
+.login-shell * {
+  box-sizing: border-box;
+}
+
 .login-shell {
   min-height: 100dvh;
   display: grid;
-  place-items: center;
-  padding: 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   background: #f5f7fb;
   color: #101828;
   font-family: 'Outfit Variable', 'Noto Sans KR Variable', sans-serif;
+  line-height: 1.6;
 }
 
-:root[data-theme='dark'] .login-shell {
+.login-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 40px;
+  background: #fff;
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+
+.login-brand img {
+  flex-shrink: 0;
+}
+
+:root[data-theme='dark'] .login-shell,
+:root[data-theme='dark'] .login-content {
   background: #081321;
   color: #e8f0fb;
 }
 
 .login-panel {
-  width: min(100%, 420px);
+  width: min(100%, 440px);
+  margin: auto;
+  padding: 64px 0;
+}
+
+.login-brand-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 56px;
+  text-align: center;
+  color: #5b21b6;
+  background: #f0f6fc;
+  border-left: 1px solid #dce3ed;
+}
+
+.login-brand-grid {
+  position: absolute;
+  inset: -20%;
+  opacity: 0.08;
+  background-image:
+    linear-gradient(currentColor 1px, transparent 1px),
+    linear-gradient(90deg, currentColor 1px, transparent 1px);
+  background-size: 48px 48px;
+  transform: rotate(-12deg);
+}
+
+.login-brand-panel > :not(.login-brand-grid) {
+  position: relative;
+}
+
+.login-brand-panel h2 {
+  margin: 24px 0 0;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.3;
+}
+
+.login-brand-panel p {
+  margin: 12px 0 0;
+  color: #667085;
+  font-size: 18px;
+}
+
+:root[data-theme='dark'] .login-brand-panel {
+  color: #c4b5fd;
+  background: #102239;
+  border-color: #2b415b;
+}
+
+:root[data-theme='dark'] .login-brand-panel p {
+  color: #b4c5dc;
 }
 
 /* 스크립트가 없을 때도 기본 폼을 읽고 제출할 수 있도록 배치 */
@@ -32,9 +114,27 @@ body {
 .native-login-fields input,
 .native-login-fields button {
   font: inherit;
-  padding: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
 }
 
 .native-login-fields button {
   margin-top: 12px;
+}
+
+@media (max-width: 1023px) {
+  .login-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .login-brand-panel {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .login-content {
+    padding: 28px 24px;
+  }
 }
