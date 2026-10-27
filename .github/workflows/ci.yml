@@ -89,7 +89,8 @@ jobs:
 
   verify:
     needs: dependency-vulnerability
-    runs-on: ubuntu-latest
+    # 고정된 Playwright 1.56의 지원 OS에서 브라우저 검증 실행
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
