@@ -451,7 +451,7 @@ export default function MetricChart({
   return (
     <Card
       size="small"
-      styles={{ body: { padding: token.padding } }}
+      styles={{ header: { paddingInline: token.padding }, body: { padding: token.padding } }}
       className="metric-chart-card"
       role="region"
       aria-label={`${accessibleTitle} 그래프`}

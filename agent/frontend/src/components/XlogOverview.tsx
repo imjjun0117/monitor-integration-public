@@ -83,7 +83,7 @@ export default function XlogOverview({
   return (
     <Card
       size="small"
-      styles={{ body: { padding: token.padding } }}
+      styles={{ header: { paddingInline: token.padding }, body: { padding: token.padding } }}
       className={compact ? 'metric-chart-card xlog-chart-card' : 'xlog-overview'}
       role={compact ? 'region' : undefined}
       aria-label={compact ? 'XLog 그래프' : undefined}

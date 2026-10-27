@@ -40,7 +40,7 @@ export default function ServiceInfoCard({
   return (
     <Card
       size="small"
-      styles={{ body: { padding: token.padding } }}
+      styles={{ header: { paddingInline: token.padding }, body: { padding: token.padding } }}
       role="region"
       aria-label={`서비스 정보 · ${info.title} · ${check.project_name ?? check.project_id} / ${check.instance_name ?? check.instance_id}`}
       title={<h3 style={{ fontSize: token.fontSizeLG, margin: 0 }}>{info.title}</h3>}

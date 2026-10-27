@@ -162,7 +162,7 @@ for (const viewport of [
     });
     for (const [route, title] of [
       ['/incidents', '장애 관리'],
-      ['/projects', '프로젝트'],
+      ['/projects', 'sample-a 인스턴스'],
       ['/api-monitoring', 'API 모니터링'],
       ['/xlog', 'XLog'],
       ['/logs', '실시간 로그'],
@@ -171,9 +171,9 @@ for (const viewport of [
     ] as const) {
       await waitForRequests(page);
       await page.goto(route);
-      await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
-      await waitForRequests(page);
-      await page.reload();
+      if (route === '/projects') {
+        await expect(page).toHaveURL(/\/projects\/sample-a(?:\?|$)/);
+      }
       await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
       const ready = route === '/incidents'
         ? page.getByRole('button', { name: '새로고침' })
@@ -188,6 +188,10 @@ for (const viewport of [
                 : route === '/certificates'
                   ? page.getByRole('combobox', { name: '만료 대상' })
                   : page.getByRole('table', { name: '프로젝트 설정' });
+      await expect(ready).toBeVisible();
+      await waitForRequests(page);
+      await page.reload();
+      await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
       await expect(ready).toBeVisible();
       await waitForRequests(page);
       await page.screenshot({
