@@ -677,70 +677,73 @@ test('project modal validates, cancels, saves, and reports duplicate server erro
 test('settings dialogs align labeled controls and retain input examples', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);
-  for (const entry of [
-    {
-      route: '/settings/projects?project=',
-      button: '프로젝트 등록',
-      title: '프로젝트 등록',
-      field: '프로젝트 ID',
-      placeholder: '예: sample-a',
-    },
-    {
-      route: '/settings/instances?project=sample-a',
-      button: '인스턴스 local-01 수정',
-      title: '인스턴스 수정',
-      field: '인스턴스 local-01 Base URL',
-      placeholder: '예: https://agent.example.com (최대 500자)',
-    },
-    {
-      route: '/settings/certificates?project=sample-a',
-      button: '인증서 대상 등록',
-      title: '인증서 대상 등록',
-      field: '인증서 호스트',
-      placeholder: '예: api.example.com',
-    },
-    {
-      route: '/settings/menus',
-      button: '수정',
-      title: '메뉴 수정',
-      field: '메뉴 이름',
-      placeholder: '메뉴에 표시할 이름',
-    },
-  ]) {
-    await waitForRequests(page);
-    await page.goto(entry.route);
-    await page.getByRole('button', { name: entry.button, exact: true }).first().click();
-    const dialog = page.getByRole('dialog', { name: entry.title, exact: true });
-    await expect(dialog.getByLabel(entry.field, { exact: true })).toHaveAttribute(
-      'placeholder',
-      entry.placeholder,
-    );
-    const fields = await dialog.locator('.ant-form-item').evaluateAll((items) =>
-      items.map((item) => {
-        const label = item.querySelector('.ant-form-item-label label')!;
-        const content = item.querySelector('.ant-form-item-control-input-content')!;
-        const control = content.querySelector('input.ant-input, .ant-select, .ant-input-number')!;
-        const labelBox = label.getBoundingClientRect();
-        const contentBox = content.getBoundingClientRect();
-        const controlBox = control.getBoundingClientRect();
-        return {
-          labelAbove: labelBox.bottom <= controlBox.top + 1,
-          sameWidth: Math.abs(contentBox.width - controlBox.width) <= 1,
-          sameLeft: Math.abs(contentBox.left - controlBox.left) <= 1,
-        };
-      }),
-    );
-    expect(fields.length).toBeGreaterThanOrEqual(2);
-    for (const field of fields) {
-      expect(field).toEqual({ labelAbove: true, sameWidth: true, sameLeft: true });
+  for (const appearance of ['light', 'dark'] as const) {
+    await page.evaluate((value) => localStorage.setItem('monitoring.theme', value), appearance);
+    for (const entry of [
+      {
+        route: '/settings/projects?project=',
+        button: '프로젝트 등록',
+        title: '프로젝트 등록',
+        field: '프로젝트 ID',
+        placeholder: '예: sample-a',
+      },
+      {
+        route: '/settings/instances?project=sample-a',
+        button: '인스턴스 local-01 수정',
+        title: '인스턴스 수정',
+        field: '인스턴스 local-01 Base URL',
+        placeholder: '예: https://agent.example.com (최대 500자)',
+      },
+      {
+        route: '/settings/certificates?project=sample-a',
+        button: '인증서 대상 등록',
+        title: '인증서 대상 등록',
+        field: '인증서 호스트',
+        placeholder: '예: api.example.com',
+      },
+      {
+        route: '/settings/menus',
+        button: '수정',
+        title: '메뉴 수정',
+        field: '메뉴 이름',
+        placeholder: '메뉴에 표시할 이름',
+      },
+    ]) {
+      await waitForRequests(page);
+      await page.goto(entry.route);
+      await page.getByRole('button', { name: entry.button, exact: true }).first().click();
+      const dialog = page.getByRole('dialog', { name: entry.title, exact: true });
+      await expect(dialog.getByLabel(entry.field, { exact: true })).toHaveAttribute(
+        'placeholder',
+        entry.placeholder,
+      );
+      const fields = await dialog.locator('.ant-form-item').evaluateAll((items) =>
+        items.map((item) => {
+          const label = item.querySelector('.ant-form-item-label label')!;
+          const content = item.querySelector('.ant-form-item-control-input-content')!;
+          const control = content.querySelector('input.ant-input, .ant-select, .ant-input-number')!;
+          const labelBox = label.getBoundingClientRect();
+          const contentBox = content.getBoundingClientRect();
+          const controlBox = control.getBoundingClientRect();
+          return {
+            labelAbove: labelBox.bottom <= controlBox.top + 1,
+            sameWidth: Math.abs(contentBox.width - controlBox.width) <= 1,
+            sameLeft: Math.abs(contentBox.left - controlBox.left) <= 1,
+          };
+        }),
+      );
+      expect(fields.length).toBeGreaterThanOrEqual(2);
+      for (const field of fields) {
+        expect(field).toEqual({ labelAbove: true, sameWidth: true, sameLeft: true });
+      }
+      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      await page.screenshot({
+        path: resolve(screenshotDirectory, `forms-${entry.title}-${appearance}.png`),
+        fullPage: true,
+      });
+      await dialog.getByRole('button', { name: '취소', exact: true }).click();
+      await expect(dialog).toBeHidden();
     }
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    await page.screenshot({
-      path: resolve(screenshotDirectory, `forms-${entry.title}.png`),
-      fullPage: true,
-    });
-    await dialog.getByRole('button', { name: '취소', exact: true }).click();
-    await expect(dialog).toBeHidden();
   }
 });
 

@@ -17,6 +17,7 @@ export function getMonitoringTheme(appearance: Theme): ThemeConfig {
         colorErrorHover: dark ? '#ffbdc3' : '#912018',
         colorErrorActive: dark ? '#f58490' : '#7a1c14',
       },
+      Tag: dark ? {} : { green7: '#237804' },
     },
     token: {
       fontFamily: '"Outfit Variable", "Noto Sans KR Variable", sans-serif',
