@@ -14,7 +14,10 @@ test('the application loads only component-neutral layout and chart/log styles',
 
   expect(entry).not.toContain('tailadmin.css');
   expect(app).not.toContain('monitoring-theme.css');
-  expect(html).not.toContain('/assets/fonts/fonts.css');
+  expect(html).toContain('/assets/fonts/fonts.css');
+  expect(app).toContain('theme={getMonitoringTheme(appearance)}');
+  expect(source('./theme.ts')).toContain('Outfit Variable');
+  expect(source('./theme.ts')).toContain('Noto Sans KR Variable');
   expect(vite).not.toContain('@tailwindcss/vite');
 });
 

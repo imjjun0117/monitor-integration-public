@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { ConfigProvider } from 'antd';
 import App from './App';
 import { selectOption } from './test-select';
 // Canvas는 실제 브라우저에서 검증. 여기서는 화면 이동과 입력 동작 검증
@@ -315,9 +316,7 @@ test('settings navigation expands on click and becomes inaccessible when collaps
   expect(screen.getByRole('menuitem', { name: '프로젝트 관리' })).toBeInTheDocument();
   fireEvent.click(toggle);
   expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  expect(screen.getByRole('menuitem', { name: '프로젝트 관리' }).closest('ul')).toHaveStyle({
-    height: '0px',
-  });
+  expect(screen.queryByRole('menuitem', { name: '프로젝트 관리' })).not.toBeInTheDocument();
 });
 
 test('shell exposes Monitoring brand without filler and keeps skip navigation and active location', async () => {
@@ -534,7 +533,7 @@ test('settings polish uses labeled selects, boolean payloads, and compact action
       }),
     ),
   );
-  const row = screen.getByRole('button', { name: '연결' }).closest('tr');
+  const row = screen.getByRole('button', { name: '인스턴스 live-01 연결 관리' }).closest('tr');
   expect(row).toContainElement(screen.getByRole('button', { name: '인스턴스 live-01 수정' }));
   expect(screen.queryByRole('button', { name: '비활성화' })).not.toBeInTheDocument();
 });
@@ -557,11 +556,38 @@ test('project settings rows expose project ID, XLog usage and delete action', as
   expect(screen.getByRole('button', { name: '삭제' })).toBeVisible();
 });
 
+test('list connection management starts and stops without saving settings or running a diagnostic', async () => {
+  app('/settings/instances');
+  const manage = await screen.findByRole('button', { name: '인스턴스 live-01 연결 관리' });
+  expect(requests.some((url) => url.endsWith('/connection'))).toBe(false);
+  fireEvent.click(manage);
+  const dialog = within(screen.getByRole('dialog', { name: '인스턴스 live-01 연결 관리' }));
+  const start = await dialog.findByRole('button', { name: '연결 시작' });
+  expect(requests.some((url) => url.endsWith('/connection/start'))).toBe(false);
+  fireEvent.click(start);
+  const stop = await dialog.findByRole('button', { name: '연결 종료' });
+  await waitFor(() => expect(stop).toBeEnabled());
+  fireEvent.click(stop);
+  await dialog.findByRole('button', { name: '연결 시작' });
+  for (const action of ['start', 'stop']) {
+    expect(
+      requests.some(
+        (url, index) =>
+          url.endsWith(`/projects/sample-a/instances/live-01/connection/${action}`) &&
+          methods[index] === 'POST',
+      ),
+    ).toBe(true);
+  }
+  expect(methods).not.toContain('PUT');
+  expect(requests.some((url) => url.endsWith('/test'))).toBe(false);
+});
+
 test('successful connection tests are acknowledged', async () => {
   cleanup();
   app('/settings/instances');
-  fireEvent.click(await screen.findByRole('button', { name: '연결' }));
-  expect(await screen.findByText('연결 테스트에 성공했습니다.')).toBeVisible();
+  fireEvent.click(await screen.findByRole('button', { name: '인스턴스 live-01 연결 관리' }));
+  fireEvent.click(await screen.findByRole('button', { name: '연결 확인' }));
+  await waitFor(() => expect(screen.getByText('연결 테스트에 성공했습니다.')).toBeVisible());
 });
 
 test('settings tables and threshold toolbar retain complete labels', async () => {
@@ -622,22 +648,28 @@ test('instance project dropdown uses enabled projects and deterministic first se
 test('connection test translates safe code and never exposes server details', async () => {
   connectionFailureCode = 'AUTH_ERROR';
   app('/settings/instances');
-  fireEvent.click(await screen.findByRole('button', { name: '연결' }));
-  expect(
-    await screen.findByText('인증에 실패했습니다. Collector 토큰을 다시 확인하세요.'),
-  ).toBeVisible();
+  fireEvent.click(await screen.findByRole('button', { name: '인스턴스 live-01 연결 관리' }));
+  fireEvent.click(await screen.findByRole('button', { name: '연결 확인' }));
+  await waitFor(() =>
+    expect(
+      screen.getByText('인증에 실패했습니다. Collector 토큰을 다시 확인하세요.'),
+    ).toBeVisible(),
+  );
   expect(screen.queryByText(/secret|stack|token=abc/i)).not.toBeInTheDocument();
 });
 
 test('connection test explains an invalid allowlist file without exposing server details', async () => {
   connectionFailureCode = 'ALLOWLIST_CONFIG_ERROR';
   app('/settings/instances');
-  fireEvent.click(await screen.findByRole('button', { name: '연결' }));
-  expect(
-    await screen.findByText(
-      '접속 허용 목록 파일을 읽을 수 없습니다. 파일 위치와 JSON 형식을 확인하세요.',
-    ),
-  ).toBeVisible();
+  fireEvent.click(await screen.findByRole('button', { name: '인스턴스 live-01 연결 관리' }));
+  fireEvent.click(await screen.findByRole('button', { name: '연결 확인' }));
+  await waitFor(() =>
+    expect(
+      screen.getByText(
+        '접속 허용 목록 파일을 읽을 수 없습니다. 파일 위치와 JSON 형식을 확인하세요.',
+      ),
+    ).toBeVisible(),
+  );
   expect(screen.queryByText(/secret|stack|token=abc/i)).not.toBeInTheDocument();
 });
 
@@ -662,10 +694,13 @@ test('an internal check can run from instance detail and refresh its result', as
 test('connection test shows safe guidance without a structured error code', async () => {
   connectionFailureCode = '';
   app('/settings/instances');
-  fireEvent.click(await screen.findByRole('button', { name: '연결' }));
-  expect(
-    await screen.findByText('Collector에 연결할 수 없습니다. 주소, 포트, 방화벽을 확인하세요.'),
-  ).toBeVisible();
+  fireEvent.click(await screen.findByRole('button', { name: '인스턴스 live-01 연결 관리' }));
+  fireEvent.click(await screen.findByRole('button', { name: '연결 확인' }));
+  await waitFor(() =>
+    expect(
+      screen.getByText('Collector에 연결할 수 없습니다. 주소, 포트, 방화벽을 확인하세요.'),
+    ).toBeVisible(),
+  );
 });
 
 test('registration starts from a toolbar action rather than an always-open form', async () => {
@@ -1075,7 +1110,10 @@ function app(path: string) {
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>
-        <App />
+        {/* JSDOM은 CSS 키프레임을 실행하지 않으므로 모션은 실제 브라우저에서 검증 */}
+        <ConfigProvider theme={{ token: { motion: false } }}>
+          <App />
+        </ConfigProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );

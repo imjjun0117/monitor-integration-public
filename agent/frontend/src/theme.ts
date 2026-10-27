@@ -1,9 +1,36 @@
 // 화면 모드 저장 및 차트·공통 화면 갱신
 import { useSyncExternalStore } from 'react';
+import { theme as antTheme, type ThemeConfig } from 'antd';
 
 export type Theme = 'light' | 'dark';
 const storageKey = 'monitoring.theme';
 const themeEvent = 'monitoring-theme-change';
+
+// 전환 전 브랜드 색상과 글꼴을 공식 디자인 토큰으로 공유
+export function getMonitoringTheme(appearance: Theme): ThemeConfig {
+  const dark = appearance === 'dark';
+  return {
+    algorithm: dark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
+    token: {
+      fontFamily: '"Outfit Variable", "Noto Sans KR Variable", sans-serif',
+      colorPrimary: dark ? '#c4b5fd' : '#5b21b6',
+      colorTextLightSolid: dark ? '#201039' : '#ffffff',
+      colorBgLayout: dark ? '#081321' : '#f5f7fb',
+      colorBgContainer: dark ? '#101f33' : '#ffffff',
+      colorBgElevated: dark ? '#11243b' : '#ffffff',
+      colorText: dark ? '#e8f0fb' : '#101828',
+      colorTextSecondary: dark ? '#b4c5dc' : '#475467',
+      colorTextTertiary: dark ? '#91a8c4' : '#667085',
+      colorTextDescription: dark ? '#b4c5dc' : '#475467',
+      colorBorder: dark ? '#3a5573' : '#b9c7d8',
+      colorBorderSecondary: dark ? '#2b415b' : '#dce3ed',
+      colorLink: dark ? '#c4b5fd' : '#5b21b6',
+      colorLinkHover: dark ? '#ddd6fe' : '#4c1d95',
+      colorLinkActive: dark ? '#ddd6fe' : '#4c1d95',
+      borderRadius: 8,
+    },
+  };
+}
 
 export function initializeTheme() {
   let theme: Theme = 'dark';

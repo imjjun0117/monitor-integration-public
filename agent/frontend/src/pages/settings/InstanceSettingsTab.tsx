@@ -350,6 +350,8 @@ function InstanceRow({
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [managingConnection, setManagingConnection] = useState(false);
+  const mobileReadonly = Grid.useBreakpoint().md === false;
   const client = useQueryClient();
   const [collectionMode, setCollectionMode] = useState<TransportMode.mode>();
   const [xlogEnabled, setXlogEnabled] = useState<boolean>();
@@ -438,11 +440,13 @@ function InstanceRow({
       <Space wrap>
         {canWrite && (
           <Button
-            loading={connectionTest.isPending}
-            disabled={connectionTest.isPending}
-            onClick={() => connectionTest.mutate()}
+            aria-label={`인스턴스 ${instance.instance_id} 연결 관리`}
+            onClick={() => {
+              connectionTest.reset();
+              setManagingConnection(true);
+            }}
           >
-            연결
+            연결 관리
           </Button>
         )}
         {canWrite && (
@@ -459,6 +463,47 @@ function InstanceRow({
             삭제
           </Button>
         )}
+        <Modal
+          title={`인스턴스 ${instance.instance_id} 연결 관리`}
+          open={managingConnection}
+          destroyOnHidden
+          onCancel={() => setManagingConnection(false)}
+          footer={
+            <Button aria-label="연결 관리 닫기" onClick={() => setManagingConnection(false)}>
+              닫기
+            </Button>
+          }
+        >
+          {managingConnection && (
+            <Space orientation="vertical" style={{ width: '100%' }}>
+              <TransportPanel
+                projectId={projectId}
+                instanceId={instance.instance_id}
+                compact
+                isDisabled={mobileReadonly}
+              />
+              <span className="field-help">
+                연결 확인은 현재 통신만 검사합니다. 웹소켓 수집을 재개하려면 연결 시작을 누르세요.
+              </span>
+              <Button
+                loading={connectionTest.isPending}
+                disabled={
+                  mobileReadonly || !canWrite || connectionChanging || connectionTest.isPending
+                }
+                onClick={() => connectionTest.mutate()}
+              >
+                연결 확인
+              </Button>
+              {!connectionTest.isPending &&
+                (connectionTest.data || connectionTest.error) &&
+                (connectionError ? (
+                  <Alert type="error" title="연결 테스트 실패" description={connectionError} />
+                ) : (
+                  <Alert type="success" title="연결 테스트에 성공했습니다." />
+                ))}
+            </Space>
+          )}
+        </Modal>
         <SettingsDialog
           id={`edit-instance-${instance.instance_id}`}
           title="인스턴스 수정"
@@ -657,17 +702,6 @@ function InstanceRow({
           <MutationError failed={permanentDelete.isError} error={permanentDelete.error} />
         </Modal>
       </Space>
-      {!connectionTest.isPending &&
-        (connectionTest.data || connectionTest.error) &&
-        (connectionError ? (
-          <Alert
-            type="error"
-            title={`${instance.instance_id} · 연결 테스트 실패`}
-            description={connectionError}
-          />
-        ) : (
-          <Alert type="success" title="연결 테스트에 성공했습니다." />
-        ))}
     </>
   );
 }

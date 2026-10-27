@@ -1,13 +1,10 @@
-/* 공식 ProLayout의 내부 색상·타이포그래피·표면은 변경하지 않음 */
+/* 브랜드 색상은 공식 토큰에서 적용하고 CSS는 레이아웃 정리에 사용 */
 .monitor-pro-layout .ant-pro-layout-content {
   min-width: 0;
 }
 /* 기본 모바일 span 토글 대신 키보드로 조작할 수 있는 공통 Button 하나만 표시 */
 .monitor-pro-layout .ant-pro-global-header-collapsed-button {
   display: none;
-}
-.monitor-brand-subtitle {
-  margin-left: 12px;
 }
 .global-project-selector {
   display: flex;
@@ -37,9 +34,6 @@
 @media (max-width: 600px) {
   .dashboard-summary {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .monitor-brand-subtitle {
-    display: none;
   }
   .global-project-selector {
     width: clamp(130px, 48vw, 220px);

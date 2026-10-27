@@ -253,10 +253,18 @@ body {
 /* 조회 필드의 너비와 레이블 기준선을 맞추고 작은 화면에서는 한 열로 배치 */
 .query-filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 240px));
   align-items: start;
   gap: 16px;
   margin-bottom: 20px;
+}
+.dashboard-scope-toolbar {
+  grid-template-columns: minmax(0, 240px) minmax(0, 180px);
+}
+@media (max-width: 575px) {
+  .query-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .query-filters > *,
 .query-filters .ant-form-item {

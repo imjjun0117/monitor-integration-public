@@ -1,3 +1,7 @@
+# Self-hosted brand fonts
+
+Outfit Variable and Noto Sans KR Variable are distributed through Fontsource under the SIL Open Font License 1.1. Their original license files are included in `assets/fonts/outfit-LICENSE.txt` and `assets/fonts/noto-sans-kr-LICENSE.txt`.
+
 # TailAdmin React template (historical chart presentation)
 
 Chart-card presentation in this application originated from [TailAdmin's free React template](https://github.com/TailAdmin/free-react-tailwind-admin-dashboard), commit e888dd1716b9803b535c7c2fa4f2c6b7d39b3da9. The legacy TailAdmin controls, forms, headers, dialogs, tables and CSS have been removed; the charts are rendered by ECharts. We retain this notice conservatively for any surviving chart presentation lineage.

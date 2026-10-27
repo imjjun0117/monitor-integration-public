@@ -290,7 +290,7 @@ test('dashboard displays operational summaries in official Ant Design cards with
   view();
   await ready();
   expect(screen.getByText('조회 기간', { selector: 'label' })).toBeVisible();
-  expect(screen.getByText(/최근 수집 데이터를 조회/)).toBeVisible();
+  expect(screen.getByText('최근 수집 데이터 기준')).toBeVisible();
   const summary = screen.getByLabelText('선택 인스턴스 요약');
   expect(summary.querySelectorAll('.ant-card')).toHaveLength(4);
   expect(summary.querySelectorAll('.ant-statistic')).toHaveLength(3);

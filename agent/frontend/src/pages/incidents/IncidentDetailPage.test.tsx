@@ -74,6 +74,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function show(write = true, path = '/incidents/1') {
@@ -275,7 +276,7 @@ test('metric incidents focus the affected resource and show other evidence only 
 
 // 작은 화면에서도 상태·시각·담당자를 생략하지 않고 필터 조건을 서버로 전달
 test('mobile incident list retains metadata and filters through the compact selector', async () => {
-  vi.spyOn(Grid, 'useBreakpoint').mockReturnValue({ md: false });
+  vi.stubGlobal('innerWidth', 390);
   vi.mocked(getIncidents).mockResolvedValue({ items: [incident], total: 1, page: 0, size: 50 });
   show(false, '/incidents');
   expect(await screen.findByRole('link', { name: /배치 지연/ })).toBeInTheDocument();

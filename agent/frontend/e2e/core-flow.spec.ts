@@ -345,6 +345,65 @@ test('all five real API filters, INTERNAL/EXTERNAL UI, and bounded rerun polling
   await expect(page.getByRole('row', { name: /내부 API E2E Internal API/ })).toBeVisible();
 });
 
+test('instance list exposes transport controls and reports real Collector start failures', async ({ page }) => {
+  await login(page);
+  await page.goto('/settings/instances?project=sample-b');
+  const requests: string[] = [];
+  page.on('request', request => {
+    if (request.method() === 'POST') {
+      requests.push(new URL(request.url()).pathname);
+    }
+  });
+  const manage = page.getByRole('button', { name: '인스턴스 local-02 연결 관리', exact: true });
+  await manage.click();
+  let dialog = page.getByRole('dialog', { name: '인스턴스 local-02 연결 관리' });
+  await expect(dialog.getByText('HTTP 조회', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '연결 시작' })).toHaveCount(0);
+  expect(requests).toEqual([]);
+  await dialog.getByRole('button', { name: '연결 확인', exact: true }).click();
+  await expect(dialog.getByText('연결 테스트에 성공했습니다.')).toBeVisible();
+  await dialog.getByRole('button', { name: '연결 관리 닫기', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+
+  await page.getByRole('button', { name: '인스턴스 local-02 수정' }).click();
+  const edit = page.getByRole('dialog', { name: '인스턴스 수정' });
+  await chooseOption(page, '수집 방식', '웹소켓 연결');
+  await edit.getByRole('button', { name: '인스턴스 local-02 저장' }).click();
+  await expect(edit).not.toBeVisible();
+  try {
+    requests.length = 0;
+    await manage.click();
+    dialog = page.getByRole('dialog', { name: '인스턴스 local-02 연결 관리' });
+    const start = dialog.getByRole('button', { name: '연결 시작', exact: true });
+    await expect(start).toBeEnabled();
+    expect(requests).toEqual([]);
+    const started = page.waitForResponse(response =>
+      new URL(response.url()).pathname.endsWith('/sample-b/instances/local-02/connection/start') &&
+      response.request().method() === 'POST',
+    );
+    await start.click();
+    // HTTP 전용 테스트 Collector의 실제 404를 Agent가 시작 실패로 반환하는 경로 검증
+    expect((await started).status()).toBe(503);
+    await expect(dialog.getByText('연결 요청에 실패했습니다. Collector 설정과 접속 가능 여부를 확인하세요.')).toBeVisible();
+    await expect(dialog.getByText('연결 실패', { exact: true })).toBeVisible();
+    expect(requests).toEqual(['/api/v1/projects/sample-b/instances/local-02/connection/start']);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole('button', { name: '인스턴스 local-02 연결 관리' })).toBeDisabled();
+    const remaining = page.getByRole('dialog', { name: '인스턴스 local-02 연결 관리' });
+    if (await remaining.isVisible()) {
+      await expect(remaining.getByRole('button', { name: '연결 시작' })).toBeDisabled();
+      await remaining.getByRole('button', { name: '연결 관리 닫기', exact: true }).click();
+    }
+  } finally {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/settings/instances?project=sample-b');
+    await page.getByRole('button', { name: '인스턴스 local-02 수정' }).click();
+    await chooseOption(page, '수집 방식', 'HTTP 조회');
+    await page.getByRole('button', { name: '인스턴스 local-02 저장' }).click();
+    await expect(page.getByRole('dialog', { name: '인스턴스 수정' })).not.toBeVisible();
+  }
+});
+
 test('settings edits persist and agent tokens remain write-only', async ({ page }) => {
   await login(page);
   await chooseOption(page, '프로젝트 선택', '샘플 A');

@@ -1,27 +1,13 @@
 import { ProCard } from '@ant-design/pro-components';
-import {
-  Alert,
-  Button,
-  ConfigProvider,
-  Flex,
-  Form,
-  Input,
-  Typography,
-  theme as antTheme,
-} from 'antd';
+import { Alert, Button, ConfigProvider, Flex, Form, Input, Typography } from 'antd';
 import koKR from 'antd/locale/ko_KR';
+import { getMonitoringTheme } from '../theme';
 
 export default function LoginPage() {
   const dark = document.documentElement.dataset.theme !== 'light';
 
   return (
-    <ConfigProvider
-      locale={koKR}
-      theme={{
-        algorithm: dark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
-        token: dark ? {} : { colorPrimary: '#0958d9' },
-      }}
-    >
+    <ConfigProvider locale={koKR} theme={getMonitoringTheme(dark ? 'dark' : 'light')}>
       <ProCard>
         <Flex align="center" gap={8}>
           <img src="/monitoring.svg" alt="" width="28" height="28" />

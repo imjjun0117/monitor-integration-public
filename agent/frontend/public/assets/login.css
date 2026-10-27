@@ -1,3 +1,5 @@
+@import url('./fonts/fonts.css');
+
 body {
   margin: 0;
 }
@@ -7,13 +9,14 @@ body {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: #f5f5f5;
-  color: #141414;
+  background: #f5f7fb;
+  color: #101828;
+  font-family: 'Outfit Variable', 'Noto Sans KR Variable', sans-serif;
 }
 
 :root[data-theme='dark'] .login-shell {
-  background: #141414;
-  color: #f5f5f5;
+  background: #081321;
+  color: #e8f0fb;
 }
 
 .login-panel {

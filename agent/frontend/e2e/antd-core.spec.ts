@@ -298,6 +298,9 @@ test('dashboard background and header remain visible across viewport and theme',
     width: number;
     layout: {
       documentWidth: number;
+      font: string;
+      brandImage: string | null;
+      scopeFields: Array<{ width: number; top: number }>;
       bodyBackground: string;
       bodyMargin: string;
       shell: { background: string; bottom: number; left: number; right: number };
@@ -352,6 +355,12 @@ test('dashboard background and header remain visible across viewport and theme',
           bodyMargin: getComputedStyle(document.body).margin,
           htmlBackground: getComputedStyle(document.documentElement).backgroundColor,
           content: geometry(content),
+          font: getComputedStyle(content).fontFamily,
+          brandImage: brand?.querySelector('img')?.getAttribute('src') ?? null,
+          scopeFields: [...document.querySelectorAll('.dashboard-scope-toolbar .ant-select')].map(element => ({
+            width: element.getBoundingClientRect().width,
+            top: element.getBoundingClientRect().top,
+          })),
           titleOverflow: (() => {
             const title = document.querySelector(
               '.instance-dashboard > .ant-card .ant-card-head-title',
@@ -399,6 +408,18 @@ test('dashboard background and header remain visible across viewport and theme',
       .soft(layout.titleOverflow.scroll, `${appearance} ${width}: instance link clipping`)
       .toBeLessThanOrEqual(layout.titleOverflow.client + 1);
     expect.soft(layout.bodyMargin, `${appearance} ${width}: browser canvas margin`).toBe('0px');
+    expect.soft(layout.shell.background, `${appearance}: existing brand canvas`).toBe(
+      appearance === 'dark' ? 'rgb(8, 19, 33)' : 'rgb(245, 247, 251)',
+    );
+    expect.soft(layout.font).toContain('Outfit Variable');
+    expect.soft(layout.font).toContain('Noto Sans KR Variable');
+    if (width >= 1024) {
+      expect.soft(layout.brandImage).toMatch(/monitoring\.svg$/);
+      expect.soft(layout.scopeFields).toHaveLength(2);
+      expect.soft(layout.scopeFields[0].width).toBeLessThanOrEqual(240);
+      expect.soft(layout.scopeFields[1].width).toBeLessThanOrEqual(180);
+      expect.soft(Math.abs(layout.scopeFields[0].top - layout.scopeFields[1].top)).toBeLessThanOrEqual(1);
+    }
     expect.soft(layout.shell.left, `${appearance} ${width}: canvas left edge`).toBe(0);
     expect.soft(layout.shell.right, `${appearance} ${width}: canvas right edge`).toBe(width);
     expect

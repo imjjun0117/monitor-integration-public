@@ -1,9 +1,10 @@
-// 상세 화면의 수동 연결 제어
+// 목록·상세·설정에서 동일한 수동 연결 제어 제공
 import { Alert, Button, Card, Space, Tag, Typography } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { DefaultService } from '../generated';
 import { usePermissions } from './PermissionContext';
+import { Loading } from './QueryState';
 
 export default function TransportPanel({
   projectId,
@@ -19,6 +20,7 @@ export default function TransportPanel({
   const client = useQueryClient();
   const { canWrite } = usePermissions();
   const args = { projectId, instanceId };
+  const changing = useIsMutating({ mutationKey: ['connection-change', projectId, instanceId] });
   const state = useQuery({
     queryKey: ['connection', projectId, instanceId],
     queryFn: () => DefaultService.getConnection(args),
@@ -35,12 +37,16 @@ export default function TransportPanel({
         return DefaultService.stopConnection(args);
       }
     },
-    onSuccess: () => {
+    onSettled: () => {
       void client.invalidateQueries({ queryKey: ['connection', projectId] });
     },
   });
   if (!state.data) {
-    return null;
+    return state.isError ? (
+      <Alert type="error" title="연결 상태를 불러오지 못했습니다." />
+    ) : (
+      <Loading />
+    );
   }
   const labels: Record<string, string> = {
     IDLE: '연결 대기',
@@ -82,7 +88,7 @@ export default function TransportPanel({
           <Button
             type={connected ? 'default' : 'primary'}
             loading={change.isPending}
-            disabled={isDisabled || change.isPending}
+            disabled={isDisabled || changing > 0}
             onClick={() => change.mutate(connected ? 'stop' : 'start')}
           >
             {connected ? '연결 종료' : '연결 시작'}

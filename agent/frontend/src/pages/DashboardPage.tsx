@@ -53,7 +53,7 @@ export default function DashboardPage() {
       <Form.Item
         label="조회 기간"
         htmlFor="dashboard-period"
-        extra={<span id="dashboard-period-help">최근 수집 데이터를 조회합니다.</span>}
+        extra={<span id="dashboard-period-help">최근 수집 데이터 기준</span>}
       >
         <Select
           id="dashboard-period"

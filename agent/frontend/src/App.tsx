@@ -22,7 +22,7 @@ import './app.css';
 import './pro-layout.css';
 import { menuForPath } from './components/PermissionProvider';
 import { ProjectScopeProvider, ProjectSelector, useProjectScope } from './components/ProjectScope';
-import { useTheme } from './theme';
+import { getMonitoringTheme, useTheme } from './theme';
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const IncidentsPage = lazy(() => import('./pages/incidents/IncidentsPage'));
@@ -103,22 +103,8 @@ function layoutRoutesFor(items: VisibleNavigationItem[], isAdmin: boolean) {
 
 export default function App() {
   const appearance = useTheme();
-  const algorithm = appearance === 'dark' ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm;
-  const defaultTokens = antTheme.getDesignToken({ algorithm });
   return (
-    <ConfigProvider
-      locale={koKR}
-      theme={{
-        algorithm,
-        token: {
-          colorTextDescription: defaultTokens.colorTextSecondary,
-          colorLink:
-            appearance === 'dark'
-              ? antTheme.getDesignToken().colorPrimaryTextHover
-              : defaultTokens.colorPrimaryTextActive,
-        },
-      }}
-    >
+    <ConfigProvider locale={koKR} theme={getMonitoringTheme(appearance)}>
       <AntApp>
         <ProjectScopeProvider>
           <AppLayout />
@@ -166,6 +152,21 @@ function AppLayout() {
         splitMenus={false}
         title="Monitoring"
         logo="/monitoring.svg"
+        token={{
+          bgLayout: token.colorBgLayout,
+          header: {
+            colorBgHeader: token.colorBgContainer,
+            colorHeaderTitle: token.colorText,
+            colorTextMenu: token.colorTextSecondary,
+            colorTextRightActionsItem: token.colorText,
+          },
+          sider: {
+            colorMenuBackground: token.colorBgContainer,
+            colorTextMenu: token.colorTextSecondary,
+            colorTextMenuSelected: token.colorLink,
+            colorTextMenuItemHover: token.colorLinkHover,
+          },
+        }}
         route={{ path: '/', routes }}
         menuProps={{ 'aria-label': '주 메뉴' }}
         collapsed={collapsed}
@@ -209,10 +210,13 @@ function AppLayout() {
           />
         )}
         actionsRender={() => [<ProjectSelector key="project" />, <UserMenu key="user" />]}
-        headerTitleRender={(_, title) => (
-          <Link to="/" aria-label="종합현황으로 이동">
+        headerTitleRender={(logo, title) => (
+          <Link to="/" aria-label="종합현황으로 이동" style={{ gap: token.marginSM }}>
+            {logo}
             {title}
-            <span className="monitor-brand-subtitle">운영 모니터링</span>
+            <span style={{ fontSize: token.fontSizeSM, color: token.colorTextSecondary }}>
+              운영 모니터링
+            </span>
           </Link>
         )}
         menuHeaderRender={false}
