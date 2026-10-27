@@ -20,8 +20,20 @@ test('setting fields expose labels and help through official Ant Design controls
         falseLabel="미사용"
         onChange={setEnabled}
       />
-      <NumberInput id="setting-count" label="횟수" value={5} onChange={setNumber} />
-      <SecretInput id="setting-secret" label="비밀" value="" onChange={vi.fn()} />
+      <NumberInput
+        id="setting-count"
+        label="횟수"
+        placeholder="1~10회"
+        value={5}
+        onChange={setNumber}
+      />
+      <SecretInput
+        id="setting-secret"
+        label="비밀"
+        placeholder="새 토큰 입력"
+        value=""
+        onChange={vi.fn()}
+      />
     </>,
   );
   const enabled = screen.getByRole('combobox', { name: '사용 여부' });
@@ -31,9 +43,11 @@ test('setting fields expose labels and help through official Ant Design controls
   expect(setEnabled).toHaveBeenCalledWith(false);
   const count = screen.getByRole('spinbutton', { name: '횟수' });
   expect(count).toHaveClass('ant-input-number-input');
+  expect(count).toHaveAttribute('placeholder', '1~10회');
   fireEvent.change(count, { target: { value: '' } });
   expect(setNumber).toHaveBeenLastCalledWith(Number.NaN);
   expect(screen.getByLabelText('비밀')).toHaveAttribute('type', 'password');
+  expect(screen.getByLabelText('비밀')).toHaveAttribute('placeholder', '새 토큰 입력');
 });
 
 test('setting dialog retains native form submission and blocks writes for read-only users', () => {

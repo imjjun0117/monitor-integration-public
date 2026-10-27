@@ -332,6 +332,7 @@ export default function InstanceThresholdSettings({
             <LabeledField id="threshold-metric" label="항목" help={description?.help}>
               <Select
                 id="threshold-metric"
+                aria-label="항목"
                 value={draft.metricKey}
                 onChange={(key) =>
                   setDraft({
@@ -421,16 +422,12 @@ export default function InstanceThresholdSettings({
                 />
               </LabeledField>
             </div>
-            <LabeledField
-              id="threshold-emails"
-              label="알림 이메일"
-              help="이 항목의 알림을 받을 주소입니다. 여러 명은 쉼표로 구분하세요. 최대 10개까지 등록할 수 있습니다."
-            >
+            <LabeledField id="threshold-emails" label="알림 이메일">
               <Input
                 id="threshold-emails"
                 value={draft.emails}
                 maxLength={2550}
-                placeholder="ops@example.com, dev@example.com"
+                placeholder="ops@example.com, dev@example.com (최대 10개)"
                 onChange={(event) => setDraft({ ...draft, emails: event.target.value })}
               />
             </LabeledField>

@@ -11,6 +11,13 @@ export function getMonitoringTheme(appearance: Theme): ThemeConfig {
   const dark = appearance === 'dark';
   return {
     algorithm: dark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
+    components: {
+      Button: {
+        colorError: dark ? '#ff9da6' : '#b42318',
+        colorErrorHover: dark ? '#ffbdc3' : '#912018',
+        colorErrorActive: dark ? '#f58490' : '#7a1c14',
+      },
+    },
     token: {
       fontFamily: '"Outfit Variable", "Noto Sans KR Variable", sans-serif',
       colorPrimary: dark ? '#c4b5fd' : '#5b21b6',

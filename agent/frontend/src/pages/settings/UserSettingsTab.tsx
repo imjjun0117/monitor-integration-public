@@ -198,6 +198,7 @@ export default function UserSettingsTab() {
           <LabeledField id="user-id" label="계정 ID">
             <Input
               id="user-id"
+              placeholder="로그인에 사용할 계정 ID"
               value={draft.username}
               disabled={editing}
               autoComplete="off"
@@ -208,11 +209,10 @@ export default function UserSettingsTab() {
           <SecretInput
             id="user-password"
             label={editing ? '새 비밀번호' : '비밀번호'}
-            help={
-              editing
-                ? '비워두면 기존 비밀번호를 유지합니다. 변경하면 기존 로그인은 종료됩니다.'
-                : '12자 이상, UTF-8 기준 72바이트 이하'
+            placeholder={
+              editing ? '비워 두면 기존 비밀번호 유지' : '12자 이상, UTF-8 기준 72바이트 이하'
             }
+            help={editing ? '비밀번호를 변경하면 기존 로그인은 종료됩니다.' : undefined}
             required={!editing}
             value={draft.password ?? ''}
             onChange={(password) => setDraft({ ...draft, password })}

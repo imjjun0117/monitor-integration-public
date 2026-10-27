@@ -482,14 +482,16 @@ test('instance settings use labeled controls, guidance, and concise actions', as
   ]) {
     expect(screen.getAllByText(label, { selector: 'label' })[0]).toBeVisible();
   }
-  expect(screen.getByText('예: https://agent.example.com, 최대 500자')).toBeVisible();
-  expect(screen.getByText('15초 이상으로 설정하세요.')).toBeVisible();
+  expect(screen.getByRole('textbox', { name: 'Collector Base URL' })).toHaveAttribute(
+    'placeholder',
+    '예: https://agent.example.com (최대 500자)',
+  );
   expect(screen.getByRole('textbox', { name: '인스턴스 ID' })).toBeVisible();
   const polling = screen.getByRole('spinbutton', { name: '새 인스턴스 폴링 간격' });
   expect(polling).toHaveClass('ant-input-number-input');
   expect(polling).toHaveAttribute('aria-valuemin', '15');
-  expect(polling).toHaveAttribute('aria-describedby', 'instance-poll-interval-help');
-  expect(document.getElementById('instance-poll-interval-help')).toHaveTextContent('15초 이상');
+  expect(polling).toHaveAttribute('placeholder', '15초 이상');
+  expect(screen.getByText('중지하면 폴링을 멈추지만 기존 수집 데이터는 유지합니다.')).toBeVisible();
   expect(screen.getByRole('button', { name: '인스턴스 등록 확인' })).toBeVisible();
 });
 

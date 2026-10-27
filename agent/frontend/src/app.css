@@ -28,17 +28,22 @@ body {
   outline: 3px solid currentColor;
 }
 
-/* 목록·차트 배치: 공식 Card/Table의 표면과 내부 스타일은 변경하지 않음 */
+/* 목록·차트·입력 배치: 공식 Card/Table의 표면과 내부 스타일은 변경하지 않음 */
 .chart-grid,
-.service-balance-grid {
+.service-balance-grid,
+.service-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 .chart-grid > *,
 .service-balance-grid > *,
+.service-field-grid > *,
 .metric-chart-card {
   min-width: 0;
+}
+.service-field-grid {
+  row-gap: 0;
 }
 .service-info-metrics {
   display: grid;
@@ -65,8 +70,7 @@ body {
 .chart-project-filter,
 .filter-actions,
 .settings-row-actions,
-.settings-toolbar,
-.check-settings-actions {
+.settings-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -271,6 +275,7 @@ body {
 @media (max-width: 767px) {
   .chart-grid,
   .service-balance-grid,
+  .service-field-grid,
   .service-info-metrics,
   .instance-chart-grid,
   .threshold-limit-fields,

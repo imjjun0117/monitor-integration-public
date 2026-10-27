@@ -176,10 +176,11 @@ export default function InstanceSettingsTab() {
         failed={create.isError}
         error={create.error}
       >
-        <LabeledField id="instance-id" label="인스턴스 ID" help="예: live-01">
+        <LabeledField id="instance-id" label="인스턴스 ID">
           <Input
             id="instance-id"
             aria-label="인스턴스 ID"
+            placeholder="예: live-01"
             value={value.instanceId}
             onChange={(event) => setValue({ ...value, instanceId: event.target.value })}
             minLength={2}
@@ -187,31 +188,30 @@ export default function InstanceSettingsTab() {
             required
           />
         </LabeledField>
-        <LabeledField id="instance-display-name" label="표시명" help="앞뒤 공백 없이 1~120자">
+        <LabeledField id="instance-display-name" label="표시명">
           <Input
             id="instance-display-name"
             aria-label="인스턴스 표시명"
+            placeholder="앞뒤 공백 없이 1~120자"
             value={value.displayName}
             onChange={(event) => setValue({ ...value, displayName: event.target.value })}
             required
           />
         </LabeledField>
-        <LabeledField id="instance-environment" label="환경" help="예: production, 최대 40자">
+        <LabeledField id="instance-environment" label="환경">
           <Input
             id="instance-environment"
             aria-label="인스턴스 환경"
+            placeholder="예: production (최대 40자)"
             value={value.environment ?? ''}
             onChange={(event) => setValue({ ...value, environment: event.target.value })}
           />
         </LabeledField>
-        <LabeledField
-          id="instance-agent-url"
-          label="Collector Base URL"
-          help="예: https://agent.example.com, 최대 500자"
-        >
+        <LabeledField id="instance-agent-url" label="Collector Base URL">
           <Input
             id="instance-agent-url"
             aria-label="Collector Base URL"
+            placeholder="예: https://agent.example.com (최대 500자)"
             value={value.agentBaseUrl}
             onChange={(event) => setValue({ ...value, agentBaseUrl: event.target.value })}
             required
@@ -220,14 +220,14 @@ export default function InstanceSettingsTab() {
         <SecretInput
           id="instance-token"
           value={value.token}
-          help="32 UTF-8 bytes 이상의 등록용 토큰"
+          placeholder="32 UTF-8 bytes 이상의 등록용 토큰"
           onChange={(token) => setValue({ ...value, token })}
         />
         <NumberInput
           id="instance-poll-interval"
           label="폴링 간격(초)"
           ariaLabel="새 인스턴스 폴링 간격"
-          help="15초 이상으로 설정하세요."
+          placeholder="15초 이상"
           min={15}
           max={MAX_POLL_INTERVAL_SECONDS}
           value={value.pollIntervalSeconds}
@@ -526,26 +526,20 @@ function InstanceRow({
               readOnly
             />
           </LabeledField>
-          <LabeledField
-            id={`instance-${instance.instance_id}-display-name`}
-            label="표시명"
-            help="앞뒤 공백 없이 1~120자"
-          >
+          <LabeledField id={`instance-${instance.instance_id}-display-name`} label="표시명">
             <Input
               id={`instance-${instance.instance_id}-display-name`}
               aria-label={`인스턴스 ${instance.instance_id} 표시명`}
+              placeholder="앞뒤 공백 없이 1~120자"
               value={draft.displayName}
               onChange={(event) => setDraft({ ...draft, displayName: event.target.value })}
             />
           </LabeledField>
-          <LabeledField
-            id={`instance-${instance.instance_id}-environment`}
-            label="환경"
-            help="최대 40자"
-          >
+          <LabeledField id={`instance-${instance.instance_id}-environment`} label="환경">
             <Input
               id={`instance-${instance.instance_id}-environment`}
               aria-label={`인스턴스 ${instance.instance_id} 환경`}
+              placeholder="예: production (최대 40자)"
               value={draft.environment ?? ''}
               onChange={(event) => setDraft({ ...draft, environment: event.target.value })}
             />
@@ -553,11 +547,11 @@ function InstanceRow({
           <LabeledField
             id={`instance-${instance.instance_id}-agent-url`}
             label="Collector Base URL"
-            help="최대 500자"
           >
             <Input
               id={`instance-${instance.instance_id}-agent-url`}
               aria-label={`인스턴스 ${instance.instance_id} Base URL`}
+              placeholder="예: https://agent.example.com (최대 500자)"
               value={draft.agentBaseUrl}
               onChange={(event) => setDraft({ ...draft, agentBaseUrl: event.target.value })}
             />
@@ -567,7 +561,7 @@ function InstanceRow({
             value={draft.token ?? ''}
             onChange={(token) => setDraft({ ...draft, token })}
             label="새 토큰"
-            help="비워 두면 기존 토큰 유지, 변경 시 32 UTF-8 bytes 이상"
+            placeholder="비워 두면 기존 토큰 유지 (32 UTF-8 bytes 이상)"
             required={false}
           />
           <LabeledField
@@ -631,7 +625,7 @@ function InstanceRow({
             id={`instance-${instance.instance_id}-poll-interval`}
             label="폴링 간격(초)"
             ariaLabel={`인스턴스 ${instance.instance_id} 폴링 간격`}
-            help="15초 이상"
+            placeholder="15초 이상"
             min={15}
             max={MAX_POLL_INTERVAL_SECONDS}
             value={draft.pollIntervalSeconds}

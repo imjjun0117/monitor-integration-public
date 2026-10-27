@@ -1,6 +1,6 @@
 // 인증서 검사 대상 및 주기 관리 화면
 import { ProForm, ProTable, type ProColumns } from '@ant-design/pro-components';
-import { Alert, Button, Form, Input, Modal, Select, Space } from 'antd';
+import { Alert, Button, Flex, Form, Input, Modal, Select } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Certificate, CertificateWrite } from '../../generated';
@@ -132,9 +132,10 @@ export default function CertificateSettingsTab() {
               preserveCurrent={Boolean(editing)}
             />
           </Form.Item>
-          <Form.Item label="호스트" htmlFor="certificate-hostname" extra="예: api.example.com">
+          <Form.Item label="호스트" htmlFor="certificate-hostname">
             <Input
               id="certificate-hostname"
+              placeholder="예: api.example.com"
               aria-label={
                 creating ? '인증서 호스트' : `인증서 ${editing?.certificate_target_id} 호스트`
               }
@@ -163,15 +164,17 @@ export default function CertificateSettingsTab() {
           <Form.Item label="SNI 호스트" htmlFor="certificate-sni">
             <Input
               id="certificate-sni"
+              placeholder="예: api.example.com"
               aria-label={creating ? 'SNI 호스트' : `인증서 ${editing?.certificate_target_id} SNI`}
               value={value.sniHostname}
               onChange={(event) => setValue({ ...value, sniHostname: event.target.value })}
               required
             />
           </Form.Item>
-          <Form.Item label="점검 간격(분)" htmlFor="certificate-check-interval" extra="1분 이상">
+          <Form.Item label="점검 간격(분)" htmlFor="certificate-check-interval">
             <Input
               id="certificate-check-interval"
+              placeholder="1분 이상"
               type="number"
               min={1}
               aria-label={
@@ -207,7 +210,7 @@ export default function CertificateSettingsTab() {
           {(create.isError || save.isError) && (
             <Alert type="error" title="인증서 대상을 저장하지 못했습니다." />
           )}
-          <Space>
+          <Flex justify="end" gap="small" wrap>
             <Button
               onClick={() => {
                 setCreating(false);
@@ -227,7 +230,7 @@ export default function CertificateSettingsTab() {
             >
               {creating ? '등록' : '저장'}
             </Button>
-          </Space>
+          </Flex>
         </ProForm>
       </Modal>
       <QueryContent query={query} empty={(query.data?.items.length ?? 0) === 0}>

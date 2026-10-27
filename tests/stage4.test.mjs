@@ -106,13 +106,13 @@ test("primary content uses the full workspace width and allows grid children to 
     /min-width:\s*0/,
   );
   assert.match(
-    cssRule(css, ".chart-grid,\n.service-balance-grid"),
+    cssRule(css, ".chart-grid,\n.service-balance-grid,\n.service-field-grid"),
     /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
   );
   assert.match(
     cssRule(
       css,
-      ".chart-grid > *,\n.service-balance-grid > *,\n.metric-chart-card",
+      ".chart-grid > *,\n.service-balance-grid > *,\n.service-field-grid > *,\n.metric-chart-card",
     ),
     /min-width:\s*0/,
   );

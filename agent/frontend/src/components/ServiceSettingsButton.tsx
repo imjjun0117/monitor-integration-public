@@ -2,7 +2,19 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ProForm } from '@ant-design/pro-components';
-import { Alert, Button, Card, Checkbox, Collapse, Form, Input, Modal, Select, Space } from 'antd';
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Collapse,
+  Flex,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Typography,
+} from 'antd';
 import { saveServiceProfile, type ApiCheck } from '../api';
 import { ServiceField, type ServiceProfile } from '../generated';
 import { usePermissions } from './PermissionContext';
@@ -144,11 +156,11 @@ export default function ServiceSettingsButton({ check }: { check: ApiCheck }) {
           {check.project_name ?? check.project_id} / {check.instance_name ?? check.instance_id} ·{' '}
           {check.name}
         </p>
-        <p className="service-balance-note">
-          프로젝트마다 다른 업체의 잔액·잔여 건수·상태를 같은 화면으로 표시합니다. 저장은 API를
-          실행하지 않으며, 이미 수집한 결과에서 값을 읽습니다.
-        </p>
+        <Typography.Paragraph type="secondary">
+          저장하면 이미 수집한 결과의 표시 방식만 바뀝니다.
+        </Typography.Paragraph>
         <ProForm
+          layout="vertical"
           submitter={false}
           onFinish={async () => {
             if (valid && !save.isPending) {
@@ -160,6 +172,7 @@ export default function ServiceSettingsButton({ check }: { check: ApiCheck }) {
           <Form.Item htmlFor="service-title" label="서비스명">
             <Input
               id="service-title"
+              placeholder="예: 메시지 잔여량"
               value={draft.title}
               maxLength={120}
               disabled={save.isPending}
@@ -169,6 +182,7 @@ export default function ServiceSettingsButton({ check }: { check: ApiCheck }) {
           <Form.Item htmlFor="service-description" label="정보 설명">
             <Input
               id="service-description"
+              placeholder="대시보드에 표시할 설명 (선택)"
               value={draft.description ?? ''}
               maxLength={500}
               disabled={save.isPending}
@@ -187,16 +201,16 @@ export default function ServiceSettingsButton({ check }: { check: ApiCheck }) {
               ]}
             />
           </Form.Item>
-          <p className="service-balance-note">
-            숫자 항목에 경고·위험 기준을 설정할 수 있습니다. 이 기준은 서비스 정보 카드에 적용하며
-            API 요청의 성공 조건은 기존 점검 설정을 사용합니다.
-          </p>
+          <Typography.Paragraph type="secondary">
+            경고·위험 기준은 서비스 정보 카드에만 적용됩니다.
+          </Typography.Paragraph>
           {draft.fields.map((field, index) => (
-            <Card key={field.key} title={`표시 항목 ${index + 1}`}>
-              <Space wrap align="start">
+            <Card key={field.key} title={`표시 항목 ${index + 1}`} style={{ marginBottom: 16 }}>
+              <div className="service-field-grid">
                 <Form.Item htmlFor={`service-label-${index}`} label="항목명">
                   <Input
                     id={`service-label-${index}`}
+                    placeholder="예: SMS 잔여 건수"
                     value={field.label}
                     maxLength={120}
                     disabled={save.isPending}
@@ -233,13 +247,10 @@ export default function ServiceSettingsButton({ check }: { check: ApiCheck }) {
                     ]}
                   />
                 </Form.Item>
-                <Form.Item
-                  htmlFor={`service-path-${index}`}
-                  label="응답 항목 경로"
-                  extra="예: $.balance, $.data.remaining"
-                >
+                <Form.Item htmlFor={`service-path-${index}`} label="응답 항목 경로">
                   <Input
                     id={`service-path-${index}`}
+                    placeholder="예: $.balance, $.data.remaining"
                     value={field.path}
                     disabled={save.isPending}
                     onChange={(event) => change(index, { path: event.target.value })}
@@ -274,6 +285,7 @@ export default function ServiceSettingsButton({ check }: { check: ApiCheck }) {
                     <Form.Item htmlFor={`service-warning-${index}`} label="경고 기준(선택)">
                       <Input
                         id={`service-warning-${index}`}
+                        placeholder="미설정"
                         type="number"
                         step="any"
                         value={field.warning ?? ''}
@@ -288,6 +300,7 @@ export default function ServiceSettingsButton({ check }: { check: ApiCheck }) {
                     <Form.Item htmlFor={`service-critical-${index}`} label="위험 기준(선택)">
                       <Input
                         id={`service-critical-${index}`}
+                        placeholder="미설정"
                         type="number"
                         step="any"
                         value={field.critical ?? ''}
@@ -301,26 +314,28 @@ export default function ServiceSettingsButton({ check }: { check: ApiCheck }) {
                     </Form.Item>
                   </>
                 )}
-              </Space>
-              <Checkbox
-                checked={field.required ?? false}
-                disabled={save.isPending}
-                onChange={(event) => change(index, { required: event.target.checked })}
-              >
-                필수 값 · 미수집이면 정보 미확인으로 표시
-              </Checkbox>
-              <Button
-                danger
-                disabled={save.isPending || draft.fields.length === 1}
-                onClick={() =>
-                  setDraft({
-                    ...draft,
-                    fields: draft.fields.filter((_, fieldIndex) => fieldIndex !== index),
-                  })
-                }
-              >
-                항목 {index + 1} 삭제
-              </Button>
+              </div>
+              <Flex justify="space-between" align="center" gap="small" wrap>
+                <Checkbox
+                  checked={field.required ?? false}
+                  disabled={save.isPending}
+                  onChange={(event) => change(index, { required: event.target.checked })}
+                >
+                  필수 값 · 미수집이면 정보 미확인으로 표시
+                </Checkbox>
+                <Button
+                  danger
+                  disabled={save.isPending || draft.fields.length === 1}
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      fields: draft.fields.filter((_, fieldIndex) => fieldIndex !== index),
+                    })
+                  }
+                >
+                  항목 {index + 1} 삭제
+                </Button>
+              </Flex>
             </Card>
           ))}
           <Button disabled={save.isPending || draft.fields.length >= 16} onClick={add}>
@@ -364,8 +379,13 @@ export default function ServiceSettingsButton({ check }: { check: ApiCheck }) {
               title="서비스 설정을 저장하지 못했습니다. 항목 경로와 경고 기준을 확인하세요."
             />
           )}
-          <div className="check-settings-actions">
-            <Button danger disabled={save.isPending} onClick={() => save.mutate(null)}>
+          <Flex justify="end" gap="small" wrap>
+            <Button
+              danger
+              style={{ marginInlineEnd: 'auto' }}
+              disabled={save.isPending}
+              onClick={() => save.mutate(null)}
+            >
               정보 표시 해제
             </Button>
             <Button disabled={save.isPending} onClick={() => setOpen(false)}>
@@ -374,7 +394,7 @@ export default function ServiceSettingsButton({ check }: { check: ApiCheck }) {
             <Button type="primary" htmlType="submit" loading={save.isPending} disabled={!valid}>
               저장
             </Button>
-          </div>
+          </Flex>
         </ProForm>
       </Modal>
     </>

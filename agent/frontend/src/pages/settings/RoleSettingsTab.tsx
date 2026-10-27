@@ -231,6 +231,7 @@ export default function RoleSettingsTab() {
           <LabeledField id="role-id" label="역할 ID">
             <Input
               id="role-id"
+              placeholder="예: MONITOR_VIEWER"
               value={draft.roleId}
               maxLength={20}
               disabled={editing}
@@ -240,6 +241,7 @@ export default function RoleSettingsTab() {
           <LabeledField id="role-name" label="역할 이름">
             <Input
               id="role-name"
+              placeholder="예: 모니터링 조회 담당"
               value={draft.name}
               maxLength={60}
               onChange={(event) => setDraft({ ...draft, name: event.target.value })}
@@ -248,6 +250,7 @@ export default function RoleSettingsTab() {
           <LabeledField id="role-description" label="설명">
             <Input
               id="role-description"
+              placeholder="역할의 용도와 담당 범위 (선택)"
               value={draft.description}
               maxLength={500}
               onChange={(event) => setDraft({ ...draft, description: event.target.value })}

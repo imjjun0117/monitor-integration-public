@@ -73,10 +73,11 @@ export default function ProjectSettingsTab() {
         failed={create.isError}
         error={create.error}
       >
-        <LabeledField id="project-id" label="프로젝트 ID" help="예: sample-a">
+        <LabeledField id="project-id" label="프로젝트 ID">
           <Input
             id="project-id"
             aria-label="프로젝트 ID"
+            placeholder="예: sample-a"
             value={value.projectId}
             onChange={(event) => setValue({ ...value, projectId: event.target.value })}
             minLength={2}
@@ -84,10 +85,11 @@ export default function ProjectSettingsTab() {
             required
           />
         </LabeledField>
-        <LabeledField id="project-display-name" label="표시명" help="앞뒤 공백 없이 1~120자">
+        <LabeledField id="project-display-name" label="표시명">
           <Input
             id="project-display-name"
             aria-label="프로젝트 표시명"
+            placeholder="앞뒤 공백 없이 1~120자"
             value={value.displayName}
             onChange={(event) => setValue({ ...value, displayName: event.target.value })}
             required

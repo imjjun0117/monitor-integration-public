@@ -85,6 +85,7 @@ export default function MenuSettingsTab() {
           <LabeledField id="menu-label" label="메뉴 이름">
             <Input
               id="menu-label"
+              placeholder="메뉴에 표시할 이름"
               required
               maxLength={60}
               value={draft.label}
@@ -94,6 +95,8 @@ export default function MenuSettingsTab() {
           <LabeledField id="menu-sort" label="표시 순서">
             <InputNumber
               id="menu-sort"
+              style={{ width: '100%' }}
+              placeholder="0~999"
               min={0}
               max={999}
               required

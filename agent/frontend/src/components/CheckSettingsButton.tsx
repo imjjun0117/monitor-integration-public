@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ProForm } from '@ant-design/pro-components';
-import { Alert, Button, Form, Input, Modal, Select } from 'antd';
+import { Alert, Button, Flex, Form, Input, Modal, Select } from 'antd';
 import { saveCheckSettings, type ApiCheck } from '../api';
 import { usePermissions } from './PermissionContext';
 import { automaticEnabled, checkInterval, checkName } from '../utils/checkPresentation';
@@ -63,6 +63,7 @@ export default function CheckSettingsButton({ check }: { check: ApiCheck }) {
         }}
       >
         <ProForm
+          layout="vertical"
           submitter={false}
           onFinish={async () => {
             if (valid && !save.isPending) {
@@ -108,10 +109,11 @@ export default function CheckSettingsButton({ check }: { check: ApiCheck }) {
           <Form.Item
             label="점검 주기(분)"
             htmlFor="check-interval"
-            extra="1분부터 7일(10,080분)까지 설정할 수 있습니다. 저장 후 마지막 점검으로부터 이 시간이 지나면 자동 실행합니다."
+            extra="마지막 점검 이후 설정한 주기가 지나면 자동 실행합니다."
           >
             <Input
               id="check-interval"
+              placeholder="1~10,080분 (최대 7일)"
               aria-label="점검 주기(분)"
               type="number"
               min={1}
@@ -132,14 +134,14 @@ export default function CheckSettingsButton({ check }: { check: ApiCheck }) {
           {save.isError && (
             <Alert type="error" title="점검 설정을 저장하지 못했습니다. 다시 시도하세요." />
           )}
-          <div className="check-settings-actions">
+          <Flex justify="end" gap="small" wrap>
             <Button disabled={save.isPending} onClick={() => setOpen(false)}>
               취소
             </Button>
             <Button type="primary" htmlType="submit" loading={save.isPending} disabled={!valid}>
               저장
             </Button>
-          </div>
+          </Flex>
         </ProForm>
       </Modal>
     </>

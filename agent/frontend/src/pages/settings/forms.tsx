@@ -24,7 +24,12 @@ export function LabeledField({
         })
       : children;
   return (
-    <Form.Item label={label} htmlFor={id} extra={help && <span id={helpId}>{help}</span>}>
+    <Form.Item
+      label={label}
+      htmlFor={id}
+      layout="vertical"
+      extra={help && <span id={helpId}>{help}</span>}
+    >
       {control}
     </Form.Item>
   );
@@ -83,6 +88,7 @@ export function SecretInput({
   onChange,
   label = 'Collector 토큰',
   help,
+  placeholder,
   required = true,
 }: {
   id: string;
@@ -90,6 +96,7 @@ export function SecretInput({
   onChange: (value: string) => void;
   label?: string;
   help?: string;
+  placeholder?: string;
   required?: boolean;
 }) {
   return (
@@ -99,6 +106,7 @@ export function SecretInput({
         aria-label={label}
         type="password"
         autoComplete="new-password"
+        placeholder={placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
@@ -111,6 +119,7 @@ export function NumberInput({
   id,
   label,
   help,
+  placeholder,
   value,
   onChange,
   min,
@@ -121,6 +130,7 @@ export function NumberInput({
   id: string;
   label: string;
   help?: string;
+  placeholder?: string;
   value: number;
   onChange: (value: number) => void;
   min?: number;
@@ -132,7 +142,9 @@ export function NumberInput({
     <LabeledField id={id} label={label} help={help}>
       <InputNumber
         id={id}
+        style={{ width: '100%' }}
         aria-label={ariaLabel}
+        placeholder={placeholder}
         value={Number.isFinite(value) ? value : null}
         min={min}
         max={max}

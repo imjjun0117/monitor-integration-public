@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getLogs, readLog, saveLog, type LogSource, type LogWrite } from '../api';
 import { usePermissions } from './PermissionContext';
 import { ProDescriptions, ProForm, ProTable, type ProColumns } from '@ant-design/pro-components';
-import { Alert, Button, Checkbox, Form, Input, Modal, Select, Space } from 'antd';
+import { Alert, Button, Checkbox, Flex, Form, Input, Modal, Select, Space } from 'antd';
 import { Empty, Failure, Loading } from './QueryState';
 
 const messages: Record<string, string> = {
@@ -389,6 +389,7 @@ function LogSettings({
         <Form.Item label="로그 이름" htmlFor="log-name">
           <Input
             id="log-name"
+            placeholder="예: 애플리케이션 로그"
             value={value.name}
             maxLength={120}
             required
@@ -398,14 +399,14 @@ function LogSettings({
         <Form.Item
           label="파일 경로"
           htmlFor="log-path"
-          extra="대상 서버의 절대 경로를 입력하세요. 날짜별 로그는 catalina.{yyyy-MM-dd}.log 형식으로 등록하면 날짜가 바뀔 때 새 파일을 읽습니다. Collector에서 허용한 폴더만 읽습니다."
+          extra="Collector에서 허용한 폴더의 절대 경로만 조회합니다."
         >
           <Input
             id="log-path"
             value={value.path}
             maxLength={1000}
             required
-            placeholder="/usr/local/tomcat/logs/catalina.out"
+            placeholder="예: /logs/catalina.{yyyy-MM-dd}.log"
             onChange={(event) => setValue((current) => ({ ...current, path: event.target.value }))}
           />
         </Form.Item>
@@ -437,13 +438,10 @@ function LogSettings({
             ]}
           />
         </Form.Item>
-        <Form.Item
-          label="조회 주기(초)"
-          htmlFor="log-interval"
-          extra="5~1,800초. 파일 전체 대신 새로 추가된 내용만 가져옵니다."
-        >
+        <Form.Item label="조회 주기(초)" htmlFor="log-interval">
           <Input
             id="log-interval"
+            placeholder="5~1,800초"
             type="number"
             min={5}
             max={1800}
@@ -457,12 +455,12 @@ function LogSettings({
           />
         </Form.Item>
         {mutation.isError && <Alert type="error" title="로그 설정을 저장하지 못했습니다." />}
-        <Space>
+        <Flex justify="end" gap="small" wrap>
           <Button onClick={onClose}>취소</Button>
           <Button type="primary" htmlType="submit" loading={mutation.isPending} disabled={!valid}>
             저장
           </Button>
-        </Space>
+        </Flex>
       </ProForm>
     </Modal>
   );

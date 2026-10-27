@@ -68,9 +68,17 @@ test('custom login and responsive dashboard meet visual behavior gates', async (
     await page.context().clearCookies();
     await page.goto('/login');
     await page.evaluate(() => sessionStorage.clear());
-    const loginBrand = page.getByText('Monitoring', { exact: true });
+    const loginBrand = page.locator('.login-brand').getByText('Monitoring', { exact: true });
     await expect(loginBrand).toHaveCount(1);
     await expect(loginBrand).toBeVisible();
+    const introduction = page.getByRole('complementary', { name: 'Monitoring 소개' });
+    if (viewport.width >= 1024) {
+      await expect(
+        introduction.getByRole('heading', { name: 'Monitoring', exact: true }),
+      ).toBeVisible();
+    } else {
+      await expect(introduction).toBeHidden();
+    }
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('h1')).toHaveText('Login');
     await expect(page.getByText(/Hermes|운영|Please sign in|통합 모니터링/)).toHaveCount(0);
