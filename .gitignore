@@ -31,3 +31,6 @@ monitor.properties
 /monitor-center/
 /monitor-agent/
 /monitor-agent-testapp/
+
+# 로컬 에이전트 작업 지침 제외
+/AGENTS.md

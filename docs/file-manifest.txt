@@ -1,5 +1,5 @@
 # Git 추적 소스 파일 목록
-# 총 545개
+# 총 544개
 .dockerignore
 .editorconfig
 .env.example
@@ -7,7 +7,6 @@
 .gitignore
 .mvn/wrapper/maven-wrapper.jar
 .mvn/wrapper/maven-wrapper.properties
-AGENTS.md
 CODE_CONVENTIONS.md
 DESIGN.md
 README.md
