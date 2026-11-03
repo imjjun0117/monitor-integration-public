@@ -2,6 +2,107 @@
 .monitor-pro-layout .ant-pro-layout-content {
   min-width: 0;
 }
+.monitor-side-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.monitor-side-brand > span {
+  display: grid;
+  line-height: 1.2;
+}
+.monitor-side-brand strong {
+  font-size: 17px;
+}
+.monitor-pro-layout .monitor-side-brand .ant-pro-global-header-logo,
+.monitor-pro-layout .monitor-side-brand img {
+  width: 34px;
+  height: 34px;
+  max-height: none;
+  flex: 0 0 34px;
+}
+.monitor-sidebar-eyebrow {
+  display: block;
+  margin-top: 24px;
+  padding: 18px 22px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.monitor-side-brand-mobile {
+  display: none;
+}
+.monitor-side-brand small {
+  font-size: 10px;
+  font-weight: 400;
+}
+.monitor-workspace-header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-inline: 24px;
+  border-bottom: 1px solid var(--ant-color-border-secondary, #dce3ed);
+  background: var(--ant-color-bg-container, #fff);
+}
+.monitor-workspace-path {
+  font-size: 12px;
+  font-weight: 600;
+}
+.monitor-workspace-location {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.monitor-workspace-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+@media (max-width: 991px) {
+  .monitor-workspace-header {
+    display: none;
+  }
+  /* 모바일에서 브랜드·메뉴와 프로젝트·계정을 별도 행에 배치해 320px에서도 겹침 방지 */
+  .monitor-pro-layout .ant-pro-global-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 56px 48px;
+    height: 104px;
+    align-items: center;
+  }
+  .monitor-pro-layout .monitor-side-brand {
+    grid-column: 1;
+    grid-row: 1;
+    width: max-content;
+  }
+  .monitor-pro-layout .monitor-side-brand .ant-pro-global-header-logo {
+    display: none;
+  }
+  .monitor-pro-layout .monitor-side-brand + div {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .monitor-pro-layout .ant-pro-global-header-right-content {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: end;
+  }
+  .monitor-side-brand-desktop {
+    display: none;
+  }
+  .monitor-side-brand-mobile {
+    display: inline;
+    justify-self: start;
+    white-space: nowrap;
+  }
+  .monitor-side-brand small {
+    display: none;
+  }
+}
 /* 기본 모바일 span 토글 대신 키보드로 조작할 수 있는 공통 Button 하나만 표시 */
 .monitor-pro-layout .ant-pro-global-header-collapsed-button {
   display: none;
@@ -18,20 +119,82 @@
 }
 .dashboard-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
+  align-content: stretch;
   gap: 12px;
-  margin-bottom: 20px;
+  min-width: 0;
+}
+.dashboard-priority-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 752fr) minmax(0, 384fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.transport-panel-compact .ant-card-body {
+  padding-block: 12px;
+}
+.transport-panel-compact .ant-typography {
+  margin: 8px 0 0;
+}
+.dashboard-summary > .ant-card {
+  min-width: 0;
+}
+.dashboard-summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+.dashboard-summary-metrics > * {
+  min-width: 0;
+}
+.dashboard-summary-metrics .ant-statistic-title {
+  font-size: 12px;
+}
+.dashboard-summary-metrics .ant-statistic-content {
+  font-size: 18px;
+}
+.dashboard-summary .service-balance-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.dashboard-summary .service-balances {
+  max-height: 280px;
+  overflow-y: auto;
+}
+.dashboard-incident-queue {
+  min-width: 0;
+}
+.dashboard-incident-queue .ant-list {
+  max-height: 320px;
+  overflow: auto;
+}
+.dashboard-incident-row {
+  display: grid;
+  grid-template-columns: minmax(70px, 100px) minmax(0, 1fr) minmax(80px, 110px);
+  align-items: start;
+  gap: 12px;
+  padding: 8px 0;
+  overflow-wrap: anywhere;
 }
 .dashboard-summary .ant-card,
 .dashboard-status-row .ant-card {
   min-width: 0;
 }
 @media (max-width: 1100px) {
+  .dashboard-priority-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .dashboard-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 600px) {
+  .dashboard-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-summary-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .global-project-selector {
     width: clamp(130px, 48vw, 220px);
   }

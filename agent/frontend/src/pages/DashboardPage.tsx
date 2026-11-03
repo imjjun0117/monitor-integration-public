@@ -3,19 +3,20 @@ import { chartPeriods, liveWindowMs, type ChartPeriod } from '../utils/chartPeri
 import { Alert, Card, Form, Listy, Select, Space, Statistic, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getDashboard, getResources } from '../api';
+import { getDashboard, getDbPools, getIncidents, getResources } from '../api';
 import type { DashboardProject, DashboardStatusCause, ResourceResponse } from '../generated';
 import MetricChart, { type NamedMetricSeries } from '../components/MetricChart';
 import ResourceUsage from '../components/ResourceUsage';
 import ServiceInfoCard from '../components/ServiceInfoCard';
 import { Empty, Failure, Loading } from '../components/QueryState';
 import StatusLabel from '../components/StatusLabel';
-import { formatPercent } from '../utils/format';
+import { formatCount, formatPercent } from '../utils/format';
 import { checkFailure, checkName } from '../utils/checkPresentation';
-import { useProjectScope } from '../components/ProjectScope';
+import { ProjectSelector, useProjectScope } from '../components/ProjectScope';
 import InstanceScope from '../components/InstanceScope';
 import XlogOverview from '../components/XlogOverview';
 import { usePermissions } from '../components/PermissionContext';
+import { incidentStates, incidentTitle, observationSummary } from './incidents/presentation';
 
 export default function DashboardPage() {
   const { token } = theme.useToken();
@@ -27,6 +28,12 @@ export default function DashboardPage() {
     ? (requestedPeriod as ChartPeriod)
     : '15m';
   const permissions = usePermissions();
+  const canReadIncidents =
+    permissions.isAdmin ||
+    Boolean(permissions.menus?.some((menu) => menu.menuId === 'incidents' && menu.canRead));
+  const canReadProjects =
+    permissions.isAdmin ||
+    Boolean(permissions.menus?.some((menu) => menu.menuId === 'projects' && menu.canRead));
   const query = useQuery({
     queryKey: ['dashboard', period, project, instance],
     queryFn: () => getDashboard(period, project, instance),
@@ -34,40 +41,56 @@ export default function DashboardPage() {
     refetchInterval: liveWindowMs(period) ? 5_000 : 15_000,
   });
   const filters = (
-    <Form
-      layout="vertical"
-      className="dashboard-scope-toolbar query-filters"
-      aria-label="대시보드 조회 범위"
-    >
-      <InstanceScope
-        key={project}
-        project={project}
-        instance={instance}
-        defaultFirst
-        onChange={(value) => {
-          params.set('project', project);
-          params.set('instance', value);
-          setParams(params, { replace: true });
+    <>
+      <Typography.Paragraph className="dashboard-intro" type="secondary">
+        선택한 인스턴스의 상태를 확인하고 이상 근거에서 바로 조치로 이동합니다.
+      </Typography.Paragraph>
+      <Form
+        layout="vertical"
+        className="dashboard-scope-toolbar query-filters"
+        aria-label="대시보드 조회 범위"
+        style={{
+          background: token.colorBgContainer,
+          border: `1px solid ${token.colorBorderSecondary}`,
+          borderRadius: token.borderRadiusLG,
         }}
-      />
-      <Form.Item
-        label="조회 기간"
-        htmlFor="dashboard-period"
-        extra={<span id="dashboard-period-help">최근 수집 데이터 기준</span>}
       >
-        <Select
-          id="dashboard-period"
-          aria-label="관제 조회 기간"
-          aria-describedby="dashboard-period-help"
-          value={period}
+        <Form.Item label="프로젝트" htmlFor="dashboard-project-select">
+          <ProjectSelector id="dashboard-project-select" ariaLabel="대시보드 프로젝트 필터" />
+        </Form.Item>
+        <InstanceScope
+          key={project}
+          project={project}
+          instance={instance}
+          defaultFirst
           onChange={(value) => {
-            params.set('period', value);
-            setParams(params);
+            params.set('project', project);
+            params.set('instance', value);
+            setParams(params, { replace: true });
           }}
-          options={Object.entries(chartPeriods).map(([value, label]) => ({ value, label }))}
         />
-      </Form.Item>
-    </Form>
+        <Form.Item
+          label={
+            <span className="dashboard-period-label">
+              조회 기간 <small id="dashboard-period-help">최근 수집 데이터 기준</small>
+            </span>
+          }
+          htmlFor="dashboard-period"
+        >
+          <Select
+            id="dashboard-period"
+            aria-label="관제 조회 기간"
+            aria-describedby="dashboard-period-help"
+            value={period}
+            onChange={(value) => {
+              params.set('period', value);
+              setParams(params);
+            }}
+            options={Object.entries(chartPeriods).map(([value, label]) => ({ value, label }))}
+          />
+        </Form.Item>
+      </Form>
+    </>
   );
   if (!project || !instance) {
     return (
@@ -110,60 +133,83 @@ export default function DashboardPage() {
       {query.isError && (
         <Alert type="warning" showIcon message="갱신에 실패해 마지막 데이터를 표시합니다." />
       )}
-      <div className="dashboard-summary" aria-label="선택 인스턴스 요약">
-        <Card size="small" styles={{ body: { padding: token.padding } }}>
-          <Typography.Text type="secondary">수집 상태</Typography.Text>
-          <div style={{ marginTop: token.marginXS }}>
+      <div className="dashboard-priority-grid">
+        <IncidentQueue project={project} instance={instance} canRead={canReadIncidents} />
+        <div className="dashboard-summary" aria-label="선택 인스턴스 요약">
+          <Card size="small" title="수집 상태">
             <StatusLabel
               status={selectedInstance?.collection_status ?? selectedInstance?.status}
               context="collection"
             />
-          </div>
-        </Card>
-        <Card size="small" styles={{ body: { padding: token.padding } }}>
-          <Link
-            aria-label={`실패 API ${data.failed_api_count}개 목록`}
-            to={`/api-monitoring?${scope}&status=DOWN&usage=used`}
-          >
-            <Statistic
-              title="실패 API"
-              value={data.failed_api_count}
-              suffix="개"
-              styles={{ content: data.failed_api_count ? { color: token.colorError } : {} }}
-            />
-          </Link>
-        </Card>
-        <Card size="small" styles={{ body: { padding: token.padding } }}>
-          <Link
-            aria-label={`만료 예정 인증서 ${data.expiring_certificate_count}개 목록`}
-            to={`/certificates?${scope}&expiry=soon`}
-          >
-            <Statistic
-              title="만료 예정 인증서"
-              value={data.expiring_certificate_count}
-              suffix="개"
-              styles={{
-                content: data.expiring_certificate_count ? { color: token.colorError } : {},
-              }}
-            />
-          </Link>
-        </Card>
-        <Card size="small" styles={{ body: { padding: token.padding } }}>
-          <a href="#dashboard-issues" aria-label="확인 필요 항목 보기">
-            <Statistic
-              title="확인 필요"
-              value={causes.length}
-              suffix="건"
-              styles={{ content: causes.length ? { color: token.colorError } : {} }}
-            />
-          </a>
-        </Card>
+            <div className="dashboard-summary-metrics">
+              <Link
+                aria-label={`실패 API ${data.failed_api_count}개 목록`}
+                to={`/api-monitoring?${scope}&status=DOWN&usage=used`}
+              >
+                <Statistic
+                  title="실패 API"
+                  value={data.failed_api_count}
+                  suffix="개"
+                  styles={{ content: data.failed_api_count ? { color: token.colorError } : {} }}
+                />
+              </Link>
+              <Link
+                aria-label={`만료 예정 인증서 ${data.expiring_certificate_count}개 목록`}
+                to={`/certificates?${scope}&expiry=soon`}
+              >
+                <Statistic
+                  title="만료 예정 인증서"
+                  value={data.expiring_certificate_count}
+                  suffix="개"
+                  styles={{
+                    content: data.expiring_certificate_count ? { color: token.colorError } : {},
+                  }}
+                />
+              </Link>
+              <a href="#dashboard-issues" aria-label="확인 필요 항목 보기">
+                <Statistic
+                  title="확인 필요"
+                  value={causes.length}
+                  suffix="건"
+                  styles={{ content: causes.length ? { color: token.colorError } : {} }}
+                />
+              </a>
+            </div>
+          </Card>
+          <Card size="small" title="외부 서비스 정보">
+            {balances.length > 0 ? (
+              <section className="service-balances" aria-label="선택 프로젝트 서비스 정보">
+                <div className="service-balance-grid">
+                  {balances.map((check) => (
+                    <ServiceInfoCard
+                      key={check.check_id}
+                      check={check}
+                      embedded
+                      action={
+                        <Link
+                          to={`/api-monitoring?${scope}&check=${encodeURIComponent(check.check_id)}`}
+                        >
+                          요청 기록 →
+                        </Link>
+                      }
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <Typography.Text type="secondary">
+                표시할 외부 서비스 정보가 없습니다.
+              </Typography.Text>
+            )}
+          </Card>
+        </div>
       </div>
       {selectedProject && selectedInstance ? (
         <InstanceDashboard
           key={`${project}/${instance}/${period}`}
           project={{ ...selectedProject, instances: [selectedInstance] }}
           period={period}
+          canRead={canReadProjects}
           showXlog={
             permissions.isAdmin ||
             Boolean(permissions.menus?.some((menu) => menu.menuId === 'xlog' && menu.canRead))
@@ -172,29 +218,7 @@ export default function DashboardPage() {
       ) : (
         <Empty>선택한 인스턴스의 정보가 없습니다.</Empty>
       )}
-      <div className={`dashboard-status-row${balances.length > 0 ? ' has-issues' : ''}`}>
-        {balances.length > 0 && (
-          <section className="service-balances" aria-label="선택 프로젝트 서비스 정보">
-            <Typography.Title level={2} style={{ fontSize: token.fontSizeLG, marginTop: 0 }}>
-              외부 서비스 정보
-            </Typography.Title>
-            <div className="service-balance-grid">
-              {balances.map((check) => (
-                <ServiceInfoCard
-                  key={check.check_id}
-                  check={check}
-                  action={
-                    <Link
-                      to={`/api-monitoring?${scope}&check=${encodeURIComponent(check.check_id)}`}
-                    >
-                      요청 기록 →
-                    </Link>
-                  }
-                />
-              ))}
-            </div>
-          </section>
-        )}
+      <div className="dashboard-status-row">
         <Card
           id="dashboard-issues"
           tabIndex={-1}
@@ -234,13 +258,95 @@ export default function DashboardPage() {
   );
 }
 
+function IncidentQueue({
+  project,
+  instance,
+  canRead,
+}: {
+  project: string;
+  instance: string;
+  canRead: boolean;
+}) {
+  const query = useQuery({
+    queryKey: ['incidents', project, 'ACTIVE', 0],
+    queryFn: () => getIncidents(project, 'ACTIVE', 0),
+    enabled: canRead,
+    refetchInterval: 15_000,
+    retry: false,
+  });
+  const page = query.data && Array.isArray(query.data.items) ? query.data : null;
+  const items = page?.items.filter((item) => item.instance_id === instance) ?? [];
+  return (
+    <Card
+      className="dashboard-incident-queue"
+      title="지금 처리할 장애"
+      role="region"
+      aria-label="지금 처리할 장애"
+      extra={
+        canRead ? (
+          <Link to={`/incidents?${new URLSearchParams({ project, state: 'ACTIVE' })}`}>
+            장애 관리대장 →
+          </Link>
+        ) : undefined
+      }
+    >
+      {!canRead ? (
+        <Alert type="info" showIcon title="장애 목록 조회 권한이 없습니다." />
+      ) : query.isPending ? (
+        <Loading />
+      ) : !page ? (
+        <Failure message="장애 목록을 불러오지 못했습니다." />
+      ) : (
+        <>
+          {query.isError && (
+            <Alert type="warning" showIcon message="갱신에 실패해 마지막 장애 목록을 표시합니다." />
+          )}
+          <Typography.Text type="secondary">
+            첫 페이지에서 선택 인스턴스 {items.length}건
+            {page.total > page.items.length && ' · 더 많은 장애는 관리대장에서 확인'}
+          </Typography.Text>
+          {items.length === 0 ? (
+            <Empty>
+              첫 페이지에 선택 인스턴스의 진행 중인 장애가 없습니다. 전체 목록은 관리대장에서
+              확인하세요.
+            </Empty>
+          ) : (
+            <Listy
+              items={items}
+              rowKey="incident_id"
+              itemRender={(item) => (
+                <div className="dashboard-incident-row">
+                  <strong>{incidentStates[item.state]}</strong>
+                  <div>
+                    <Link
+                      to={`/incidents/${item.incident_id}?${new URLSearchParams({ project: item.project_id })}`}
+                    >
+                      {incidentTitle(item)}
+                    </Link>
+                    <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
+                      {observationSummary(item.latest_observation)}
+                    </Typography.Paragraph>
+                  </div>
+                  <span>{item.assignee ?? '담당 미지정'}</span>
+                </div>
+              )}
+            />
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 function InstanceDashboard({
   project,
   period,
+  canRead,
   showXlog,
 }: {
   project: DashboardProject;
   period: ChartPeriod;
+  canRead: boolean;
   showXlog: boolean;
 }) {
   const { token } = theme.useToken();
@@ -248,6 +354,14 @@ function InstanceDashboard({
   const query = useQuery({
     queryKey: ['resources', project.project_id, instance.instance_id, period],
     queryFn: () => getResources(project.project_id, instance.instance_id, period),
+    enabled: canRead,
+    refetchInterval: liveWindowMs(period) ? 5_000 : 15_000,
+    retry: false,
+  });
+  const pools = useQuery({
+    queryKey: ['pools', project.project_id, instance.instance_id, period],
+    queryFn: () => getDbPools(project.project_id, instance.instance_id, period),
+    enabled: canRead,
     refetchInterval: liveWindowMs(period) ? 5_000 : 15_000,
     retry: false,
   });
@@ -257,10 +371,72 @@ function InstanceDashboard({
   const context = `${project.display_name} / ${instance.display_name}`;
   return (
     <section className="instance-dashboard" aria-label={context}>
+      {resource && (resource.stale || query.isError) && (
+        <Alert type="warning" showIcon message="마지막 정상 자원 데이터를 표시합니다." />
+      )}
+      <Card
+        size="small"
+        title="DB 연결 풀"
+        role="region"
+        aria-label="DB 연결 풀"
+        extra={
+          canRead ? (
+            <Link
+              to={`/projects/${project.project_id}/instances/${instance.instance_id}?tab=db-pools`}
+            >
+              풀 상세 →
+            </Link>
+          ) : undefined
+        }
+      >
+        {!canRead ? (
+          <Alert type="info" showIcon title="DB 연결 풀 조회 권한이 없습니다." />
+        ) : pools.isPending ? (
+          <Loading />
+        ) : !pools.data ? (
+          <Failure message="DB 연결 풀을 불러오지 못했습니다." />
+        ) : (
+          <>
+            {(pools.data.stale || pools.isError) && (
+              <Alert type="warning" showIcon message="마지막 정상 DB 풀 데이터를 표시합니다." />
+            )}
+            {!pools.data.items.length ? (
+              <Empty>DB Pool 수집이 지원되지 않거나 수집된 풀이 없습니다.</Empty>
+            ) : (
+              <div className="dashboard-pool-grid">
+                {pools.data.items.map((pool) => (
+                  <section key={pool.pool_id} aria-label={`${pool.name} 연결 풀`}>
+                    <Typography.Text strong>{pool.name}</Typography.Text>
+                    <div className="dashboard-pool-metrics">
+                      <div>
+                        사용 중 / 최대{' '}
+                        <strong>
+                          {pool.active == null ? '미수집' : formatCount(pool.active)} /{' '}
+                          {pool.max_size == null ? '미수집' : formatCount(pool.max_size)}
+                        </strong>
+                      </div>
+                      <div>
+                        유휴 연결{' '}
+                        <strong>{pool.idle == null ? '미수집' : formatCount(pool.idle)}</strong>
+                      </div>
+                      <div>
+                        연결 대기{' '}
+                        <strong>
+                          {pool.waiters == null ? '미수집' : formatCount(pool.waiters)}
+                        </strong>
+                      </div>
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </Card>
       <div className="instance-context" aria-label="인스턴스 상태">
         <Space wrap size={[token.marginSM, token.marginXS]}>
           <Typography.Title level={2} style={{ fontSize: token.fontSizeLG, margin: 0 }}>
-            자원 현황
+            자원 추이 · {chartPeriods[period]}
           </Typography.Title>
           <StatusLabel status={instance.status} context="overview" />
           <Typography.Text type="secondary">
@@ -268,100 +444,111 @@ function InstanceDashboard({
             <time>{formatTime(latest?.central_received_at ?? instance.last_seen_at)}</time>
           </Typography.Text>
         </Space>
-        <Link
-          aria-label={`${context} 상세 보기`}
-          to={`/projects/${project.project_id}/instances/${instance.instance_id}`}
-        >
-          인스턴스 상세 →
-        </Link>
+        {canRead && (
+          <Link
+            aria-label={`${context} 상세 보기`}
+            to={`/projects/${project.project_id}/instances/${instance.instance_id}`}
+          >
+            인스턴스 상세 →
+          </Link>
+        )}
       </div>
-      {(resource?.stale || query.isError) && (
-        <Alert type="warning" showIcon message="마지막 정상 자원 데이터를 표시합니다." />
-      )}
-      {query.isPending ? (
+      {!canRead ? (
+        <Alert type="info" showIcon title="인스턴스 자원 조회 권한이 없습니다." />
+      ) : query.isPending ? (
         <Loading />
       ) : !resource ? (
         <Failure message="인스턴스 자원을 불러오지 못했습니다." />
       ) : (
-        <div className="chart-grid instance-chart-grid">
-          <MetricChart
-            liveWindow={liveWindowMs(period)}
-            context={context}
-            title="CPU"
-            points={[]}
-            series={series.cpu}
-            xKey="sampled_at"
-            yKey="value"
-            unit="ratio"
-            summary={
-              <ResourceUsage
-                capacityLabel="CPU"
-                used={latest?.system_cpu_ratio}
-                total={1}
-                unit="ratio"
-              />
-            }
-          />
-          <MetricChart
-            liveWindow={liveWindowMs(period)}
-            context={context}
-            title="RAM"
-            points={[]}
-            series={series.ram}
-            xKey="sampled_at"
-            yKey="value"
-            unit="ratio"
-            summary={
-              <ResourceUsage
-                used={latest?.physical_memory_used_bytes}
-                total={latest?.physical_memory_total_bytes}
-                capacityLabel="전체 RAM"
-              />
-            }
-          />
+        <div className="instance-chart-grid">
+          <div className="dashboard-resource-grid">
+            <MetricChart
+              dense
+              liveWindow={liveWindowMs(period)}
+              context={context}
+              title="CPU"
+              points={[]}
+              series={series.cpu}
+              xKey="sampled_at"
+              yKey="value"
+              unit="ratio"
+              summary={
+                <ResourceUsage
+                  dense
+                  capacityLabel="CPU"
+                  used={latest?.system_cpu_ratio}
+                  total={1}
+                  unit="ratio"
+                />
+              }
+            />
+            <MetricChart
+              dense
+              liveWindow={liveWindowMs(period)}
+              context={context}
+              title="RAM"
+              points={[]}
+              series={series.ram}
+              xKey="sampled_at"
+              yKey="value"
+              unit="ratio"
+              summary={
+                <ResourceUsage
+                  dense
+                  used={latest?.physical_memory_used_bytes}
+                  total={latest?.physical_memory_total_bytes}
+                  capacityLabel="전체 RAM"
+                />
+              }
+            />
+            <MetricChart
+              dense
+              liveWindow={liveWindowMs(period)}
+              context={context}
+              title="JVM Heap"
+              points={[]}
+              series={series.heap}
+              xKey="sampled_at"
+              yKey="value"
+              unit="ratio"
+              summary={
+                <ResourceUsage
+                  dense
+                  used={latest?.heap_used_bytes}
+                  total={latest?.heap_max_bytes}
+                  capacityLabel="최대 힙"
+                />
+              }
+            />
+            <MetricChart
+              dense
+              liveWindow={liveWindowMs(period)}
+              context={context}
+              title="디스크"
+              points={[]}
+              series={series.disk}
+              xKey="sampled_at"
+              yKey="value"
+              unit="ratio"
+              summary={
+                <div className="dashboard-disk-usage">
+                  {(resource.disks ?? []).map((disk) => (
+                    <ResourceUsage
+                      dense
+                      key={disk.path_id}
+                      label={disk.path_display}
+                      used={disk.used_bytes}
+                      total={disk.total_bytes}
+                      capacityLabel="전체 볼륨"
+                    />
+                  ))}
+                </div>
+              }
+            />
+          </div>
           {showXlog && (
             <XlogOverview compact project={project.project_id} instance={instance.instance_id} />
           )}
-          <MetricChart
-            liveWindow={liveWindowMs(period)}
-            context={context}
-            title="JVM Heap"
-            points={[]}
-            series={series.heap}
-            xKey="sampled_at"
-            yKey="value"
-            unit="ratio"
-            summary={
-              <ResourceUsage
-                used={latest?.heap_used_bytes}
-                total={latest?.heap_max_bytes}
-                capacityLabel="최대 힙"
-              />
-            }
-          />
-          <MetricChart
-            liveWindow={liveWindowMs(period)}
-            context={context}
-            title="디스크"
-            points={[]}
-            series={series.disk}
-            xKey="sampled_at"
-            yKey="value"
-            unit="ratio"
-            summary={
-              <div className="dashboard-disk-usage">
-                {(resource.disks ?? []).map((disk) => (
-                  <ResourceUsage
-                    key={disk.path_id}
-                    label={disk.path_display}
-                    used={disk.used_bytes}
-                    total={disk.total_bytes}
-                    capacityLabel="전체 볼륨"
-                  />
-                ))}
-              </div>
-            }
-          />
         </div>
       )}
     </section>

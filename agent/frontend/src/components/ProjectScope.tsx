@@ -52,7 +52,13 @@ export function ProjectScopeProvider({ children }: { children: ReactNode }) {
   return <Scope.Provider value={{ project, select }}>{children}</Scope.Provider>;
 }
 
-export function ProjectSelector() {
+export function ProjectSelector({
+  id = 'global-project-select',
+  ariaLabel = '프로젝트 선택',
+}: {
+  id?: string;
+  ariaLabel?: string;
+}) {
   const { project, select } = useProjectScope();
   const dashboard = useLocation().pathname === '/';
   const query = useQuery({ queryKey: ['projects'], queryFn: getProjects });
@@ -69,12 +75,12 @@ export function ProjectSelector() {
   }, [query.data, project, dashboard]);
   return (
     <div className="global-project-selector">
-      <label className="visually-hidden" htmlFor="global-project-select">
+      <label className="visually-hidden" htmlFor={id}>
         프로젝트
       </label>
       <Select
-        id="global-project-select"
-        aria-label="프로젝트 선택"
+        id={id}
+        aria-label={ariaLabel}
         showSearch
         filterOption={(input, option) =>
           `${option?.label ?? ''} ${option?.value ?? ''}`

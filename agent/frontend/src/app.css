@@ -63,6 +63,24 @@ body {
 .dashboard-status-row.has-issues {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.36fr);
 }
+.dashboard-pool-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+.dashboard-pool-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.dashboard-pool-metrics strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
 .issue-scroll {
   max-height: 440px;
   overflow: auto;
@@ -191,17 +209,48 @@ body {
   flex-shrink: 0;
 }
 .instance-chart-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
 }
-@media (min-width: 1201px) {
-  .instance-chart-grid:has(> .xlog-chart-card) {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.05fr);
+.dashboard-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, auto);
+  gap: 16px;
+  min-width: 0;
+}
+.dashboard-resource-grid > *,
+.instance-chart-grid > * {
+  min-width: 0;
+}
+.instance-chart-grid:has(> .xlog-chart-card) {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+@media (min-width: 1101px) {
+  .instance-chart-grid:has(> .dashboard-resource-grid):has(> .xlog-chart-card) {
+    grid-template-columns: minmax(0, 752fr) minmax(0, 384fr);
+    gap: 16px;
   }
-  .xlog-chart-card {
-    grid-column: 3;
-    grid-row: 1 / span 2;
-  }
+}
+.instance-chart-grid .xlog-chart-card {
+  height: 100%;
+}
+.instance-chart-grid .xlog-chart-card .xlog-scatter {
+  height: 440px;
+}
+.dashboard-resource-grid .chart {
+  height: 176px;
+  min-height: 176px;
+}
+.dashboard-resource-grid .metric-chart-statistics {
+  margin-top: 4px;
+}
+.dashboard-resource-grid .metric-chart-statistics th,
+.dashboard-resource-grid .metric-chart-statistics td {
+  padding: 2px 3px;
 }
 .dashboard-disk-usage {
   display: grid;
@@ -210,15 +259,57 @@ body {
 #dashboard-issues {
   scroll-margin-top: 80px;
 }
-.instance-chart-grid .chart,
-.xlog-chart-card .xlog-scatter {
-  height: 250px;
-  min-height: 250px;
-}
 .xlog-kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+}
+.xlog-overview:not(.xlog-detailed) .xlog-kpis {
+  padding-block: 16px;
+  border-block: 1px solid var(--ant-color-border-secondary, #dce3ed);
+}
+.xlog-detailed {
+  display: grid;
+  gap: 16px;
+}
+.xlog-plot-panel {
+  min-width: 0;
+  min-height: 0;
+}
+.xlog-plot-panel .xlog-scatter {
+  height: 330px;
+}
+.xlog-list-panel {
+  min-width: 0;
+}
+.xlog-filter-card {
+  min-width: 0;
+  margin-bottom: 16px;
+}
+.xlog-page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+}
+.xlog-page-toolbar p {
+  margin: 0;
+}
+.xlog-filter-card .query-filters {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+.xlog-inline-filters {
+  margin-bottom: 16px;
+}
+.xlog-inline-filters .query-filters {
+  grid-template-columns: 190px minmax(0, 260px) minmax(0, 1fr);
+  margin-bottom: 0;
+}
+.xlog-filter-card .global-project-selector {
+  width: 100%;
 }
 .xlog-chart-summary {
   display: grid;
@@ -277,7 +368,6 @@ body {
   .service-balance-grid,
   .service-field-grid,
   .service-info-metrics,
-  .instance-chart-grid,
   .threshold-limit-fields,
   .threshold-selectors {
     grid-template-columns: minmax(0, 1fr);
@@ -291,8 +381,37 @@ body {
   .xlog-scatter {
     height: 300px;
   }
+  .dashboard-pool-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
+@media (max-width: 1100px) {
+  .xlog-filter-card .query-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .xlog-inline-filters .query-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .instance-chart-grid:has(> .xlog-chart-card) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .instance-chart-grid .xlog-chart-card .xlog-scatter {
+    height: 300px;
+  }
+}
+@media (max-width: 767px) {
+  .xlog-filter-card .query-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .xlog-inline-filters .query-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-resource-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+}
 /* 조회 필드의 너비와 레이블 기준선을 맞추고 작은 화면에서는 한 열로 배치 */
 .query-filters {
   display: grid;
@@ -302,7 +421,29 @@ body {
   margin-bottom: 20px;
 }
 .dashboard-scope-toolbar {
-  grid-template-columns: minmax(0, 240px) minmax(0, 180px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  padding: 4px 16px;
+}
+.dashboard-period-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+.dashboard-period-label small {
+  font-size: 11px;
+  font-weight: 400;
+}
+.dashboard-scope-toolbar .global-project-selector {
+  width: 100%;
+}
+@media (max-width: 767px) {
+  .dashboard-scope-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    padding-block: 12px;
+  }
 }
 @media (max-width: 575px) {
   .query-filters {

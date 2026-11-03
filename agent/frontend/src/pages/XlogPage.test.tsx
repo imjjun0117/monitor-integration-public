@@ -26,6 +26,40 @@ function HistoryControls() {
   );
 }
 
+test('instance XLog keeps its fixed scope while exposing period and HTTP filters', async () => {
+  const read = vi.spyOn(DefaultService, 'getXlog').mockResolvedValue({
+    enabled_projects: 1,
+    eligible_instances: 1,
+    connected_instances: 1,
+    summary: { count: 0, errors: 0, average_ms: 0, p95_ms: 0 },
+    items: [],
+  });
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MemoryRouter initialEntries={['/projects/p/instances/i?tab=xlog']}>
+        <XlogPage projectId="p" instanceId="i" />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  await waitFor(() =>
+    expect(read).toHaveBeenCalledWith(expect.objectContaining({ project: 'p', instance: 'i' })),
+  );
+  const filters = screen.getByRole('form', { name: 'XLog 필터' });
+  expect(filters).toBeVisible();
+  expect(filters).toHaveClass('xlog-inline-filters');
+  expect(screen.queryByRole('region', { name: 'XLog 필터' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('combobox', { name: '인스턴스 선택' })).not.toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: 'XLog 조회 기간' })).toBeVisible();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'HTTP 오류만' }));
+  await waitFor(() =>
+    expect(read).toHaveBeenLastCalledWith(
+      expect.objectContaining({ project: 'p', instance: 'i', errorsOnly: true }),
+    ),
+  );
+});
+
 test('URL history restores XLog checkbox, request filter and displayed records', async () => {
   const items = [200, 500].map((status) => ({
     id: status,
@@ -67,6 +101,7 @@ test('URL history restores XLog checkbox, request filter and displayed records',
     </QueryClientProvider>,
   );
   const checkbox = screen.getByRole('checkbox', { name: 'HTTP 오류만' });
+  expect(screen.getByRole('combobox', { name: 'XLog 프로젝트 필터' })).toBeVisible();
   await screen.findByRole('button', { name: 'GET /status-200' });
   expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ errorsOnly: false }));
   fireEvent.click(checkbox);

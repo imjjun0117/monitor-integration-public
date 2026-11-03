@@ -7,11 +7,10 @@ const repositoryRoot = resolve(import.meta.dirname, '../..');
 const centerPort = Number(process.env.HERMES_E2E_CENTER_PORT ?? 18180);
 const e2eJavaHome = findJava21Home();
 const configuredChrome = process.env.HERMES_E2E_CHROME_PATH;
-const relocatedChrome =
-  '/Users/Shared/Relocated Items/Security/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const applicationsChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const nativeChrome =
   process.platform === 'darwin'
-    ? [configuredChrome, relocatedChrome].find((candidate) => candidate && existsSync(candidate))
+    ? [configuredChrome, applicationsChrome].find((candidate) => candidate && existsSync(candidate))
     : undefined;
 
 export default defineConfig({

@@ -70,6 +70,7 @@ export default function MetricChart({
   context,
   showLegend = false,
   liveWindow,
+  dense = false,
 }: {
   title: string;
   points: Point[];
@@ -82,6 +83,7 @@ export default function MetricChart({
   context?: string;
   showLegend?: boolean;
   liveWindow?: number;
+  dense?: boolean;
 }) {
   const { token } = antTheme.useToken();
   const theme = useTheme();
@@ -451,7 +453,10 @@ export default function MetricChart({
   return (
     <Card
       size="small"
-      styles={{ header: { paddingInline: token.padding }, body: { padding: token.padding } }}
+      styles={{
+        header: { paddingInline: token.padding },
+        body: { padding: dense ? token.paddingXS : token.padding },
+      }}
       className="metric-chart-card"
       role="region"
       aria-label={`${accessibleTitle} 그래프`}

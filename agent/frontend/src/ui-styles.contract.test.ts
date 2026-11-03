@@ -40,6 +40,16 @@ test('custom styles do not repaint Ant Design shell, cards, forms or tables', ()
   );
 });
 
+test('reference layout groups incident queue, DB pool, and XLog panels without repainting AntD surfaces', () => {
+  const app = source('./app.css');
+  const layout = source('./pro-layout.css');
+  const incidents = source('./pages/incidents/incidents.css');
+  expect(layout).toMatch(/\.dashboard-priority-grid\s*\{[^}]*grid-template-columns:/);
+  expect(app).toMatch(/\.dashboard-pool-metrics\s*\{[^}]*grid-template-columns:/);
+  expect(app).toMatch(/\.xlog-plot-panel\s*\{[^}]*min-height:/);
+  expect(incidents).toMatch(/\.incident-summary-grid\s*\{[^}]*grid-template-columns:/);
+});
+
 test('chart internals, readable log/code content, focus and responsive layouts survive', () => {
   const app = source('./app.css');
   const layout = source('./pro-layout.css');

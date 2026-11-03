@@ -161,7 +161,7 @@ for (const viewport of [
       fullPage: true,
     });
     for (const [route, title] of [
-      ['/incidents', '장애 관리'],
+      ['/incidents', '장애 관리대장'],
       ['/projects', 'sample-a 인스턴스'],
       ['/api-monitoring', 'API 모니터링'],
       ['/xlog', 'XLog'],
@@ -175,19 +175,20 @@ for (const viewport of [
         await expect(page).toHaveURL(/\/projects\/sample-a(?:\?|$)/);
       }
       await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
-      const ready = route === '/incidents'
-        ? page.getByRole('button', { name: '새로고침' })
-        : route === '/projects'
-          ? page.getByRole('link', { name: '샘플 A 1', exact: true })
-          : route === '/api-monitoring'
-            ? page.getByRole('textbox', { name: 'API 이름' })
-            : route === '/xlog'
-              ? page.getByRole('combobox', { name: 'XLog 조회 기간' })
-              : route === '/logs'
-                ? page.getByRole('combobox', { name: '인스턴스 선택' })
-                : route === '/certificates'
-                  ? page.getByRole('combobox', { name: '만료 대상' })
-                  : page.getByRole('table', { name: '프로젝트 설정' });
+      const ready =
+        route === '/incidents'
+          ? page.getByRole('button', { name: '새로고침' })
+          : route === '/projects'
+            ? page.getByRole('link', { name: '샘플 A 1', exact: true })
+            : route === '/api-monitoring'
+              ? page.getByRole('textbox', { name: 'API 이름' })
+              : route === '/xlog'
+                ? page.getByRole('combobox', { name: 'XLog 조회 기간' })
+                : route === '/logs'
+                  ? page.getByRole('combobox', { name: '인스턴스 선택' })
+                  : route === '/certificates'
+                    ? page.getByRole('combobox', { name: '만료 대상' })
+                    : page.getByRole('table', { name: '프로젝트 설정' });
       await expect(ready).toBeVisible();
       await waitForRequests(page);
       await page.reload();
@@ -198,7 +199,9 @@ for (const viewport of [
         path: resolve(screenshotDirectory, `${viewport.name}-${route.replaceAll('/', '-')}.png`),
         fullPage: true,
       });
-      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        viewport.width,
+      );
     }
     await waitForRequests(page);
     await page.goto('/settings/instances');
@@ -247,9 +250,11 @@ test('mobile page headings and navigation stay compact', async ({ page }) => {
   for (const route of ['/logs', '/incidents', '/xlog']) {
     await waitForRequests(page);
     await page.goto(`${route}?project=sample-a`);
-    await expect(page.getByRole('combobox', {
-      name: route === '/incidents' ? '장애 상태 필터' : '인스턴스 선택',
-    })).toBeVisible();
+    await expect(
+      page.getByRole('combobox', {
+        name: route === '/incidents' ? '장애 상태 필터' : '인스턴스 선택',
+      }),
+    ).toBeVisible();
     await waitForRequests(page);
     const heading = page.locator('#main-content h1');
     await expect(heading).toBeVisible();
@@ -276,7 +281,10 @@ test('mobile page headings and navigation stay compact', async ({ page }) => {
         const url = new URL(response.url());
         return url.pathname === '/api/v1/incidents' && url.searchParams.get('state') === '';
       });
-      await page.locator('.ant-select-dropdown:visible').getByText('전체 이력', { exact: true }).click();
+      await page
+        .locator('.ant-select-dropdown:visible')
+        .getByText('전체 이력', { exact: true })
+        .click();
       await expect(page).toHaveURL(/state=&?/);
       const response = await historyResponse;
       expect(response.ok()).toBe(true);
@@ -285,7 +293,9 @@ test('mobile page headings and navigation stay compact', async ({ page }) => {
       const rows = page.locator('.incident-row-summary');
       for (const row of await rows.all()) {
         await expect(row).toContainText('담당자');
-        expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+        expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+          true,
+        );
       }
     }
   }
@@ -335,8 +345,13 @@ test('dashboard background and header remain visible across viewport and theme',
       });
       const layout = await page.evaluate(() => {
         const shell = document.querySelector('.monitor-app-canvas')!;
-        const brand = document.querySelector('a[aria-label="종합현황으로 이동"]');
-        const header = document.querySelector('header.ant-layout-header:not(:empty)')!;
+        const desktop = window.innerWidth >= 1024;
+        const brand = document.querySelector(
+          `${desktop ? '.ant-layout-sider' : 'header.ant-layout-header'} a[aria-label="종합현황으로 이동"]`,
+        );
+        const header = document.querySelector(
+          desktop ? '.monitor-workspace-header' : 'header.ant-layout-header:not(:empty)',
+        )!;
         const content = document.querySelector('.ant-pro-layout-content')!;
         const root = document.getElementById('root')!;
         const geometry = (element: Element) => {
@@ -361,14 +376,14 @@ test('dashboard background and header remain visible across viewport and theme',
           content: geometry(content),
           font: getComputedStyle(content).fontFamily,
           brandImage: brand?.querySelector('img')?.getAttribute('src') ?? null,
-          scopeFields: [...document.querySelectorAll('.dashboard-scope-toolbar .ant-select')].map(element => ({
-            width: element.getBoundingClientRect().width,
-            top: element.getBoundingClientRect().top,
-          })),
+          scopeFields: [...document.querySelectorAll('.dashboard-scope-toolbar .ant-select')].map(
+            (element) => ({
+              width: element.getBoundingClientRect().width,
+              top: element.getBoundingClientRect().top,
+            }),
+          ),
           titleOverflow: (() => {
-            const title = document.querySelector(
-              '.instance-context',
-            )!;
+            const title = document.querySelector('.instance-context')!;
             return { scroll: title.scrollWidth, client: title.clientWidth };
           })(),
           header: geometry(header),
@@ -412,17 +427,20 @@ test('dashboard background and header remain visible across viewport and theme',
       .soft(layout.titleOverflow.scroll, `${appearance} ${width}: instance link clipping`)
       .toBeLessThanOrEqual(layout.titleOverflow.client + 1);
     expect.soft(layout.bodyMargin, `${appearance} ${width}: browser canvas margin`).toBe('0px');
-    expect.soft(layout.shell.background, `${appearance}: existing brand canvas`).toBe(
-      appearance === 'dark' ? 'rgb(8, 19, 33)' : 'rgb(245, 247, 251)',
-    );
+    expect
+      .soft(layout.shell.background, `${appearance}: existing brand canvas`)
+      .toBe(appearance === 'dark' ? 'rgb(8, 19, 33)' : 'rgb(245, 247, 251)');
     expect.soft(layout.font).toContain('Outfit Variable');
     expect.soft(layout.font).toContain('Noto Sans KR Variable');
     if (width >= 1024) {
       expect.soft(layout.brandImage).toMatch(/monitoring\.svg$/);
-      expect.soft(layout.scopeFields).toHaveLength(2);
-      expect.soft(layout.scopeFields[0].width).toBeLessThanOrEqual(240);
-      expect.soft(layout.scopeFields[1].width).toBeLessThanOrEqual(180);
-      expect.soft(Math.abs(layout.scopeFields[0].top - layout.scopeFields[1].top)).toBeLessThanOrEqual(1);
+      expect.soft(layout.scopeFields).toHaveLength(3);
+      for (const field of layout.scopeFields) {
+        expect.soft(field.width).toBeGreaterThanOrEqual(130);
+        expect.soft(field.width).toBeLessThanOrEqual(480);
+        expect.soft(Math.abs(field.top - layout.scopeFields[0].top)).toBeLessThanOrEqual(1);
+        expect.soft(Math.abs(field.width - layout.scopeFields[0].width)).toBeLessThanOrEqual(2);
+      }
     }
     expect.soft(layout.shell.left, `${appearance} ${width}: canvas left edge`).toBe(0);
     expect.soft(layout.shell.right, `${appearance} ${width}: canvas right edge`).toBe(width);
@@ -454,16 +472,19 @@ test('dashboard background and header remain visible across viewport and theme',
   }
 });
 
-test('dashboard uses compact hierarchy and consistent chart surfaces', async ({ page }) => {
+test('dashboard prioritizes incidents, two-row summary, DB pool, and resource charts', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);
-  await expect(page.locator('.instance-chart-grid > .ant-card')).toHaveCount(4);
   // 격리된 샘플 프로젝트에서 실제 설정 API를 통해 빈 XLog 패널도 검증
   await waitForRequests(page);
   await page.goto('/settings/projects?project=sample-a');
   const row = page.getByRole('row', { name: /sample-a/ });
-  const enabled = page.waitForResponse(response =>
-    new URL(response.url()).pathname === '/api/v1/projects/sample-a/xlog-settings' && response.request().method() === 'PUT',
+  const enabled = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/api/v1/projects/sample-a/xlog-settings' &&
+      response.request().method() === 'PUT',
   );
   await row.getByRole('button', { name: '미사용', exact: true }).click();
   expect((await enabled).status()).toBe(200);
@@ -471,20 +492,66 @@ test('dashboard uses compact hierarchy and consistent chart surfaces', async ({ 
     await waitForRequests(page);
     await page.goto('/?project=sample-a&instance=local-01');
     await expect(page.locator('.instance-chart-grid .chart').first()).toBeVisible();
-    const panels = page.locator('.instance-chart-grid > .ant-card');
-    await expect(panels).toHaveCount(5);
-    await page.screenshot({ path: resolve(screenshotDirectory, 'dashboard-hierarchy.png'), fullPage: true });
-    const summary = await page.getByLabel('선택 인스턴스 요약').boundingBox();
-    expect(summary!.height).toBeLessThanOrEqual(112);
-    const titles = await panels.locator('.ant-card-head h3').evaluateAll(
-      elements => elements.map(element => Number.parseFloat(getComputedStyle(element).fontSize)),
+    const panels = page.locator('.dashboard-resource-grid > .ant-card');
+    await expect(panels).toHaveCount(4);
+    await expect(page.locator('.instance-chart-grid > .ant-card')).toHaveCount(1);
+    await page.screenshot({
+      path: resolve(screenshotDirectory, 'dashboard-hierarchy.png'),
+      fullPage: true,
+    });
+    const queue = page.getByRole('region', { name: '지금 처리할 장애' });
+    const summary = page.getByLabel('선택 인스턴스 요약');
+    await expect(queue).toBeVisible();
+    await expect(summary.locator(':scope > .ant-card')).toHaveCount(2);
+    for (const label of ['수집 상태', '실패 API', '만료 예정 인증서', '확인 필요']) {
+      await expect(summary.getByText(label, { exact: true })).toBeVisible();
+    }
+    const summaryCards = await summary.locator(':scope > .ant-card').evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+      }),
     );
-    expect(titles).toHaveLength(5);
-    expect(titles.every(size => size <= 18)).toBe(true);
+    expect(summaryCards[0].x).toBeCloseTo(summaryCards[1].x, 0);
+    expect(summaryCards[1].y).toBeGreaterThanOrEqual(summaryCards[0].y + summaryCards[0].height);
+    const resourceCards = await panels.evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { x: box.x, y: box.y };
+      }),
+    );
+    expect(resourceCards[0].y).toBeCloseTo(resourceCards[1].y, 0);
+    expect(resourceCards[2].y).toBeCloseTo(resourceCards[3].y, 0);
+    expect(resourceCards[2].y).toBeGreaterThan(resourceCards[0].y);
+    expect(resourceCards[0].x).toBeLessThan(resourceCards[1].x);
+    expect(resourceCards[2].x).toBeLessThan(resourceCards[3].x);
+    const queueBox = (await queue.boundingBox())!;
+    const summaryBox = (await summary.boundingBox())!;
+    expect(queueBox.y).toBeCloseTo(summaryBox.y, 0);
+    expect(queueBox.x + queueBox.width).toBeLessThanOrEqual(summaryBox.x + 1);
+    expect(queueBox.y + queueBox.height).toBeGreaterThanOrEqual(
+      summaryCards[1].y + summaryCards[1].height,
+    );
     const context = page.getByLabel('인스턴스 상태');
     await expect(context).toBeVisible();
-    expect((await context.boundingBox())!.height).toBeLessThanOrEqual(64);
-    expect((await panels.first().boundingBox())!.y).toBeLessThanOrEqual(400);
+    expect((await context.boundingBox())!.y).toBeGreaterThanOrEqual(summaryBox.y);
+    const pools = page.getByRole('region', { name: 'DB 연결 풀' });
+    await expect(pools).toBeVisible();
+    await expect(pools).toContainText('Sample Pool');
+    for (const metric of ['사용 중 / 최대', '유휴 연결', '연결 대기']) {
+      await expect(pools).toContainText(metric);
+    }
+    for (const title of ['CPU', 'RAM', 'JVM Heap', '디스크']) {
+      await expect(
+        page.getByRole('region', { name: `샘플 A / 샘플 A 1 · ${title} 그래프` }),
+      ).toBeVisible();
+    }
+    await expect(page.getByRole('region', { name: 'XLog 그래프' })).toBeVisible();
+    const poolBox = (await pools.boundingBox())!;
+    expect((await context.boundingBox())!.y).toBeGreaterThanOrEqual(poolBox.y + poolBox.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      1440,
+    );
     const issues = page.getByRole('link', { name: '확인 필요 항목 보기' });
     await expect(issues).toHaveAttribute('href', '#dashboard-issues');
     await issues.focus();
@@ -494,8 +561,10 @@ test('dashboard uses compact hierarchy and consistent chart surfaces', async ({ 
   } finally {
     await waitForRequests(page);
     await page.goto('/settings/projects?project=sample-a');
-    const disabled = page.waitForResponse(response =>
-      new URL(response.url()).pathname === '/api/v1/projects/sample-a/xlog-settings' && response.request().method() === 'PUT',
+    const disabled = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/v1/projects/sample-a/xlog-settings' &&
+        response.request().method() === 'PUT',
     );
     await row.getByRole('button', { name: '사용', exact: true }).click();
     expect((await disabled).status()).toBe(200);
@@ -820,7 +889,9 @@ test('API list filters real external and internal sample checks', async ({ page 
 });
 
 // 실제 Collector 수집값에 임계치를 적용해 생성된 장애로 모바일 목록 검증
- test('mobile incident rows wrap real collector alerts without losing metadata', async ({ page }) => {
+test('mobile incident rows wrap real collector alerts without losing metadata', async ({
+  page,
+}) => {
   await login(page);
   await page.goto('/settings/thresholds?project=sample-b');
   await page.getByRole('combobox', { name: '인스턴스', exact: true }).click();
@@ -828,14 +899,19 @@ test('API list filters real external and internal sample checks', async ({ page 
   await page.getByRole('button', { name: '추가', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '임계치 추가' });
   await dialog.getByRole('combobox', { name: '항목', exact: true }).click();
-  await page.locator('.ant-select-dropdown:visible').getByText('CPU 사용률', { exact: true }).click();
+  await page
+    .locator('.ant-select-dropdown:visible')
+    .getByText('CPU 사용률', { exact: true })
+    .click();
   await dialog.getByLabel('경고 기준', { exact: true }).fill('5');
   await dialog.getByLabel('위험 기준', { exact: true }).fill('10');
   await dialog.getByRole('button', { name: '등록', exact: true }).click();
   await expect(dialog).toBeHidden();
   try {
     await page.goto('/incidents?project=sample-b');
-    await expect(page.getByRole('link', { name: /시스템 CPU/ }).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('link', { name: /시스템 CPU/ }).first()).toBeVisible({
+      timeout: 20_000,
+    });
     for (const appearance of ['light', 'dark'] as const) {
       await page.evaluate((value) => localStorage.setItem('monitoring.theme', value), appearance);
       for (const width of [320, 390]) {
@@ -845,7 +921,9 @@ test('API list filters real external and internal sample checks', async ({ page 
         await expect(row).toBeVisible();
         await expect(row).toContainText('담당자 미지정');
         await expect(row.locator('time')).toBeVisible();
-        expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+        expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+          true,
+        );
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
         await page.screenshot({
           path: resolve(screenshotDirectory, `${appearance}-${width}-incident-data.png`),
@@ -858,14 +936,16 @@ test('API list filters real external and internal sample checks', async ({ page 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/settings/thresholds?project=sample-b');
     await page.getByRole('combobox', { name: '인스턴스', exact: true }).click();
-    await page.locator('.ant-select-dropdown:visible').getByText('샘플 B 1', { exact: true }).click();
+    await page
+      .locator('.ant-select-dropdown:visible')
+      .getByText('샘플 B 1', { exact: true })
+      .click();
     await page.getByRole('button', { name: 'CPU 사용률 삭제' }).click();
     const removal = page.getByRole('dialog', { name: '임계치 삭제' });
     await removal.getByRole('button', { name: '삭제', exact: true }).click();
     await expect(removal).toBeHidden();
   }
 });
-
 
 for (const width of [320, 390]) {
   for (const appearance of ['light', 'dark'] as const) {

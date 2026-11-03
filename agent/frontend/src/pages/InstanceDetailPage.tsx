@@ -29,7 +29,7 @@ import { usePermissions } from '../components/PermissionContext';
 import TransportPanel from '../components/TransportPanel';
 import InstanceThresholdSettings from './settings/InstanceThresholdSettings';
 import CollectorEvents from '../components/CollectorEvents';
-import XlogOverview from '../components/XlogOverview';
+import XlogPage from './XlogPage';
 
 type TabKey =
   | 'resources'
@@ -44,11 +44,13 @@ export default function InstanceDetailPage() {
   const { projectId = '', instanceId = '' } = useParams();
   const [search, setSearch] = useSearchParams();
   const current = (search.get('tab') ?? 'resources') as TabKey;
-  const { canWrite } = usePermissions();
+  const { canWrite, isAdmin, menus } = usePermissions();
+  const canReadXlog =
+    isAdmin || Boolean(menus?.some((menu) => menu.menuId === 'xlog' && menu.canRead));
   return (
     <>
       <PageBackLink to={`/projects/${projectId}`}>{`${projectId} 인스턴스 목록으로`}</PageBackLink>
-      <TransportPanel projectId={projectId} instanceId={instanceId} />
+      <TransportPanel projectId={projectId} instanceId={instanceId} compact showSettingsLink />
       <Tabs
         activeKey={current}
         onChange={(key) => setSearch({ tab: key })}
@@ -88,9 +90,13 @@ export default function InstanceDetailPage() {
           {
             key: 'xlog',
             label: 'XLog',
-            children: current === 'xlog' && (
-              <XlogOverview project={projectId} instance={instanceId} detailed />
-            ),
+            children:
+              current === 'xlog' &&
+              (canReadXlog ? (
+                <XlogPage projectId={projectId} instanceId={instanceId} />
+              ) : (
+                <Alert type="info" showIcon title="XLog 조회 권한이 없습니다." />
+              )),
           },
           ...(canWrite
             ? [

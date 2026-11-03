@@ -13,9 +13,34 @@
 }
 .incident-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
   gap: 20px;
   align-items: start;
+}
+.incident-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.incident-summary-grid strong {
+  display: block;
+  font-size: 20px;
+}
+.incident-detail-heading h1 {
+  margin: 0;
+}
+.incident-section-heading {
+  margin: 0;
+  font-size: 16px;
+  line-height: inherit;
+}
+.incident-detail-heading p {
+  margin: 4px 0 0;
+}
+.incident-detail-facts {
+  margin-top: 12px;
 }
 .incident-heading,
 .incident-toolbar,
@@ -26,6 +51,7 @@
   align-items: center;
   gap: 12px;
 }
+
 .incident-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -44,6 +70,25 @@
 }
 .incident-note {
   white-space: pre-wrap;
+}
+.incident-assignee-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+.incident-assignee-row .ant-form-item {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.incident-assignee-row .ant-select {
+  width: 100%;
+}
+.incident-evidence-range,
+.incident-event-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
 }
 .incident-comparison summary:focus-visible,
 .incident-history summary:focus-visible {
@@ -73,6 +118,9 @@
   }
 }
 @media (max-width: 767px) {
+  .incident-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .incident-side,
   .incident-observations {
     grid-template-columns: minmax(0, 1fr);

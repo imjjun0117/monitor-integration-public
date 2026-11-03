@@ -201,7 +201,7 @@ API 모니터링에서 해당 항목의 **서비스 정보 설정**을 열어 �
 
 - 디자인 기준은 `DESIGN.md`, 공개 근거와 재사용 금지는 `docs/design-reference.md`, 화면·상태 acceptance는 `docs/dashboard-redesign-spec.md`에서 확인합니다.
 - 로그인은 `/login`의 custom Korean page입니다. `Accept: text/html`로 `/` 접근 시 상대 `/login` redirect가 유지되어야 하고 API의 인증 실패는 기존 JSON 401을 유지해야 합니다.
-- macOS E2E는 시스템에 설치된 네이티브 Chrome 실행 파일을 사용합니다. 이 저장소에서 검증한 경로는 `/Users/Shared/Relocated Items/Security/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`이며 다른 Mac에서는 `HERMES_E2E_CHROME_PATH`로 명시하도록 한다. Parallels 브라우저는 사용하지 않습니다.
+- macOS E2E는 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`의 네이티브 Chrome 실행 파일을 사용합니다. 다른 위치에 설치했다면 `HERMES_E2E_CHROME_PATH`로 명시합니다. Parallels 브라우저는 사용하지 않습니다.
 - screenshot 기준은 `docs/screenshots/redesign/login-{1440,1024,390}.png`와 `dashboard-{1440,1024,390}.png`입니다. 민감한 운영 식별자나 credential을 포함하지 않습니다.
 - 모바일 설정 화면은 의도적으로 read-only입니다. 조회와 상위 탐색은 유지하지만 변경은 768px 이상 viewport에서 수행합니다.
-- full E2E는 production sample agent가 쓰는 `18081`~`18084`와 충돌합니다. 검증 창에는 네 agent container만 안전하게 중지하고 test harness 종료 후 반드시 다시 시작하며 PostgreSQL volume과 tunnel/backend는 삭제하지 않습니다.
+- full E2E는 별도 Compose 프로젝트의 PostgreSQL(`55432`), Agent 서버(`18180`), bootstrap(`18179`), 샘플 Agent(`18181`부터 4개 포트), TLS(`18443`, `18444`)를 사용합니다. 포트가 이미 점유되어 있으면 테스트 시작 전 실패하며 운영 컨테이너를 중지하지 않습니다. 필요한 경우 `HERMES_E2E_*_PORT` 환경 변수로 충돌하지 않는 포트를 지정합니다.

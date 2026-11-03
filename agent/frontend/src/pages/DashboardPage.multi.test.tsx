@@ -3,7 +3,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import DashboardPage from './DashboardPage';
-import { getDashboard } from '../api';
+import { getDashboard, getIncidents } from '../api';
+import { PermissionContext } from '../components/PermissionContext';
+import type { ManagedMenu } from '../generated';
 import { selectOption } from '../test-select';
 import { ProjectScopeProvider, ProjectSelector } from '../components/ProjectScope';
 import { ServiceMetric, Status } from '../generated';
@@ -30,6 +32,8 @@ const state = vi.hoisted(() => ({
   empty: false,
   many: false,
   balances: false,
+  queue: false,
+  malformedQueue: false,
 }));
 const getResources = vi.fn(async (_projectId: string, instanceId: string, _period: string) => {
   if (state.failures.has(instanceId)) {
@@ -89,6 +93,11 @@ const getResources = vi.fn(async (_projectId: string, instanceId: string, _perio
     stale: state.stale,
   };
 });
+const getDbPools = vi.fn(async (_project: string, _instance: string, _period: string) => ({
+  items: [{ pool_id: 'main', name: 'Main', active: 3, max_size: 10, idle: null, waiters: 2 }],
+  history: [],
+  stale: false,
+}));
 const dashboard = {
   get service_balances() {
     return state.balances
@@ -222,6 +231,37 @@ vi.mock('../api', () => ({
       : (dashboard.projects.find((item) => item.project_id === project)?.instances ?? []),
   }),
   getResources: (...args: unknown[]) => getResources(...(args as [string, string, string])),
+  getDbPools: (...args: unknown[]) => getDbPools(...(args as [string, string, string])),
+  getIncidents: vi.fn(async () => {
+    if (state.malformedQueue) {
+      return { page: 0, size: 50, total: 0 };
+    }
+    return {
+      items: state.queue
+        ? [
+            {
+              incident_id: 17,
+              project_id: 'alpha',
+              instance_id: 'up',
+              state: 'IN_PROGRESS',
+              assignee: 'operator',
+              kind: 'METRIC',
+              subject_name: 'JVM Heap',
+              latest_observation: {
+                status: 'WARN',
+                metric_key: 'JVM_HEAP',
+                value: 0.8,
+                warning_value: 0.75,
+              },
+              opened_at: '2026-09-09T00:00:00Z',
+            },
+          ]
+        : [],
+      total: state.queue ? 101 : 0,
+      page: 0,
+      size: 50,
+    };
+  }),
 }));
 vi.mock('../components/MetricChart', () => ({
   metricSeriesStyle: (index: number) => ({
@@ -240,27 +280,52 @@ vi.mock('../components/MetricChart', () => ({
 beforeEach(() => {
   sessionStorage.clear();
   getResources.mockClear();
+  getDbPools.mockClear();
   vi.mocked(getDashboard).mockClear();
+  vi.mocked(getIncidents).mockClear();
   state.failures.clear();
   state.stale = false;
   state.empty = false;
   state.many = false;
   state.balances = false;
+  state.queue = false;
+  state.malformedQueue = false;
 });
 afterEach(cleanup);
-function view(url = '/') {
+function view(url = '/', permissions?: { isAdmin: boolean; menus: ManagedMenu[] }) {
   return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
       <MemoryRouter initialEntries={[url]}>
-        <ProjectScopeProvider>
-          <ProjectSelector />
-          <DashboardPage />
-        </ProjectScopeProvider>
+        <PermissionContext.Provider
+          value={{
+            role: permissions?.isAdmin ? 'ADMIN' : 'OPERATOR',
+            username: 'tester',
+            isAdmin: permissions?.isAdmin ?? true,
+            canWrite: false,
+            menus: permissions?.menus,
+          }}
+        >
+          <ProjectScopeProvider>
+            <ProjectSelector />
+            <DashboardPage />
+          </ProjectScopeProvider>
+        </PermissionContext.Provider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+function menu(menuId: string, canRead: boolean): ManagedMenu {
+  return {
+    menuId,
+    label: menuId,
+    route: `/${menuId}`,
+    sortOrder: 0,
+    enabled: true,
+    canRead,
+    canWrite: false,
+  };
 }
 async function ready(name = 'Alpha / Up') {
   const panel = await screen.findByRole('region', { name });
@@ -286,18 +351,147 @@ test('initial dashboard selects one project and one instance without querying ev
   }
 });
 
+test('dashboard shows selected pool operations without replacing missing idle with zero', async () => {
+  view();
+  await ready();
+  const pools = await screen.findByRole('region', { name: 'DB 연결 풀' });
+  expect(getDbPools).toHaveBeenCalledWith('alpha', 'up', '15m');
+  expect(within(pools).getByText('Main')).toBeVisible();
+  expect(within(pools).getByText('3 / 10')).toBeVisible();
+  expect(within(pools).getByText('미수집')).toBeVisible();
+  expect(within(pools).getByText('2')).toBeVisible();
+});
+
+test('resource request failure without cached observations never claims last good data', async () => {
+  state.failures.add('up');
+  view();
+  const panel = await screen.findByRole('region', { name: 'Alpha / Up' });
+  expect(await within(panel).findByText('인스턴스 자원을 불러오지 못했습니다.')).toBeVisible();
+  expect(
+    within(panel).queryByText('마지막 정상 자원 데이터를 표시합니다.'),
+  ).not.toBeInTheDocument();
+});
+
+test('dashboard queue shows incident handling separately from collection and limits page counts', async () => {
+  state.queue = true;
+  view();
+  await ready();
+  const queue = await screen.findByRole('region', { name: '지금 처리할 장애' });
+  expect(getIncidents).toHaveBeenCalledWith('alpha', 'ACTIVE', 0);
+  expect(within(queue).getByText('조치 중')).toBeVisible();
+  expect(within(queue).getByText('operator')).toBeVisible();
+  expect(within(queue).getByRole('link', { name: /JVM Heap/ })).toHaveAttribute(
+    'href',
+    '/incidents/17?project=alpha',
+  );
+  expect(within(queue).getByText(/첫 페이지에서 선택 인스턴스 1건/)).toBeVisible();
+  expect(within(queue).queryByText('101건')).not.toBeInTheDocument();
+  expect(screen.getByText('수집 상태')).toBeVisible();
+});
+
+test('dashboard-only operator sees permission states without denied incident or project requests and links', async () => {
+  view('/', {
+    isAdmin: false,
+    menus: [menu('dashboard', true), menu('incidents', false), menu('projects', false)],
+  });
+  const summary = await screen.findByLabelText('선택 인스턴스 요약');
+  expect(summary.querySelectorAll(':scope > .ant-card')).toHaveLength(2);
+  expect(screen.getByRole('region', { name: '지금 처리할 장애' })).toHaveTextContent(
+    '장애 목록 조회 권한이 없습니다.',
+  );
+  expect(screen.getByRole('region', { name: 'DB 연결 풀' })).toHaveTextContent(
+    'DB 연결 풀 조회 권한이 없습니다.',
+  );
+  expect(screen.getByRole('region', { name: 'Alpha / Up' })).toHaveTextContent(
+    '인스턴스 자원 조회 권한이 없습니다.',
+  );
+  expect(screen.queryByRole('link', { name: '장애 관리대장 →' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /인스턴스 상세/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: '풀 상세 →' })).not.toBeInTheDocument();
+  expect(getIncidents).not.toHaveBeenCalled();
+  expect(getDbPools).not.toHaveBeenCalled();
+  expect(getResources).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['allowed operator', false, true],
+  ['admin override', true, false],
+])('%s retains incident, DB pool, and resource data', async (_, isAdmin, canRead) => {
+  state.queue = true;
+  view('/', {
+    isAdmin,
+    menus: [menu('dashboard', true), menu('incidents', canRead), menu('projects', canRead)],
+  });
+  await ready();
+  expect(await screen.findByText('Main')).toBeVisible();
+  expect(screen.getByRole('link', { name: '장애 관리대장 →' })).toBeVisible();
+  expect(screen.getByRole('link', { name: /JVM Heap/ })).toBeVisible();
+  expect(getIncidents).toHaveBeenCalledWith('alpha', 'ACTIVE', 0);
+  expect(getDbPools).toHaveBeenCalledWith('alpha', 'up', '15m');
+  expect(getResources).toHaveBeenCalledWith('alpha', 'up', '15m');
+});
+
+test('dashboard queue reports malformed incident pages without crashing or claiming zero incidents', async () => {
+  state.malformedQueue = true;
+  view();
+  await ready();
+  const queue = await screen.findByRole('region', { name: '지금 처리할 장애' });
+  expect(await within(queue).findByText('장애 목록을 불러오지 못했습니다.')).toBeVisible();
+  expect(within(queue).queryByText(/첫 페이지에서 선택 인스턴스 0건/)).not.toBeInTheDocument();
+});
+
 test('dashboard displays operational summaries in official Ant Design cards without changing links', async () => {
   view();
   await ready();
-  expect(screen.getByText('조회 기간', { selector: 'label' })).toBeVisible();
-  expect(screen.getByText('최근 수집 데이터 기준')).toBeVisible();
+  const period = screen.getByRole('combobox', { name: '관제 조회 기간' });
+  const periodLabel = document.querySelector('label[for="dashboard-period"]');
+  const periodHelp = screen.getByText('최근 수집 데이터 기준');
+  expect(periodLabel).toBeVisible();
+  expect(periodLabel).toHaveTextContent('조회 기간');
+  expect(periodLabel).toContainElement(periodHelp);
+  expect(periodHelp).toBeVisible();
+  expect(period).toHaveAccessibleDescription('최근 수집 데이터 기준');
   const summary = screen.getByLabelText('선택 인스턴스 요약');
-  expect(summary.querySelectorAll('.ant-card')).toHaveLength(4);
+  expect(summary.querySelectorAll(':scope > .ant-card')).toHaveLength(2);
   expect(summary.querySelectorAll('.ant-statistic')).toHaveLength(3);
   expect(within(summary).getByRole('link', { name: '실패 API 0개 목록' })).toHaveAttribute(
     'href',
     '/api-monitoring?project=alpha&instance=up&status=DOWN&usage=used',
   );
+});
+
+test('dashboard scope explains how to act on the selected instance', async () => {
+  view();
+  await ready();
+  expect(
+    screen.getByText('선택한 인스턴스의 상태를 확인하고 이상 근거에서 바로 조치로 이동합니다.'),
+  ).toBeVisible();
+});
+
+test('dashboard keeps three scoped filter fields in one toolbar', async () => {
+  view();
+  await ready();
+  const toolbar = screen.getByRole('form', { name: '대시보드 조회 범위' });
+  expect(within(toolbar).getByRole('combobox', { name: '대시보드 프로젝트 필터' })).toBeVisible();
+  expect(within(toolbar).getByRole('combobox', { name: '인스턴스 선택' })).toBeVisible();
+  expect(within(toolbar).getByRole('combobox', { name: '관제 조회 기간' })).toBeVisible();
+});
+
+test('priority and monitoring cards follow the dashboard reading order', async () => {
+  view();
+  const panel = await ready();
+  const priority = screen.getByRole('region', { name: '지금 처리할 장애' });
+  const summary = screen.getByLabelText('선택 인스턴스 요약');
+  const pool = await screen.findByRole('region', { name: 'DB 연결 풀' });
+  const issues = screen.getByRole('region', { name: '상태 이상 목록' });
+  expect(priority.closest('.dashboard-priority-grid')).toContainElement(summary);
+  expect(summary).toHaveTextContent('외부 서비스 정보');
+  expect(priority.compareDocumentPosition(pool) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(panel).toContainElement(pool);
+  expect(panel.compareDocumentPosition(issues) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(
+    within(panel).getByTestId('chart-CPU').closest('.dashboard-resource-grid'),
+  ).toContainElement(within(panel).getByTestId('chart-디스크'));
 });
 
 test('dropdown search selects another project then its first instance and clears the previous target', async () => {

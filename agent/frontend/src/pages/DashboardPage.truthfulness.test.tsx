@@ -5,7 +5,10 @@ import { afterEach, expect, test, vi } from 'vitest';
 import DashboardPage from './DashboardPage';
 
 const state = vi.hoisted(() => ({ causes: [] as Array<Record<string, unknown>> }));
-vi.mock('../components/ProjectScope', () => ({ useProjectScope: () => ({ project: 'alpha' }) }));
+vi.mock('../components/ProjectScope', () => ({
+  useProjectScope: () => ({ project: 'alpha' }),
+  ProjectSelector: () => null,
+}));
 vi.mock('../components/InstanceScope', () => ({ default: () => null }));
 vi.mock('../api', () => ({
   getDashboard: vi.fn(async () => ({
@@ -16,6 +19,7 @@ vi.mock('../api', () => ({
     status_causes: state.causes,
   })),
   getResources: vi.fn(),
+  getIncidents: vi.fn(async () => ({ items: [], page: 0, size: 50, total: 0 })),
 }));
 vi.mock('../components/MetricChart', () => ({
   default: () => <div />,

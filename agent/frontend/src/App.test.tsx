@@ -326,8 +326,12 @@ test('shell exposes Monitoring brand without filler and keeps skip navigation an
     'href',
     '#main-content',
   );
-  expect(screen.getAllByText('Monitoring')).toHaveLength(1);
-  expect(screen.queryAllByRole('img', { name: 'Monitoring' })).toHaveLength(0);
+  expect(document.querySelector('.monitor-side-brand-desktop')).toHaveTextContent('Monitoring');
+  expect(document.querySelector('.monitor-side-brand-mobile')).toHaveTextContent('Monitoring');
+  const brand = screen.getByRole('link', { name: '종합현황으로 이동' });
+  expect(within(brand).queryByRole('img', { name: 'Monitoring' })).not.toBeInTheDocument();
+  expect(brand.querySelector('img')).toHaveAttribute('src', '/monitoring.svg');
+  expect(brand.querySelector('img')).toHaveAttribute('alt', '');
   expect(screen.getByText('운영 모니터링')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'API 모니터링' })).toHaveAttribute(
     'aria-current',
@@ -337,6 +341,50 @@ test('shell exposes Monitoring brand without filler and keeps skip navigation an
   expect(
     screen.queryByText('외부·내부 API 점검 결과를 조회하고 재점검합니다.'),
   ).not.toBeInTheDocument();
+});
+
+test('mobile brand keeps a single link and a 34px decorative logo', async () => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((media: string) => ({
+      matches: media.startsWith('(max-width:'),
+      media,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    })),
+  );
+  app('/');
+  const brand = await screen.findByRole('link', { name: '종합현황으로 이동' });
+  expect(brand).toHaveAttribute('href', '/');
+  expect(brand.querySelectorAll('a')).toHaveLength(0);
+  expect(within(brand).queryByRole('img', { name: 'Monitoring' })).not.toBeInTheDocument();
+  const logo = brand.querySelector('img');
+  expect(logo).toHaveAttribute('alt', '');
+  expect(logo).toHaveAttribute('width', '34');
+  expect(logo).toHaveAttribute('height', '34');
+  expect(logo).toHaveStyle({ width: '34px', height: '34px' });
+});
+
+test('mobile page heading fits the compact 32px height constraint', async () => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((media: string) => ({
+      matches: media.startsWith('(max-width:'),
+      media,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    })),
+  );
+  app('/api-monitoring');
+  const heading = await screen.findByRole('heading', { name: 'API 모니터링' });
+  expect(heading).toHaveStyle({ fontSize: '24px' });
+  expect(
+    Number.parseFloat(heading.style.fontSize) * Number(heading.style.lineHeight),
+  ).toBeLessThanOrEqual(32);
 });
 
 // Vitest의 첫 lazy route 변환은 병렬 실행 시 10초 이상 걸릴 수 있음. 링크 계약은 그대로 검증.

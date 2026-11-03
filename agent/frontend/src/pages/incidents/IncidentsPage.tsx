@@ -1,6 +1,6 @@
 // 진행 중·복구된 장애 관리대장과 프로젝트별 조사 화면 진입
 import { ProTable, type ProColumns } from '@ant-design/pro-components';
-import { Button, Flex, Grid, Pagination, Select, Space, Tag, Typography } from 'antd';
+import { Button, Card, Flex, Grid, Pagination, Select, Space, Tag, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getIncidents } from '../../api';
@@ -127,35 +127,69 @@ export default function IncidentsPage() {
   return (
     <div className="incident-page">
       <Typography.Paragraph style={{ margin: 0 }} type="secondary">
-        처리할 장애를 확인하고, 항목을 눌러 원인과 조치 기록을 확인하세요.
+        담당 미지정 항목을 먼저 확인하고, 각 장애의 판정 근거와 조치 기록을 살펴보세요.
       </Typography.Paragraph>
-      <Flex gap="small" align="center" justify="space-between" wrap>
-        {compact ? (
-          <Select
-            aria-label="장애 상태 필터"
-            value={state}
-            onChange={(value) => change('state', value)}
-            style={{ flex: 1, minWidth: 160 }}
-            options={STATE_OPTIONS}
-          />
-        ) : (
-          <Space wrap role="group" aria-label="장애 상태 필터">
-            {STATE_OPTIONS.map(({ value, label }) => (
-              <Button
-                key={value}
-                aria-pressed={state === value}
-                type={state === value ? 'primary' : 'default'}
-                onClick={() => change('state', value)}
-              >
-                {label}
-              </Button>
-            ))}
-          </Space>
-        )}
-        <Button loading={query.isFetching} onClick={() => void query.refetch()}>
-          새로고침
-        </Button>
-      </Flex>
+      {query.data && (
+        <Card size="small" role="region" aria-label="장애 처리 현황">
+          <div className="incident-summary-grid">
+            <div>
+              전체 조건 <strong>{query.data.total}건</strong>
+            </div>
+            <div>
+              담당 미지정{' '}
+              <strong>{query.data.items.filter((item) => !item.assignee).length}건</strong>
+            </div>
+            <div>
+              미확인{' '}
+              <strong>{query.data.items.filter((item) => item.state === 'OPEN').length}건</strong>
+            </div>
+            <div>
+              조치 중{' '}
+              <strong>
+                {query.data.items.filter((item) => item.state === 'IN_PROGRESS').length}건
+              </strong>
+            </div>
+            <div>
+              확인됨{' '}
+              <strong>
+                {query.data.items.filter((item) => item.state === 'ACKNOWLEDGED').length}건
+              </strong>
+            </div>
+          </div>
+          <Typography.Text type="secondary">
+            상태·담당자별 수치는 현재 페이지 {query.data.items.length}건만 집계합니다.
+          </Typography.Text>
+        </Card>
+      )}
+      <Card size="small" role="region" aria-label="장애 상태 및 새로고침">
+        <Flex gap="small" align="center" justify="space-between" wrap>
+          {compact ? (
+            <Select
+              aria-label="장애 상태 필터"
+              value={state}
+              onChange={(value) => change('state', value)}
+              style={{ flex: 1, minWidth: 160 }}
+              options={STATE_OPTIONS}
+            />
+          ) : (
+            <Space wrap role="group" aria-label="장애 상태 필터">
+              {STATE_OPTIONS.map(({ value, label }) => (
+                <Button
+                  key={value}
+                  aria-pressed={state === value}
+                  type={state === value ? 'primary' : 'default'}
+                  onClick={() => change('state', value)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </Space>
+          )}
+          <Button loading={query.isFetching} onClick={() => void query.refetch()}>
+            새로고침
+          </Button>
+        </Flex>
+      </Card>
       <RefreshFailure
         visible={query.isError && Boolean(query.data)}
         updatedAt={query.dataUpdatedAt}
@@ -166,7 +200,7 @@ export default function IncidentsPage() {
       ) : !query.data ? (
         <Failure />
       ) : (
-        <>
+        <Card size="small" role="region" aria-label="장애 목록">
           <Flex gap="small" align="baseline" wrap>
             <Typography.Text strong>
               {state === 'ACTIVE' ? '진행 중' : state === '' ? '전체 이력' : incidentStates[state]}{' '}
@@ -203,7 +237,7 @@ export default function IncidentsPage() {
               />
             </>
           )}
-        </>
+        </Card>
       )}
     </div>
   );

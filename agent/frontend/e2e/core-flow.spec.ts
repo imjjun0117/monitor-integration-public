@@ -48,114 +48,141 @@ async function chooseOption(page: Page, label: string, option: string) {
   const control = page.getByRole('combobox', { name: label, exact: true });
   await control.click();
   await expect(control).toHaveAttribute('aria-expanded', 'true');
-  await page.locator('.ant-select-dropdown:visible').getByText(option, { exact: true }).click();
+  const dropdown = page.locator('.ant-select-dropdown:visible:not(.ant-slide-up-leave)');
+  await expect(dropdown).toHaveCSS('pointer-events', 'auto');
+  await dropdown.getByText(option, { exact: true }).click();
   // 선택 반영 전에 문서를 이동하여 프로젝트 범위 저장이 중단되지 않도록 검증
   await expect(control.locator('..')).toHaveAttribute('title', option);
   await expect(control).toHaveAttribute('aria-expanded', 'false');
-  // 닫힘 상태 변경 뒤 남는 애니메이션까지 완료된 후 다음 화면 검증
+  // 닫힘 모션 중 남은 팝업이 다음 선택의 포인터를 가리지 않도록 종료 확인
   await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0);
 }
 
-test('custom login and responsive dashboard meet visual behavior gates', async ({ page }) => {
-  mkdirSync(screenshotDirectory, { recursive: true });
-  const viewports = [
-    { name: '1440', width: 1440, height: 900 },
-    { name: '1024', width: 1024, height: 900 },
-    { name: '390', width: 390, height: 844 },
-  ];
-  for (const viewport of viewports) {
-    await page.setViewportSize(viewport);
-    await page.context().clearCookies();
-    await page.goto('/login');
-    await page.evaluate(() => sessionStorage.clear());
-    const loginBrand = page.locator('.login-brand').getByText('Monitoring', { exact: true });
-    await expect(loginBrand).toHaveCount(1);
-    await expect(loginBrand).toBeVisible();
-    const introduction = page.getByRole('complementary', { name: 'Monitoring 소개' });
-    if (viewport.width >= 1024) {
-      await expect(
-        introduction.getByRole('heading', { name: 'Monitoring', exact: true }),
-      ).toBeVisible();
-    } else {
-      await expect(introduction).toBeHidden();
-    }
-    await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.locator('h1')).toHaveText('Login');
-    await expect(page.getByText(/Hermes|운영|Please sign in|통합 모니터링/)).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
-    );
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    await page.screenshot({
-      path: resolve(screenshotDirectory, `login-${viewport.name}.png`),
-      fullPage: true,
-    });
+const dashboardViewports = [
+  { name: '1440', width: 1440, height: 900 },
+  { name: '1024', width: 1024, height: 900 },
+  { name: '390', width: 390, height: 844 },
+];
+test.describe('custom login and responsive dashboard visual behavior gates', () => {
+  for (const viewport of dashboardViewports) {
+    test(`viewport ${viewport.name}`, async ({ page }) => {
+      test.setTimeout(180_000);
+      mkdirSync(screenshotDirectory, { recursive: true });
+      await page.setViewportSize(viewport);
+      await page.context().clearCookies();
+      await page.goto('/login');
+      await page.evaluate(() => sessionStorage.clear());
+      const loginBrand = page.locator('.login-brand').getByText('Monitoring', { exact: true });
+      await expect(loginBrand).toHaveCount(1);
+      await expect(loginBrand).toBeVisible();
+      const introduction = page.getByRole('complementary', { name: 'Monitoring 소개' });
+      if (viewport.width >= 1024) {
+        await expect(
+          introduction.getByRole('heading', { name: 'Monitoring', exact: true }),
+        ).toBeVisible();
+      } else {
+        await expect(introduction).toBeHidden();
+      }
+      await expect(page.locator('h1')).toHaveCount(1);
+      await expect(page.locator('h1')).toHaveText('Login');
+      await expect(page.getByText(/Hermes|운영|Please sign in|통합 모니터링/)).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      await page.screenshot({
+        path: resolve(screenshotDirectory, `login-${viewport.name}.png`),
+        fullPage: true,
+      });
 
-    await login(page);
-    if (viewport.width === 390) {
-      await page.getByRole('button', { name: '메뉴 열기' }).click();
-    }
-    await expect(page.getByRole('menu', { name: '주 메뉴' }).getByRole('menuitem')).toHaveCount(8);
-    await expect(page.getByRole('link', { name: '종합 현황' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    if (viewport.width === 390) {
-      await page.getByRole('link', { name: '종합 현황', exact: true }).click();
-      await expect(page.getByRole('menu', { name: '주 메뉴' })).not.toBeVisible();
-    }
-    await expect(page.getByRole('heading', { name: /평균/ })).toHaveCount(0);
-    await expect(page.getByRole('combobox', { name: '프로젝트 선택' })).toBeVisible();
-    await chooseOption(page, '프로젝트 선택', '샘플 A');
-    await expect(page.getByRole('link', { name: /샘플 A \/ 샘플 A 1/ })).toBeVisible();
-    // docs/project-scoped-dashboard-plan.md: 한 서버의 조회 범위 유지와 프로젝트 변경 시 초기화 검증
-    const resourceResponse = page.waitForResponse((response) => {
-      const url = new URL(response.url());
-      return url.pathname.endsWith('/projects/sample-a/instances/local-02/resources');
-    });
-    await chooseOption(page, '인스턴스 선택', '샘플 A 2');
-    const resources = await resourceResponse;
-    expect(resources.ok()).toBe(true);
-    const resourceData = (await resources.json()) as ResourceResponse;
-    expect(resourceData.latest?.system_cpu_ratio).toBeNull();
-    expect(resourceData.history.length).toBeGreaterThan(0);
-    await expect(
-      page.getByRole('region', { name: '샘플 A / 샘플 A 2', exact: true }),
-    ).toBeVisible();
-    await expect(page.locator('.instance-dashboard')).toHaveCount(1);
-    await expect(page.getByRole('region', { name: '샘플 A / 샘플 A 1', exact: true })).toHaveCount(
-      0,
-    );
-    await expect(page).toHaveURL(/instance=local-02/);
-    await page.reload();
-    await expect(
-      page.getByRole('region', { name: '샘플 A / 샘플 A 2', exact: true }),
-    ).toBeVisible();
-    await expect(page).toHaveURL(/instance=local-02/);
-    await chooseOption(page, '프로젝트 선택', '샘플 B');
-    await expect(
-      page.getByRole('region', { name: '샘플 B / 샘플 B 1', exact: true }),
-    ).toBeVisible();
-    await expect(page).toHaveURL(/project=sample-b.*instance=local-01/);
-    await expect(page.getByRole('region', { name: '샘플 A / 샘플 A 2', exact: true })).toHaveCount(
-      0,
-    );
-    for (const title of ['CPU', 'RAM', 'JVM Heap', '디스크']) {
+      await login(page);
+      if (viewport.width === 390) {
+        await page.getByRole('button', { name: '메뉴 열기' }).click();
+      }
+      await expect(page.getByRole('menu', { name: '주 메뉴' }).getByRole('menuitem')).toHaveCount(
+        8,
+      );
+      await expect(page.getByRole('link', { name: '종합 현황' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      if (viewport.width === 390) {
+        await page.getByRole('link', { name: '종합 현황', exact: true }).click();
+        await expect(page.getByRole('menu', { name: '주 메뉴' })).not.toBeVisible();
+      }
+      await expect(page.getByRole('heading', { name: /평균/ })).toHaveCount(0);
+      const projectSelectorName =
+        viewport.width === 390 ? '대시보드 프로젝트 필터' : '프로젝트 선택';
       await expect(
-        page.getByRole('region', { name: `샘플 B / 샘플 B 1 · ${title} 그래프`, exact: true }),
+        page.getByRole('combobox', { name: projectSelectorName, exact: true }),
       ).toBeVisible();
-    }
-    await assertDashboardLayout(page);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    await page.screenshot({
-      path: resolve(screenshotDirectory, `dashboard-${viewport.name}.png`),
-      fullPage: true,
+      await chooseOption(page, projectSelectorName, '샘플 A');
+      await expect(page.getByRole('link', { name: /샘플 A \/ 샘플 A 1/ })).toBeVisible();
+      // docs/project-scoped-dashboard-plan.md: 한 서버의 조회 범위 유지와 프로젝트 변경 시 초기화 검증
+      const resourceResponse = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return url.pathname.endsWith('/projects/sample-a/instances/local-02/resources');
+      });
+      await chooseOption(page, '인스턴스 선택', '샘플 A 2');
+      const resources = await resourceResponse;
+      expect(resources.ok()).toBe(true);
+      const resourceData = (await resources.json()) as ResourceResponse;
+      expect(resourceData.latest?.system_cpu_ratio).toBeNull();
+      expect(resourceData.history.length).toBeGreaterThan(0);
+      await expect(
+        page.getByRole('region', { name: '샘플 A / 샘플 A 2', exact: true }),
+      ).toBeVisible();
+      await expect(page.locator('.instance-dashboard')).toHaveCount(1);
+      await expect(
+        page.getByRole('region', { name: '샘플 A / 샘플 A 1', exact: true }),
+      ).toHaveCount(0);
+      await expect(page).toHaveURL(/instance=local-02/);
+      await page.reload();
+      await expect(
+        page.getByRole('region', { name: '샘플 A / 샘플 A 2', exact: true }),
+      ).toBeVisible();
+      await expect(page).toHaveURL(/instance=local-02/);
+      await chooseOption(page, '프로젝트 선택', '샘플 B');
+      await expect(
+        page.getByRole('region', { name: '샘플 B / 샘플 B 1', exact: true }),
+      ).toBeVisible();
+      await expect(page).toHaveURL(/project=sample-b.*instance=local-01/);
+      await expect(
+        page.getByRole('region', { name: '샘플 A / 샘플 A 2', exact: true }),
+      ).toHaveCount(0);
+      for (const title of ['CPU', 'RAM', 'JVM Heap', '디스크']) {
+        await expect(
+          page.getByRole('region', { name: `샘플 B / 샘플 B 1 · ${title} 그래프`, exact: true }),
+        ).toBeVisible();
+      }
+      await page.screenshot({
+        path: resolve(screenshotDirectory, `dashboard-${viewport.name}.png`),
+        fullPage: true,
+      });
+      await assertDashboardLayout(page);
+      await page.getByRole('button', { name: /계정 메뉴/ }).click();
+      await page.getByRole('menuitem', { name: '라이트 모드로 전환' }).click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+      await expect(page.getByRole('menu', { name: '계정 메뉴' })).toBeHidden();
+      await expect(page.getByRole('region', { name: /CPU 그래프/ })).toBeVisible();
+      await page.screenshot({
+        path: resolve(screenshotDirectory, `dashboard-light-${viewport.name}.png`),
+        fullPage: true,
+      });
+      await assertDashboardLayout(page);
+      await page.getByRole('button', { name: /계정 메뉴/ }).click();
+      await page.getByRole('menuitem', { name: '다크 모드로 전환' }).click();
+      await expect(page.getByRole('menu', { name: '계정 메뉴' })).toBeHidden();
+      await expect(page.getByRole('region', { name: /CPU 그래프/ })).toBeVisible();
+      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      if (viewport.width === 390) {
+        await page.goto('/settings/projects');
+        await expect(page.getByText(/모바일에서는 조회만 지원/)).toBeVisible();
+        await expect(
+          page.getByRole('button', { name: '프로젝트 등록', exact: true }),
+        ).toBeDisabled();
+      }
     });
-    if (viewport.width === 390) {
-      await page.goto('/settings/projects');
-      await expect(page.getByText(/모바일에서는 조회만 지원/)).toBeVisible();
-      await expect(page.getByRole('button', { name: '프로젝트 등록', exact: true })).toBeDisabled();
-    }
   }
 });
 
@@ -353,11 +380,13 @@ test('all five real API filters, INTERNAL/EXTERNAL UI, and bounded rerun polling
   await expect(page.getByRole('row', { name: /내부 API E2E Internal API/ })).toBeVisible();
 });
 
-test('instance list exposes transport controls and reports real Collector start failures', async ({ page }) => {
+test('instance list exposes transport controls and reports real Collector start failures', async ({
+  page,
+}) => {
   await login(page);
   await page.goto('/settings/instances?project=sample-b');
   const requests: string[] = [];
-  page.on('request', request => {
+  page.on('request', (request) => {
     if (request.method() === 'POST') {
       requests.push(new URL(request.url()).pathname);
     }
@@ -385,14 +414,18 @@ test('instance list exposes transport controls and reports real Collector start 
     const start = dialog.getByRole('button', { name: '연결 시작', exact: true });
     await expect(start).toBeEnabled();
     expect(requests).toEqual([]);
-    const started = page.waitForResponse(response =>
-      new URL(response.url()).pathname.endsWith('/sample-b/instances/local-02/connection/start') &&
-      response.request().method() === 'POST',
+    const started = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname.endsWith(
+          '/sample-b/instances/local-02/connection/start',
+        ) && response.request().method() === 'POST',
     );
     await start.click();
     // HTTP 전용 테스트 Collector의 실제 404를 Agent가 시작 실패로 반환하는 경로 검증
     expect((await started).status()).toBe(503);
-    await expect(dialog.getByText('연결 요청에 실패했습니다. Collector 설정과 접속 가능 여부를 확인하세요.')).toBeVisible();
+    await expect(
+      dialog.getByText('연결 요청에 실패했습니다. Collector 설정과 접속 가능 여부를 확인하세요.'),
+    ).toBeVisible();
     await expect(dialog.getByText('연결 실패', { exact: true })).toBeVisible();
     expect(requests).toEqual(['/api/v1/projects/sample-b/instances/local-02/connection/start']);
     await page.setViewportSize({ width: 390, height: 844 });
@@ -672,7 +705,7 @@ test('project-limited viewer sees read-only UI and server denies privileged rout
   await page.locator('input[name="password"]').fill(viewerPassword);
   await page.getByRole('button', { name: 'Login' }).click();
   await expect(page.getByRole('heading', { name: '종합 현황' })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: '프로젝트 선택' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: '프로젝트 선택', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /샘플 A \/ 샘플 A 1/ })).toBeVisible();
   await page.goto('/settings/projects');
   await expect(page.getByRole('button', { name: '프로젝트 등록' })).toHaveCount(0);
@@ -707,17 +740,25 @@ async function assertDashboardLayout(page: Page) {
           insideViewport: box.left >= -tolerance && box.right <= innerWidth + tolerance,
         };
       });
-    const unclipped = [
+    const clipped = [
       ...document.querySelectorAll<HTMLElement>('[role="img"], .ant-card-head-title'),
     ]
       .filter((element) => element.offsetParent !== null)
-      .every((element) => element.scrollWidth <= element.clientWidth + tolerance);
+      .filter((element) => element.scrollWidth > element.clientWidth + tolerance)
+      .map((element) => ({
+        label: element.getAttribute('aria-label') ?? element.textContent?.slice(0, 80),
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+      }));
     const canvas = document.querySelector<HTMLElement>('.monitor-app-canvas')!;
     return {
       noDocumentOverflow: root.scrollWidth <= innerWidth,
       boxes,
-      unclipped,
-      canvasToBottom: canvas.getBoundingClientRect().bottom >= root.scrollHeight - tolerance,
+      clipped,
+      canvasToBottom:
+        canvas.getBoundingClientRect().bottom + scrollY >= root.scrollHeight - tolerance,
+      canvasBottom: canvas.getBoundingClientRect().bottom + scrollY,
+      rootHeight: root.scrollHeight,
       background: getComputedStyle(canvas).backgroundColor,
     };
   });
@@ -727,8 +768,11 @@ async function assertDashboardLayout(page: Page) {
     layout.boxes.every((box) => box.insideMain && box.insideViewport),
     JSON.stringify(layout.boxes),
   ).toBe(true);
-  expect(layout.unclipped).toBe(true);
-  expect(layout.canvasToBottom).toBe(true);
+  expect(layout.clipped, JSON.stringify(layout.clipped)).toEqual([]);
+  expect(
+    layout.canvasToBottom,
+    `canvas bottom ${layout.canvasBottom}, root ${layout.rootHeight}`,
+  ).toBe(true);
   expect(layout.background).not.toBe('rgba(0, 0, 0, 0)');
 }
 

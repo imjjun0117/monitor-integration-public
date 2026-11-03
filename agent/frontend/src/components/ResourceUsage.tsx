@@ -9,6 +9,7 @@ export default function ResourceUsage({
   unit = 'bytes',
   label,
   valueLabel,
+  dense = false,
 }: {
   used?: number | null;
   total?: number | null;
@@ -16,6 +17,7 @@ export default function ResourceUsage({
   unit?: 'bytes' | 'ratio';
   label?: string;
   valueLabel?: string;
+  dense?: boolean;
 }) {
   const { token } = theme.useToken();
   const usage = typeof used === 'number' && Number.isFinite(used) && used >= 0 ? used : null;
@@ -27,7 +29,10 @@ export default function ResourceUsage({
       {label && <span className="resource-usage-label">{label}</span>}
       <div className="resource-usage-heading">
         <div className="resource-usage-value" aria-label={valueLabel}>
-          <Typography.Text strong style={{ fontSize: token.fontSizeHeading3 }}>
+          <Typography.Text
+            strong
+            style={{ fontSize: dense ? token.fontSizeLG : token.fontSizeHeading3 }}
+          >
             {unit === 'ratio' ? formatPercent(usage) : formatBytes(usage, byteUnit)}
           </Typography.Text>
           {unit === 'bytes' && <span> / {formatBytes(capacity, byteUnit)}</span>}

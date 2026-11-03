@@ -8,10 +8,12 @@ export default function ServiceInfoCard({
   check,
   action,
   showServer = true,
+  embedded = false,
 }: {
   check: ApiCheck;
   action?: ReactNode;
   showServer?: boolean;
+  embedded?: boolean;
 }) {
   const { token } = theme.useToken();
   const info = check.service_info;
@@ -40,7 +42,12 @@ export default function ServiceInfoCard({
   return (
     <Card
       size="small"
-      styles={{ header: { paddingInline: token.padding }, body: { padding: token.padding } }}
+      variant={embedded ? 'borderless' : 'outlined'}
+      styles={
+        embedded
+          ? { header: { paddingInline: 0 }, body: { paddingInline: 0 } }
+          : { header: { paddingInline: token.padding }, body: { padding: token.padding } }
+      }
       role="region"
       aria-label={`서비스 정보 · ${info.title} · ${check.project_name ?? check.project_id} / ${check.instance_name ?? check.instance_id}`}
       title={<h3 style={{ fontSize: token.fontSizeLG, margin: 0 }}>{info.title}</h3>}

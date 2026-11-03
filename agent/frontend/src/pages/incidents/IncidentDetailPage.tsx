@@ -68,36 +68,39 @@ export default function IncidentDetailPage() {
       <Link to={`/incidents?${new URLSearchParams({ project: incident.project_id })}`}>
         ← 장애 관리대장
       </Link>
-      <Card title="장애 요약" aria-label="장애 요약">
+      <div className="incident-detail-heading">
+        <h1>{incidentTitle(incident)}</h1>
+        <p>
+          장애 #{id} · {incident.project_name} · {incident.instance_name ?? '프로젝트 공통'}
+        </p>
+      </div>
+      <Card title="장애 요약" aria-label="장애 요약" size="small">
         <Flex justify="space-between" align="center" wrap>
-          <div>
-            <span>장애 #{id}</span>
-            <h2>{incidentTitle(incident)}</h2>
-            <p>
-              {incident.project_name} · {incident.instance_name ?? '프로젝트 공통'}
-            </p>
-          </div>
+          <Space wrap>
+            <StatusLabel
+              status={incident.latest_observation.status}
+              context={
+                incident.kind === 'COLLECTION'
+                  ? 'collection'
+                  : incident.kind === 'METRIC'
+                    ? undefined
+                    : 'check'
+              }
+            />
+            <strong>{observationSummary(incident.latest_observation)}</strong>
+          </Space>
           <Tag>{incidentStates[incident.state]}</Tag>
         </Flex>
-        <Space wrap>
-          <StatusLabel
-            status={incident.latest_observation.status}
-            context={
-              incident.kind === 'COLLECTION'
-                ? 'collection'
-                : incident.kind === 'METRIC'
-                  ? undefined
-                  : 'check'
-            }
-          />
-          <strong>{observationSummary(incident.latest_observation)}</strong>
-        </Space>
         <RefreshFailure
           visible={query.isError}
           updatedAt={query.dataUpdatedAt}
           retry={() => void query.refetch()}
         />
-        <Descriptions column={{ xs: 1, sm: 2, lg: 3 }}>
+        <Descriptions
+          className="incident-detail-facts"
+          column={{ xs: 1, sm: 2, lg: 3, xl: 5 }}
+          size="small"
+        >
           <Descriptions.Item label="최초 감지">
             {incidentTime(incident.opened_at)}
           </Descriptions.Item>
@@ -126,6 +129,7 @@ export default function IncidentDetailPage() {
         )}
 
         <Collapse
+          size="small"
           items={[
             {
               key: 'comparison',
@@ -147,7 +151,11 @@ export default function IncidentDetailPage() {
         />
       </Card>
       <div className="incident-workspace">
-        <Card title="원인 조사" aria-label="장애 조사">
+        <Card
+          title={<h2 className="incident-section-heading">원인 조사</h2>}
+          aria-label="장애 조사"
+          role="region"
+        >
           <p className="field-help">확인할 시점을 선택하고, 당시의 자원·점검·로그를 살펴보세요.</p>
           <Space wrap className="incident-periods" role="group" aria-label="조사 기준 시점">
             <Button
@@ -210,13 +218,15 @@ export default function IncidentDetailPage() {
                             key: event.event_id,
                             children: (
                               <div>
-                                <div>
+                                <div className="incident-event-heading">
                                   <strong>
                                     {eventLabels[event.event_type] ?? event.event_type}
                                   </strong>
                                   <span>
-                                    {incidentTime(event.occurred_at)} ·{' '}
-                                    {event.actor === 'SYSTEM' ? '자동 판정' : event.actor}
+                                    <time dateTime={event.occurred_at}>
+                                      {incidentTime(event.occurred_at)}
+                                    </time>{' '}
+                                    · {event.actor === 'SYSTEM' ? '자동 판정' : event.actor}
                                   </span>
                                 </div>
                                 {event.event_type === 'ASSIGNED' && (
@@ -308,7 +318,7 @@ function IncidentActions({ detail }: { detail: IncidentDetail }) {
     },
   });
   if (!canWrite) {
-    return null;
+    return <Alert type="info" showIcon title="읽기 전용입니다. 장애 조치 권한이 없습니다." />;
   }
   const changed = version !== detail.incident.version && !mutation.isPending;
   const submit = (action: IncidentAction.action) => {
@@ -321,29 +331,24 @@ function IncidentActions({ detail }: { detail: IncidentDetail }) {
     });
   };
   return (
-    <>
-      <p className="mobile-readonly-notice">
-        담당자·조치 기록 변경은 데스크톱 화면에서 가능합니다.
-      </p>
-      <Card title="장애 처리" className="incident-actions" aria-label="장애 처리">
-        <p className="field-help">정상 상태가 확인되면 자동으로 복구 처리됩니다.</p>
-        <div className="incident-toolbar">
-          <Button
-            disabled={detail.incident.state !== 'OPEN' || mutation.isPending}
-            onClick={() => submit(IncidentAction.action.ACKNOWLEDGE)}
-          >
-            확인 처리
-          </Button>
-          <Button
-            disabled={
-              !['OPEN', 'ACKNOWLEDGED'].includes(detail.incident.state) || mutation.isPending
-            }
-            onClick={() => submit(IncidentAction.action.START)}
-          >
-            조치 시작
-          </Button>
-        </div>
-        <div className="incident-toolbar">
+    <Card title="장애 처리" className="incident-actions" aria-label="장애 처리">
+      <p className="field-help">정상 상태가 확인되면 자동으로 복구 처리됩니다.</p>
+      <div className="incident-toolbar">
+        <Button
+          disabled={detail.incident.state !== 'OPEN' || mutation.isPending}
+          onClick={() => submit(IncidentAction.action.ACKNOWLEDGE)}
+        >
+          확인 처리
+        </Button>
+        <Button
+          disabled={!['OPEN', 'ACKNOWLEDGED'].includes(detail.incident.state) || mutation.isPending}
+          onClick={() => submit(IncidentAction.action.START)}
+        >
+          조치 시작
+        </Button>
+      </div>
+      <Form layout="vertical" className="incident-action-form">
+        <div className="incident-toolbar incident-assignee-row">
           <Form.Item label="담당자" htmlFor="incident-assignee">
             <Select
               id="incident-assignee"
@@ -380,38 +385,45 @@ function IncidentActions({ detail }: { detail: IncidentDetail }) {
             onChange={(event) => setNote(event.target.value)}
           />
         </Form.Item>
-        <Button
-          disabled={!note.trim() || mutation.isPending}
-          onClick={() => submit(IncidentAction.action.COMMENT)}
-        >
-          메모 등록
-        </Button>
-        {saved && <p role="status">조치 기록을 저장했습니다.</p>}
-        {(changed || (mutation.error instanceof ApiError && mutation.error.status === 409)) && (
+      </Form>
+      <Button
+        disabled={!note.trim() || mutation.isPending}
+        onClick={() => submit(IncidentAction.action.COMMENT)}
+      >
+        메모 등록
+      </Button>
+      {saved && <p role="status">조치 기록을 저장했습니다.</p>}
+      {(changed || (mutation.error instanceof ApiError && mutation.error.status === 409)) && (
+        <Alert
+          type="warning"
+          title="장애 상태나 다른 담당자의 기록이 변경되었습니다."
+          action={
+            <Button
+              type="link"
+              onClick={() => {
+                setVersion(detail.incident.version);
+                setSaved(false);
+                mutation.reset();
+              }}
+            >
+              최신 상태로 계속 작성
+            </Button>
+          }
+          description="입력한 메모는 유지됩니다. 현재 상태와 담당자를 확인한 뒤 저장하세요."
+        />
+      )}
+      {mutation.isError &&
+        !(mutation.error instanceof ApiError && mutation.error.status === 409) && (
           <Alert
-            type="warning"
-            title="장애 상태나 다른 담당자의 기록이 변경되었습니다."
-            action={
-              <Button
-                type="link"
-                onClick={() => {
-                  setVersion(detail.incident.version);
-                  setSaved(false);
-                  mutation.reset();
-                }}
-              >
-                최신 상태로 계속 작성
-              </Button>
+            type="error"
+            title={
+              mutation.error instanceof ApiError && mutation.error.status === 403
+                ? '조치 권한이 없습니다. 관리자에게 권한을 확인하세요.'
+                : '조치 기록을 저장하지 못했습니다.'
             }
-            description="입력한 메모는 유지됩니다. 현재 상태와 담당자를 확인한 뒤 저장하세요."
           />
         )}
-        {mutation.isError &&
-          !(mutation.error instanceof ApiError && mutation.error.status === 409) && (
-            <Alert type="error" title="조치 기록을 저장하지 못했습니다." />
-          )}
-      </Card>
-    </>
+    </Card>
   );
 }
 
@@ -425,7 +437,11 @@ function Evidence({ data, incident }: { data: IncidentEvidence; incident: Incide
   return (
     <>
       <p className="incident-evidence-range">
-        {incidentTime(data.from)} ~ {incidentTime(data.to)}
+        <strong>조사 자료 범위</strong>
+        <span>
+          <time dateTime={data.from}>{incidentTime(data.from)}</time> ~{' '}
+          <time dateTime={data.to}>{incidentTime(data.to)}</time>
+        </span>
         <span>선택 시각 전후 15분</span>
       </p>
       <Tabs

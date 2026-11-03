@@ -4,17 +4,56 @@ import { useTheme } from '../theme';
 import type { XlogPage } from '../generated';
 
 export type XlogItem = XlogPage['items'][number];
+export type XlogZoom = { start: number; end: number };
+
+function zoomOptions(zoom?: XlogZoom) {
+  return zoom
+    ? { startValue: zoom.start, endValue: zoom.end, rangeMode: ['value', 'value'] as const }
+    : { start: 0, end: 100, rangeMode: ['percent', 'percent'] as const };
+}
+
 export default function XlogChart({
   items,
   onSelect,
+  rangeMinutes,
+  rangeEnd,
+  zoom,
+  onZoomChange,
 }: {
   items: XlogItem[];
   onSelect: (item: XlogItem) => void;
+  rangeMinutes?: number;
+  rangeEnd?: number;
+  zoom?: XlogZoom;
+  onZoomChange?: (zoom?: XlogZoom) => void;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const currentChart = useRef<import('echarts').ECharts | undefined>(undefined);
   const currentItems = useRef(items);
   currentItems.current = items;
+  const savedZoom = useRef(zoom);
+  const zoomChanged = useRef(onZoomChange);
+  zoomChanged.current = onZoomChange;
+  const updatingZoom = useRef(false);
+  const oldestPoint = Math.min(...items.map((item) => item.payload.started_at));
+  const newestPoint = Math.max(...items.map((item) => item.payload.started_at));
+  const liveRange = useRef<{ min?: number; max?: number }>({});
+  liveRange.current = {
+    min:
+      rangeMinutes && rangeEnd
+        ? Math.min(rangeEnd - rangeMinutes * 60_000, oldestPoint)
+        : undefined,
+    max: rangeEnd ? Math.max(rangeEnd, newestPoint) : undefined,
+  };
+  const currentRange = useRef<{ min?: number; max?: number }>({});
+  currentRange.current = {
+    min: savedZoom.current
+      ? Math.min(liveRange.current.min ?? savedZoom.current.start, savedZoom.current.start)
+      : liveRange.current.min,
+    max: savedZoom.current
+      ? Math.max(liveRange.current.max ?? savedZoom.current.end, savedZoom.current.end)
+      : liveRange.current.max,
+  };
   const theme = useTheme();
   useEffect(() => {
     let disposed = false;
@@ -30,12 +69,12 @@ export default function XlogChart({
       const series = [
         {
           name: 'HTTP 2xx·3xx',
-          color: '#4bd9f5',
+          color: theme === 'dark' ? '#4bd9f5' : '#0085a4',
           matches: (item: XlogItem) => item.payload.status < 400,
         },
         {
           name: 'HTTP 4xx·5xx',
-          color: '#f78fa6',
+          color: theme === 'dark' ? '#f78fa6' : '#c43a64',
           matches: (item: XlogItem) => item.payload.status >= 400,
         },
       ];
@@ -76,6 +115,8 @@ export default function XlogChart({
           },
           xAxis: {
             type: 'time',
+            min: currentRange.current.min,
+            max: currentRange.current.max,
             splitNumber: 4,
             axisLabel: { color, hideOverlap: true },
             axisLine: { lineStyle: { color: '#35516e' } },
@@ -91,7 +132,7 @@ export default function XlogChart({
             },
           },
           dataZoom: [
-            { type: 'inside' },
+            { type: 'inside', ...zoomOptions(savedZoom.current) },
             {
               type: 'slider',
               bottom: 8,
@@ -99,12 +140,13 @@ export default function XlogChart({
               borderColor: 'transparent',
               fillerColor: 'rgba(167,139,250,.18)',
               textStyle: { color },
+              ...zoomOptions(savedZoom.current),
             },
           ],
           series: series.map((series) => ({
             name: series.name,
             type: 'scatter',
-            symbolSize: 2.5,
+            symbolSize: 6,
             itemStyle: { color: series.color, opacity: 0.8 },
             emphasis: { scale: 2 },
             data: currentItems.current.filter(series.matches).map((item) => ({
@@ -138,6 +180,51 @@ export default function XlogChart({
           onSelect(item);
         }
       });
+      chart.on('datazoom', () => {
+        if (updatingZoom.current || !chart) {
+          return;
+        }
+        const view = chart.getOption() as {
+          xAxis: Array<{ min?: number; max?: number }>;
+          dataZoom: Array<{
+            startValue?: number;
+            endValue?: number;
+            start: number;
+            end: number;
+          }>;
+        };
+        const axis = view.xAxis[0];
+        const selected = view.dataZoom[0];
+        const min = axis?.min ?? currentRange.current.min;
+        const max = axis?.max ?? currentRange.current.max;
+        if (!selected || min === undefined || max === undefined) {
+          return;
+        }
+        // 사용자 선택을 축의 절대 시각으로 보관하여 조회 시간축 이동과 분리
+        const next =
+          selected.start === 0 && selected.end === 100
+            ? undefined
+            : {
+                start: selected.startValue ?? min + ((max - min) * selected.start) / 100,
+                end: selected.endValue ?? min + ((max - min) * selected.end) / 100,
+              };
+        if (savedZoom.current?.start === next?.start && savedZoom.current?.end === next?.end) {
+          return;
+        }
+        savedZoom.current = next;
+        zoomChanged.current?.(next);
+      });
+      chart.on('restore', () => {
+        savedZoom.current = undefined;
+        currentRange.current = liveRange.current;
+        updatingZoom.current = true;
+        chart?.setOption({
+          xAxis: liveRange.current,
+          dataZoom: [zoomOptions(), zoomOptions()],
+        });
+        updatingZoom.current = false;
+        zoomChanged.current?.(undefined);
+      });
       observer = new ResizeObserver(() => chart?.resize());
       observer.observe(element.current);
     });
@@ -149,15 +236,23 @@ export default function XlogChart({
     };
   }, [theme, onSelect]);
   useEffect(() => {
-    // 갱신 시 데이터만 교체하여 사용자가 확대한 시간 범위 유지
-    currentChart.current?.setOption({
+    const chart = currentChart.current;
+    if (!chart) {
+      return;
+    }
+    // 축 갱신 시 절대 선택값을 재적용하여 새 자료에서도 같은 시각 유지
+    updatingZoom.current = true;
+    chart.setOption({
+      xAxis: currentRange.current,
+      dataZoom: [zoomOptions(savedZoom.current), zoomOptions(savedZoom.current)],
       series: [false, true].map((errors) => ({
         data: items
           .filter((item) => item.payload.status >= 400 === errors)
           .map((item) => ({ value: [item.payload.started_at, item.payload.duration_ms], item })),
       })),
     });
-  }, [items]);
+    updatingZoom.current = false;
+  }, [items, rangeMinutes, rangeEnd]);
   return (
     <div
       ref={element}

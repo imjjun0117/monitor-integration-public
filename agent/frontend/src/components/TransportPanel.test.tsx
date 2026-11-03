@@ -88,6 +88,40 @@ it('blocks duplicate operations across panels for the same instance', async () =
   client.clear();
 });
 
+it('compact connection status retains the settings route and connection control', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <MemoryRouter>
+      <QueryClientProvider client={client}>
+        <TransportPanel projectId="sample-a" instanceId="prod" compact showSettingsLink />
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+  const region = await screen.findByRole('region', { name: 'Collector 연결 상태' });
+  expect(region).toHaveClass('ant-card-small');
+  expect(region).toContainElement(screen.getByRole('button', { name: '연결 시작' }));
+  expect(region).toContainElement(screen.getByRole('link', { name: '인스턴스 설정 →' }));
+  expect(screen.getByRole('link', { name: '인스턴스 설정 →' })).toHaveAttribute(
+    'href',
+    '/settings/instances?project=sample-a',
+  );
+  client.clear();
+});
+
+it('compact settings panel does not link back to itself', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <MemoryRouter>
+      <QueryClientProvider client={client}>
+        <TransportPanel projectId="sample-a" instanceId="prod" compact />
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+  await screen.findByRole('button', { name: '연결 시작' });
+  expect(screen.queryByRole('link', { name: '인스턴스 설정 →' })).not.toBeInTheDocument();
+  client.clear();
+});
+
 it('shows a state-query failure without offering a connection action', async () => {
   vi.mocked(DefaultService.getConnection).mockRejectedValue(new Error('unavailable'));
   const start = vi.spyOn(DefaultService, 'startConnection');

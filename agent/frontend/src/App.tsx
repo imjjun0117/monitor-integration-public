@@ -37,6 +37,9 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const XlogPage = lazy(() => import('./pages/XlogPage'));
 const LiveLogsPage = lazy(() => import('./pages/LiveLogsPage'));
 const MOBILE_NAVIGATION_QUERY = '(max-width: 991px)';
+const BRAND_LOGO = (
+  <img src="/monitoring.svg" alt="" width={34} height={34} style={{ width: 34, height: 34 }} />
+);
 
 type NavigationItem = { label: string; to: string; icon: ReactNode };
 type VisibleNavigationItem = NavigationItem & { sort: number; canRead?: boolean };
@@ -116,6 +119,7 @@ export default function App() {
 
 function AppLayout() {
   const { token } = antTheme.useToken();
+  const appearance = useTheme();
   const screens = Grid.useBreakpoint();
   const [collapsed, setCollapsed] = useState(
     () => window.matchMedia(MOBILE_NAVIGATION_QUERY).matches,
@@ -148,13 +152,22 @@ function AppLayout() {
       </a>
       <ProLayout
         className="monitor-pro-layout"
-        layout="mix"
+        layout="side"
+        siderWidth={224}
         splitMenus={false}
         title="Monitoring"
-        logo="/monitoring.svg"
+        logo={BRAND_LOGO}
+        menuExtraRender={(layout) =>
+          layout.collapsed ? null : (
+            <span className="monitor-sidebar-eyebrow" style={{ color: token.colorTextTertiary }}>
+              WORKSPACE
+            </span>
+          )
+        }
         token={{
           bgLayout: token.colorBgLayout,
           header: {
+            heightLayoutHeader: screens.lg === false ? 104 : 64,
             colorBgHeader: token.colorBgContainer,
             colorHeaderTitle: token.colorText,
             colorTextMenu: token.colorTextSecondary,
@@ -162,6 +175,7 @@ function AppLayout() {
           },
           sider: {
             colorMenuBackground: token.colorBgContainer,
+            colorBgMenuItemSelected: appearance === 'dark' ? '#2a1e49' : '#ede9fe',
             colorTextMenu: token.colorTextSecondary,
             colorTextMenuSelected: token.colorLink,
             colorTextMenuItemHover: token.colorLinkHover,
@@ -209,36 +223,68 @@ function AppLayout() {
             icon={layout.collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           />
         )}
-        actionsRender={() => [<ProjectSelector key="project" />, <UserMenu key="user" />]}
-        headerTitleRender={(logo, title) => (
-          <Link to="/" aria-label="종합현황으로 이동" style={{ gap: token.marginSM }}>
-            {logo}
-            {title}
-            <span style={{ fontSize: token.fontSizeSM, color: token.colorTextSecondary }}>
-              운영 모니터링
+        actionsRender={(layout) =>
+          layout.isMobile ? [<ProjectSelector key="project" />, <UserMenu key="user" />] : []
+        }
+        menuHeaderRender={() => (
+          <Link
+            to="/"
+            aria-label="종합현황으로 이동"
+            className="monitor-side-brand"
+            style={{ color: token.colorText }}
+          >
+            {BRAND_LOGO}
+            <span>
+              <strong className="monitor-side-brand-desktop">Monitoring</strong>
+              <strong className="monitor-side-brand-mobile">Monitoring</strong>
+              <small style={{ color: token.colorTextTertiary }}>운영 모니터링</small>
             </span>
           </Link>
         )}
-        menuHeaderRender={false}
         contentWidth="Fluid"
       >
+        <header className="monitor-workspace-header" aria-label="워크스페이스 헤더">
+          <div className="monitor-workspace-location">
+            <Button
+              type="text"
+              aria-label={collapsed ? '사이드 메뉴 펼치기' : '사이드 메뉴 접기'}
+              aria-expanded={!collapsed}
+              onClick={() => setCollapsed(!collapsed)}
+              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            />
+            <span className="monitor-workspace-path">
+              WORKSPACE /{' '}
+              {pathname.startsWith('/incidents/') ? '장애 상세' : pageTitle(pathname, search)}
+            </span>
+          </div>
+          <div className="monitor-workspace-actions">
+            <ProjectSelector id="workspace-project-select" />
+            <UserMenu />
+          </div>
+        </header>
         <section id="main-content" tabIndex={-1}>
           <PageContainer
+            header={{ style: { paddingInline: screens.lg ? 32 : token.padding } }}
+            childrenContentStyle={{ paddingInline: screens.lg ? 32 : token.padding }}
             token={{
-              paddingInlinePageContainerContent: screens.md ? token.paddingLG : token.padding,
+              paddingInlinePageContainerContent: screens.lg ? 32 : token.padding,
               paddingBlockPageContainerContent: token.paddingLG,
             }}
             title={
-              <h1
-                style={{
-                  fontSize: 'inherit',
-                  lineHeight: 'inherit',
-                  margin: 0,
-                  whiteSpace: 'normal',
-                }}
-              >
-                {pageTitle(pathname, search)}
-              </h1>
+              pathname.startsWith('/incidents/') ? (
+                false
+              ) : (
+                <h1
+                  style={{
+                    fontSize: screens.lg ? (pathname === '/xlog' ? 26 : 28) : 24,
+                    lineHeight: screens.lg ? 1.4 : 1.3,
+                    margin: 0,
+                    whiteSpace: 'normal',
+                  }}
+                >
+                  {pageTitle(pathname, search)}
+                </h1>
+              )
             }
           >
             <Suspense fallback={<div role="status">화면을 불러오는 중입니다.</div>}>
@@ -290,6 +336,9 @@ function RouteAccess({ children }: { children: ReactNode }) {
 }
 
 function pageTitle(pathname: string, search: string) {
+  if (pathname === '/incidents') {
+    return '장애 관리대장';
+  }
   if (pathname === '/instances') {
     return new URLSearchParams(search).get('collection') === 'UP'
       ? '수집 정상 서버'

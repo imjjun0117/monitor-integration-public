@@ -10,11 +10,13 @@ export default function TransportPanel({
   projectId,
   instanceId,
   compact = false,
+  showSettingsLink = !compact,
   isDisabled = false,
 }: {
   projectId: string;
   instanceId: string;
   compact?: boolean;
+  showSettingsLink?: boolean;
   isDisabled?: boolean;
 }) {
   const client = useQueryClient();
@@ -74,6 +76,7 @@ export default function TransportPanel({
       role="region"
       aria-label="Collector 연결 상태"
       size={compact ? 'small' : 'medium'}
+      className={compact ? 'transport-panel-compact' : undefined}
       title={compact ? undefined : state.data.mode === 'WSS' ? '웹소켓 수집' : 'HTTP 수집'}
     >
       <Space wrap>
@@ -94,7 +97,7 @@ export default function TransportPanel({
             {connected ? '연결 종료' : '연결 시작'}
           </Button>
         )}
-        {!compact && (
+        {showSettingsLink && (
           <Link to={'/settings/instances?' + new URLSearchParams({ project: projectId })}>
             인스턴스 설정 →
           </Link>
